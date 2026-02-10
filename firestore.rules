@@ -16,7 +16,7 @@ service cloud.firestore {
 
     match /stories/{storyId} {
       allow read: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/stories/$(storyId)).data.familyId)).data.ownerUid;
-      allow create: if request.auth != null;
+      allow create: if false;
     }
 
     match /characters/{characterId} {
