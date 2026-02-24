@@ -1,53 +1,47 @@
-# To learn more about how to use Nix to configure your environment
-# see: https://developers.google.com/idx/guides/customize-idx-env
 { pkgs, ... }: {
+  # To learn more about how to use Nix to configure your environment
+  # see: https://developers.google.com/idx/guides/customize-idx-env
+
   # Which nixpkgs channel to use.
   channel = "stable-24.05"; # or "unstable"
+
   # Use https://search.nixos.org/packages to find packages
   packages = [
-    # pkgs.go
-    # pkgs.python311
-    # pkgs.python311Packages.pip
-    # pkgs.nodejs_20
-    # pkgs.nodePackages.nodemon
+    # Add nodejs so we can run npm.
+    pkgs.nodejs_20
+    # Add firebase-tools for the firebase CLI.
+    pkgs.nodePackages.firebase-tools
   ];
-  # Sets environment variables in the workspace
-  env = {};
-  idx = {
-    # Search for the extensions you want on https://open-vsx.org/ and use "publisher.id"
-    extensions = [
-      # "vscodevim.vim"
-      "google.gemini-cli-vscode-ide-companion"
-    ];
-    # Enable previews
-    previews = {
-      enable = true;
-      previews = {
-        # web = {
-        #   # Example: run "npm run dev" with PORT set to IDX's defined port for previews,
-        #   # and show it in IDX's web preview panel
-        #   command = ["npm" "run" "dev"];
-        #   manager = "web";
-        #   env = {
-        #     # Environment variables to set for your server
-        #     PORT = "$PORT";
-        #   };
-        # };
-      };
+
+  # Set up workspace lifecycle hooks.
+  idx.workspace = {
+    # Run commands when the workspace is first created.
+    onCreate = {
+      # Install npm dependencies in the functions directory.
+      npm-install = "cd functions && npm install";
     };
-    # Workspace lifecycle hooks
-    workspace = {
-      # Runs when a workspace is first created
-      onCreate = {
-        # Example: install JS dependencies from NPM
-        # npm-install = "npm install";
-        # Open editors for the following files by default, if they exist:
-        default.openFiles = [ ".idx/dev.nix" "README.md" ];
+    # Run commands every time the workspace is (re)started.
+    onStart = {
+      # Start the Firebase Functions emulator.
+      start-emulator = "cd functions && npm run serve";
+    };
+  };
+
+  # Configure a web preview for your application.
+  idx.previews = {
+    enable = true;
+    previews = {
+      # Preview for the Firebase emulator UI
+      emulator-ui = {
+        command = ["echo", "Firebase emulator running on http://localhost:4000"];
+        manager = "web";
+        port = 4000;
       };
-      # Runs when the workspace is (re)started
-      onStart = {
-        # Example: start a background task to watch and re-build backend code
-        # watch-backend = "npm run watch-backend";
+      # Preview for the functions endpoint
+      functions = {
+        command = ["echo", "Functions emulator running on http://localhost:5001"];
+        manager = "web";
+        port = 5001;
       };
     };
   };

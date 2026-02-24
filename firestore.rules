@@ -2,25 +2,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Default-deny rule: All access is denied unless explicitly allowed in a nested match.
+    // This is the most critical security feature of a sealed system.
     match /{document=**} {
       allow read, write: if false;
     }
 
+    // Families can be read and written to only by their designated owner.
     match /families/{familyId} {
       allow read, write: if request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid;
     }
 
+    // Children can be read and written to only by the owner of their family.
     match /children/{childId} {
       allow read, write: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/children/$(childId)).data.familyId)).data.ownerUid;
     }
 
+    // Stories can be read only by the owner of their family.
+    // Client-side story creation, modification, or deletion is forbidden.
     match /stories/{storyId} {
       allow read: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/stories/$(storyId)).data.familyId)).data.ownerUid;
-      allow create: if false;
+      allow write: if false;
     }
 
+    // Characters can be read only by the owner of their associated family, enforcing consistent data boundaries.
+    // This completes the sealing of the system.
     match /characters/{characterId} {
-      allow read: if true;
+      allow read: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/characters/$(characterId)).data.familyId)).data.ownerUid;
+      allow write: if false;
     }
   }
 }
