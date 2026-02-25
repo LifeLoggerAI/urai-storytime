@@ -1,47 +1,57 @@
 { pkgs, ... }: {
-  # To learn more about how to use Nix to configure your environment
-  # see: https://developers.google.com/idx/guides/customize-idx-env
+  # The channel determines which package versions are available.
+  channel = "stable-23.11"; # or "unstable"
 
-  # Which nixpkgs channel to use.
-  channel = "stable-24.05"; # or "unstable"
-
-  # Use https://search.nixos.org/packages to find packages
+  # A list of packages to install.
   packages = [
-    # Add nodejs so we can run npm.
+    pkgs.firebase-tools
     pkgs.nodejs_20
-    # Add firebase-tools for the firebase CLI.
-    pkgs.nodePackages.firebase-tools
   ];
 
-  # Set up workspace lifecycle hooks.
-  idx.workspace = {
-    # Run commands when the workspace is first created.
-    onCreate = {
-      # Install npm dependencies in the functions directory.
-      npm-install = "cd functions && npm install";
-    };
-    # Run commands every time the workspace is (re)started.
-    onStart = {
-      # Start the Firebase Functions emulator.
-      start-emulator = "cd functions && npm run serve";
-    };
+  # A set of environment variables to define.
+  env = {
+    FIREBASE_EMULATOR_HUB = "localhost:4400";
   };
 
-  # Configure a web preview for your application.
-  idx.previews = {
-    enable = true;
+  # Workspace lifecycle hooks.
+  idx = {
+    # VS Code extensions to install.
+    extensions = [
+      "dbaeumer.vscode-eslint"
+      "googlecloudtools.cloudcode"
+    ];
+
+    # Workspace lifecycle hooks.
+    workspace = {
+      # Runs when a workspace is first created.
+      onCreate = {
+        "npm-install" = "npm --prefix functions install";
+      };
+      # Runs every time the workspace is (re)started.
+      onStart = {
+        "start-emulator" = "firebase emulators:start";
+      };
+    };
+
+    # Configure a web preview for your application.
     previews = {
       # Preview for the Firebase emulator UI
-      emulator-ui = {
-        command = ["echo", "Firebase emulator running on http://localhost:4000"];
+      "emulator-ui" = {
+        command = [ "echo" "Firebase emulator running on http://localhost:4000" ];
         manager = "web";
         port = 4000;
       };
       # Preview for the functions endpoint
       functions = {
-        command = ["echo", "Functions emulator running on http://localhost:5001"];
+        command = [ "echo" "Functions emulator running on http://localhost:5001" ];
         manager = "web";
         port = 5001;
+      };
+      # Preview for the hosting endpoint
+      hosting = {
+        command = [ "echo" "Hosting emulator running on http://localhost:5000" ];
+        manager = "web";
+        port = 5000;
       };
     };
   };
