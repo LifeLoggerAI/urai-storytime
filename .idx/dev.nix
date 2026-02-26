@@ -25,31 +25,32 @@
     workspace = {
       # Runs when a workspace is first created.
       onCreate = {
-        "npm-install" = "npm --prefix functions install";
+        npmInstall = "npm --prefix functions install";
       };
       # Runs every time the workspace is (re)started.
       onStart = {
-        "start-emulator" = "firebase emulators:start";
+        # Start the Firebase emulator in the background.
+        startEmulator = "firebase emulators:start &";
       };
     };
 
     # Configure a web preview for your application.
     previews = {
       # Preview for the Firebase emulator UI
-      "emulator-ui" = {
-        command = [ "echo" "Firebase emulator running on http://localhost:4000" ];
+      emulatorUi = {
+        command = "echo 'Firebase emulator running on http://localhost:4000'";
         manager = "web";
         port = 4000;
       };
       # Preview for the functions endpoint
       functions = {
-        command = [ "echo" "Functions emulator running on http://localhost:5001" ];
+        command = "echo 'Functions emulator running on http://localhost:5001'";
         manager = "web";
         port = 5001;
       };
       # Preview for the hosting endpoint
       hosting = {
-        command = [ "echo" "Hosting emulator running on http://localhost:5000" ];
+        command = "echo 'Hosting emulator running on http://localhost:5000'";
         manager = "web";
         port = 5000;
       };
