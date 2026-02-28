@@ -1,8 +1,29 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read, write: if false;
+    // Disallow any public read access by default.
+    // All content should be served via short-lived signed URLs.
+    allow read: if false;
+
+    // Disallow any client-side writes.
+    // All uploads should be handled by a secure admin pipeline.
+    allow write: if false;
+
+    // Fine-grained rules for specific paths if needed in the future,
+    // but for V1, we default to the most secure posture.
+    match /voice/{allPaths=**} {
+      // Reads are still disallowed, access is via signed URL.
+      allow read: if false;
+      // Client-side writes are explicitly forbidden.
+      allow write: if false;
+    }
+
+    match /images/{allPaths=**} {
+      // Reads are still disallowed, access is via signed URL.
+      allow read: if false;
+      // Client-side writes are explicitly forbidden.
+      allow write: if false;
     }
   }
 }

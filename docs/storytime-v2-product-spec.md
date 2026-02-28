@@ -6,7 +6,7 @@
 
 ## 1. Overview
 
-URAI Storytime V2 is a parent-guided magical story world designed to grow with a child. It is a "soft entry point" into the URAI ecosystem, focused on wonder, safety, and emotional continuity. Phase 1 targets ages 3-8.
+URAI Storytime V2 is a parent-guided magical story world designed to grow with a child, focused on wonder, safety, and emotional continuity. Phase 1 targets ages 3-8.
 
 ## 2. Core Philosophy
 

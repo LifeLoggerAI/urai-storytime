@@ -1,22 +1,75 @@
-## What StoryTime Is
-StoryTime is a quiet place for stories.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storytime V2</title>
+    <script src="/__/firebase/9.6.1/firebase-app-compat.js"></script>
+    <script src="/__/firebase/9.6.1/firebase-auth-compat.js"></script>
+    <script src="/__/firebase/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/9.6.1/firebase-functions-compat.js"></script>
+    <script src="/__/firebase/init.js"></script>
+    <style>
+        /* ... existing styles ... */
+        .danger-button { background-color: #dc3545; }
+    </style>
+</head>
+<body>
 
-It offers slow, repeating narratives that end in calm. Stories are not personalized, measured, or optimized. Silence is allowed. Nothing needs to be learned or completed.
+<div class="container">
+    <!-- ... existing auth and family containers ... -->
 
-StoryTime is designed to be returned to gently, night after night, without pressure or performance.
+    <div id="story-container" class="hidden">
+        <h2>2. Manage & Generate</h2>
+        <p>Family ID: <span id="familyIdDisplay"></span></p>
+        
+        <label for="child-select">Choose a child:</label>
+        <select id="child-select"></select>
+        <button id="viewHistoryButton">View History</button>
+        <button id="deleteChildButton" class="danger-button">Delete Child</button>
 
-## What StoryTime Is Not
-StoryTime is not an educational program. It does not track attention, behavior, or progress. It does not ask children questions about themselves. It does not try to improve, fix, or accelerate development.
+        <br><br>
+        <label for="mode-select">Choose a mode:</label>
+        <select id="mode-select">
+            <option value="day">Day</option>
+            <option value="night">Night</option>
+        </select>
+        <br><br>
+        <button id="generateStoryButton">Get Story</button>
+    </div>
 
-## What Parents Should Expect
-- Familiar stories told slowly
-- Calm endings
-- No scores, streaks, or rewards
-- No summaries or reports
+    <!-- ... other containers: history, player, expansion ... -->
+</div>
 
-If StoryTime ever feels rushed, loud, or demanding, something has gone wrong.
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // ... existing setup: auth, functions, db, ui elements ...
+        const deleteChildButton = document.getElementById('deleteChildButton');
+        const deleteChildDataFunc = functions.httpsCallable('deleteChildData');
 
-## Why StoryTime Exists
-StoryTime exists to witness a child, not shape them.
+        // ... existing listeners for signIn, createFamily, etc. ...
 
-It is meant to be a steady presence — something that can exist alongside family life without competing for attention.
+        deleteChildButton.onclick = async () => {
+            const childId = ui.childSelect.value;
+            const childName = ui.childSelect.options[ui.childSelect.selectedIndex].text;
+            if (!childId) return showError("Please select a child to delete.");
+
+            if (confirm(`Are you sure you want to delete all data for ${childName}? This cannot be undone.`)) {
+                try {
+                    const result = await deleteChildDataFunc({ familyId, childId });
+                    if (result.data.success) {
+                        showResponse(`All data for ${childName} has been deleted.`);
+                        await fetchAndPopulateChildren(familyId);
+                    } else {
+                        showError(result.data.error || 'Failed to delete child data.');
+                    }
+                } catch (err) { showError(err.message); }
+            }
+        };
+
+        // ... rest of the script ...
+    });
+</script>
+
+</body>
+</html>

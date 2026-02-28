@@ -2,34 +2,60 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default-deny rule: All access is denied unless explicitly allowed in a nested match.
-    // This is the most critical security feature of a sealed system.
-    match /{document=**} {
-      allow read, write: if false;
+
+    // Helper functions for clarity and reuse
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Families can be read and written to only by their designated owner.
+    // Checks if the requesting user is the owner of a specific family document
+    function isFamilyOwner(familyId) {
+      return isAuthenticated()
+        && request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid;
+    }
+
+    // Rules for the 'families' collection
     match /families/{familyId} {
-      allow read, write: if request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid;
-    }
 
-    // Children can be read and written to only by the owner of their family.
-    match /children/{childId} {
-      allow read, write: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/children/$(childId)).data.familyId)).data.ownerUid;
-    }
+      // A user can read their own family document.
+      allow read: if isFamilyOwner(familyId);
 
-    // Stories can be read only by the owner of their family.
-    // Client-side story creation, modification, or deletion is forbidden.
-    match /stories/{storyId} {
-      allow read: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/stories/$(storyId)).data.familyId)).data.ownerUid;
-      allow write: if false;
-    }
+      // A new family document can be created by any authenticated user,
+      // as long as they set themselves as the owner.
+      allow create: if isAuthenticated()
+                    && request.resource.data.ownerUid == request.auth.uid;
 
-    // Characters can be read only by the owner of their associated family, enforcing consistent data boundaries.
-    // This completes the sealing of the system.
-    match /characters/{characterId} {
-      allow read: if request.auth.uid == get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/characters/$(characterId)).data.familyId)).data.ownerUid;
-      allow write: if false;
+      // The owner can update or delete their family document.
+      allow update, delete: if isFamilyOwner(familyId);
+
+      // Rules for the 'children' subcollection
+      match /children/{childId} {
+        // Only the family owner can manage child documents.
+        allow read, write: if isFamilyOwner(familyId);
+      }
+
+      // Rules for the 'stories' subcollection
+      match /stories/{storyId} {
+        // Only the family owner can read stories.
+        allow read: if isFamilyOwner(familyId);
+
+        // Stories are created by a backend function, not the client.
+        allow create: if false;
+
+        // Clients can only update the 'isRead' status of a story.
+        allow update: if isFamilyOwner(familyId)
+                      && request.resource.data.diff(resource.data).changedKeys()
+                         .hasOnly(["isRead"]);
+
+        // The family owner can delete stories.
+        allow delete: if isFamilyOwner(familyId);
+      }
+
+      // Rules for the 'settings' subcollection
+      match /settings/{settingsDoc} {
+        // The family owner has full control over their settings.
+        allow read, write: if isFamilyOwner(familyId);
+      }
     }
   }
 }

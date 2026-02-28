@@ -1,58 +1,54 @@
 { pkgs, ... }: {
-  # The channel determines which package versions are available.
-  channel = "stable-23.11"; # or "unstable"
+  # Use the stable channel for reproducibility.
+  channel = "stable-24.05";
 
-  # A list of packages to install.
+  # Install Node.js 20 and Firebase Tools.
   packages = [
-    pkgs.firebase-tools
     pkgs.nodejs_20
+    pkgs.firebase-tools
   ];
 
-  # A set of environment variables to define.
-  env = {
-    FIREBASE_EMULATOR_HUB = "localhost:4400";
-  };
-
-  # Workspace lifecycle hooks.
+  # Recommended VS Code extensions for a Next.js and Firebase project.
   idx = {
-    # VS Code extensions to install.
     extensions = [
-      "dbaeumer.vscode-eslint"
-      "googlecloudtools.cloudcode"
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "firebase.firebase-vscode"
     ];
 
     # Workspace lifecycle hooks.
     workspace = {
-      # Runs when a workspace is first created.
+      # Install npm dependencies when the workspace is first created.
       onCreate = {
-        npmInstall = "npm --prefix functions install";
+        # Install dependencies for the Next.js app
+        root-npm-install = "npm install";
+        # Install dependencies for Firebase Functions
+        functions-npm-install = "npm --prefix functions install";
       };
+
       # Runs every time the workspace is (re)started.
       onStart = {
-        # Start the Firebase emulator in the background.
-        startEmulator = "firebase emulators:start &";
+        # Start the Firebase emulators in the background.
+        # The '&' is important to prevent blocking.
+        emulators = "firebase emulators:start &";
       };
     };
 
-    # Configure a web preview for your application.
+    # Configure web previews for your application and emulators.
     previews = {
-      # Preview for the Firebase emulator UI
-      emulatorUi = {
-        command = "echo 'Firebase emulator running on http://localhost:4000'";
-        manager = "web";
-        port = 4000;
-      };
-      # Preview for the functions endpoint
-      functions = {
-        command = "echo 'Functions emulator running on http://localhost:5001'";
-        manager = "web";
-        port = 5001;
-      };
-      # Preview for the hosting endpoint
-      hosting = {
-        command = "echo 'Hosting emulator running on http://localhost:5000'";
-        manager = "web";
-        port = 5000;
+      enable = true;
+      previews = {
+        # Preview for the Next.js web application
+        web = {
+          command = ["npm" "run" "dev" "--" "-p" "$PORT"];
+          manager = "web";
+        };
+        # Preview for the Firebase Emulator UI
+        emulator-ui = {
+          command = ["echo" "Emulator UI at http://localhost:4000"];
+          manager = "web";
+          port = 4000;
+        };
       };
     };
   };
