@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ChildManager from './ChildManager';
 import StoryHistory from './StoryHistory';
+import StoryGenerator from './StoryGenerator'; // Import the new component
 import { auth, db } from '../../firebase'; // Adjust path as needed
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -43,6 +44,7 @@ const ParentDashboard = () => {
       {user ? (
         <>
           <ChildManager familyId={familyId} />
+          <StoryGenerator familyId={familyId} /> {/* Add the new component here */}
           <StoryHistory familyId={familyId} />
         </>
       ) : (

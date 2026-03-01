@@ -3,27 +3,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions for clarity and reuse
+    // Helper functions for authentication and ownership
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Checks if the requesting user is the owner of a specific family document
+    // Checks if the requesting user is the owner of the family document.
     function isFamilyOwner(familyId) {
-      return isAuthenticated()
-        && request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid;
+      return isAuthenticated() && request.auth.uid == get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid;
     }
 
     // Rules for the 'families' collection
     match /families/{familyId} {
 
-      // A user can read their own family document.
+      // A user can only read their own family document.
       allow read: if isFamilyOwner(familyId);
 
-      // A new family document can be created by any authenticated user,
-      // as long as they set themselves as the owner.
-      allow create: if isAuthenticated()
-                    && request.resource.data.ownerUid == request.auth.uid;
+      // A new family document can be created if the user is authenticated
+      // and sets themselves as the owner.
+      allow create: if isAuthenticated() && request.resource.data.ownerUid == request.auth.uid;
 
       // The owner can update or delete their family document.
       allow update, delete: if isFamilyOwner(familyId);
@@ -53,7 +51,7 @@ service cloud.firestore {
 
       // Rules for the 'settings' subcollection
       match /settings/{settingsDoc} {
-        // The family owner has full control over their settings.
+        // Only the family owner can manage their settings.
         allow read, write: if isFamilyOwner(familyId);
       }
     }
