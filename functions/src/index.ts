@@ -1,107 +1,145 @@
+
+import * as functions from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { getStorage } from "firebase-admin/storage";
 
 admin.initializeApp();
-
 const db = admin.firestore();
-const storage = admin.storage();
+const storage = getStorage();
 
-// A predefined list of calm, age-appropriate story templates.
-const storyTemplates = [
-    { theme: "The Friendly Owl Who Lost His Hoot", duration: 180 },
-    { theme: "The Little Bear Who Couldn't Sleep", duration: 210 },
-    { theme: "The Magical River That Flowed with Starlight", duration: 195 },
-    { theme: "The Sleepy Fox and the Quiet Moon", duration: 170 },
-    { theme: "The Journey of a Little Raindrop", duration: 220 },
-    { theme: "The Secret of the Whispering Tree", duration: 200 },
-    { theme: "The Night the Stars Danced", duration: 185 },
-    { theme: "The Grateful Turtle and the Gentle Wave", duration: 215 },
-    { theme: "The Cloud Who Painted the Sky", duration: 190 },
-    { theme: "The Firefly Who Lit Up the Forest", duration: 175 },
-];
+// A secure, server-side whitelist of approved story templates for V1.
+const ALLOWED_TEMPLATES = ["dinosaur-friends.json", "moon-explorer.json", "ocean-wonders.json", "sleepy-stars.json"];
 
 /**
- * Generates a new story for a given child, validating ownership and subscription status.
+ * =================================================================================
+ *  GENERATE STORY FUNCTION (V1)
+ * =================================================================================
  */
 export const generateStory = onCall(async (request) => {
-    // 1. Authentication Check
-    if (!request.auth) {
-        throw new HttpsError(
-            "unauthenticated",
-            "The function must be called while authenticated."
-        );
-    }
+  // 1. Authentication Check
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to create a story.");
+  }
 
-    const { childId, familyId } = request.data;
-    const uid = request.auth.uid;
+  const parentUid = request.auth.uid;
+  const { familyId, childId, templateId } = request.data;
 
-    // 2. Ownership & Subscription Validation
-    const familyRef = db.collection("families").doc(familyId);
-    const familyDoc = await familyRef.get();
-    const familyData = familyDoc.data();
+  // 2. Input Validation
+  if (!familyId || !childId || !templateId) {
+    throw new HttpsError("invalid-argument", "Missing required parameters: familyId, childId, or templateId.");
+  }
 
-    if (!familyDoc.exists || familyData?.ownerUid !== uid) {
-        throw new HttpsError(
-            "permission-denied",
-            "You do not have permission to generate a story for this family."
-        );
-    }
+  // 3. Ownership Validation
+  const familyRef = db.collection("families").doc(familyId);
+  const familyDoc = await familyRef.get();
 
-    if (familyData?.billing?.status !== "active") {
-        throw new HttpsError(
-            "failed-precondition",
-            "An active subscription is required to generate new stories."
-        );
-    }
+  if (!familyDoc.exists || familyDoc.data()?.ownerUid !== parentUid) {
+    throw new HttpsError("permission-denied", "You do not have permission to access this family's data.");
+  }
 
-    // 3. Child Validation
-    const childRef = familyRef.collection("children").doc(childId);
-    const childDoc = await childRef.get();
+  // 4. Template Whitelist Validation
+  if (!ALLOWED_TEMPLATES.includes(templateId)) {
+    throw new HttpsError("invalid-argument", `The story template '${templateId}' is not valid or not enabled.`);
+  }
 
-    if (!childDoc.exists) {
-        throw new HttpsError(
-            "not-found",
-            "The specified child does not exist in this family."
-        );
-    }
+  // 5. Core Story Generation Logic (Placeholder for V1)
+  const storyTheme = "A Tale of Friendship";
+  const storyDuration = 180;
+  const audioPath = `stories/${familyId}/${childId}/${templateId}-${Date.now()}.mp3`;
+  const imagePath = `stories/${familyId}/${childId}/${templateId}-${Date.now()}.png`;
 
-    // 4. Content Generation
-    const template = storyTemplates[Math.floor(Math.random() * storyTemplates.length)];
+  // 6. Save to Firestore
+  const storiesRef = familyRef.collection('stories');
+  const newStoryRef = await storiesRef.add({
+    childId: childId,
+    templateId: templateId,
+    theme: storyTheme,
+    duration: storyDuration,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    isRead: false,
+    audioPath: audioPath,
+    imagePath: imagePath,
+  });
+  const newStoryId = newStoryRef.id;
 
-    // V1 uses predefined assets for safety and predictability.
-    const placeholderAudio = "voice/v1/placeholder_audio.mp3";
-    const placeholderImage = "images/v1/placeholder_image.png";
+  // 7. Generate Signed URLs for Assets
+  const bucket = storage.bucket();
+  const signedUrlConfig: any = {
+      action: 'read',
+      expires: Date.now() + 1000 * 60 * 60 * 24, // 24 hours
+  };
 
-    // 5. Generate Signed URLs
-    const expires = Date.now() + 60 * 60 * 1000; // 1 hour
-    const bucket = storage.bucket("urai-storytime-68426933-5c896.appspot.com");
+  const [audioUrl] = await bucket.file(audioPath).getSignedUrl(signedUrlConfig);
+  const [imageUrl] = await bucket.file(imagePath).getSignedUrl(signedUrlConfig);
 
-    const [audioUrl] = await bucket.file(placeholderAudio).getSignedUrl({
-        action: "read",
-        expires,
-    });
+  // 8. Return Structured Payload
+  return {
+    storyId: newStoryId,
+    theme: storyTheme,
+    audioUrl: audioUrl,
+    imageUrl: imageUrl,
+    duration: storyDuration,
+    createdAt: new Date().toISOString(),
+  };
+});
 
-    const [imageUrl] = await bucket.file(placeholderImage).getSignedUrl({
-        action: "read",
-        expires,
-    });
+/**
+ * =================================================================================
+ *  GET STORY PLAYBACK DETAILS FUNCTION (V1)
+ * =================================================================================
+ */
+export const getStoryPlaybackDetails = onCall(async (request) => {
+  // 1. Authentication Check
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in to view a story.");
+  }
 
-    // 6. Write to Firestore
-    const storiesRef = familyRef.collection("stories");
-    const newStory = {
-        theme: template.theme,
-        duration: template.duration,
-        audioUrl,
-        imageUrl,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        isRead: false,
-    };
+  const parentUid = request.auth.uid;
+  const { familyId, storyId } = request.data;
 
-    const storyDocRef = await storiesRef.add(newStory);
+  // 2. Input Validation
+  if (!familyId || !storyId) {
+    throw new HttpsError("invalid-argument", "Missing required parameters: familyId or storyId.");
+  }
 
-    // 7. Return Payload
-    return {
-        storyId: storyDocRef.id,
-        ...newStory,
-    };
+  // 3. Ownership Validation
+  const familyRef = db.collection("families").doc(familyId);
+  const familyDoc = await familyRef.get();
+
+  if (!familyDoc.exists || familyDoc.data()?.ownerUid !== parentUid) {
+    throw new HttpsError("permission-denied", "You do not have permission to access this family's data.");
+  }
+
+  // 4. Fetch Story Document
+  const storyRef = familyRef.collection("stories").doc(storyId);
+  const storyDoc = await storyRef.get();
+
+  if (!storyDoc.exists) {
+    throw new HttpsError("not-found", "The requested story does not exist.");
+  }
+
+  const storyData = storyDoc.data();
+  const audioPath = storyData?.audioPath;
+  const imagePath = storyData?.imagePath;
+
+  if (!audioPath || !imagePath) {
+      throw new HttpsError("internal", "Story data is incomplete and assets cannot be loaded.");
+  }
+
+  // 5. Generate Signed URLs for Assets
+  const bucket = storage.bucket();
+  const signedUrlConfig: any = {
+      action: 'read',
+      expires: Date.now() + 1000 * 60 * 15, // 15-minute expiry for playback URLs
+  };
+
+  const [audioUrl] = await bucket.file(audioPath).getSignedUrl(signedUrlConfig);
+  const [imageUrl] = await bucket.file(imagePath).getSignedUrl(signedUrlConfig);
+
+  // 6. Return URLs
+  return {
+    audioUrl,
+    imageUrl,
+  };
 });

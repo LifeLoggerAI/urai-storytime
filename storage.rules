@@ -1,21 +1,15 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // The 'voice' directory contains the generated story audio files.
-    match /voice/v1/{allPaths=**} {
-      // Files can only be read. The backend provides a short-lived signed URL for access.
-      allow read: if true;
-      // Files are uploaded exclusively by the backend, so client writes are disallowed.
-      allow write: if false;
-    }
-
-    // The 'images' directory contains the generated story images.
-    match /images/v1/{allPaths=**} {
-      // Files can only be read. The backend provides a short-lived signed URL for access.
-      allow read: if true;
-      // Files are uploaded exclusively by the backend, so client writes are disallowed.
-      allow write: if false;
+    // By default, deny all reads and writes to the entire bucket.
+    // The application's security model relies on Cloud Functions generating
+    // short-lived signed URLs for authorized users to access specific assets.
+    // This prevents any possibility of unauthorized direct access, listing, or modification
+    // of stored files via the client-side SDKs.
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
