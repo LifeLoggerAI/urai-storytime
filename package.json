@@ -1,0 +1,17 @@
+{
+  "name": "urai-storytime",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node dist/server.mjs",
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "node scripts/typecheck.mjs",
+    "test": "node --test",
+    "test:smoke": "node tests/e2e/smoke.test.mjs",
+    "test:e2e": "node tests/e2e/smoke.test.mjs",
+    "format": "node scripts/format-check.mjs"
+  }
+}
