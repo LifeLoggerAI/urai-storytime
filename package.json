@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/server.mjs",
+    "dev": "node scripts/server.mjs src",
     "build": "node scripts/build.mjs",
-    "preview": "node dist/server.mjs",
+    "preview": "node dist/server.mjs dist",
     "lint": "node scripts/lint.mjs",
     "typecheck": "node scripts/typecheck.mjs",
-    "test": "node --test",
-    "test:smoke": "node tests/e2e/smoke.test.mjs",
+    "test": "node --test tests/unit/*.test.mjs tests/integration/*.test.mjs",
+    "test:smoke": "npm run test:e2e",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
-    "format": "node scripts/format-check.mjs"
+    "format": "node scripts/format-check.mjs",
+    "validate": "npm run format && npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build"
   }
 }
