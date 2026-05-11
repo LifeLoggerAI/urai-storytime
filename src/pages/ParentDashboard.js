@@ -61,7 +61,7 @@ const ParentDashboard = () => {
         <div style={backgroundStyle}>
             <div style={{ maxWidth: '800px', margin: '0 auto', background: 'white', padding: '2rem', borderRadius: '8px', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}>
                 <h1>Parent Dashboard</h1>
-                <p>Welcome! Here you can manage your children's profiles and story settings.</p>
+                <p>Welcome! Here you can manage your children&apos;s profiles and story settings.</p>
                 <ChildManager familyId={familyId} />
                 <StoryGenerator familyId={familyId} onTemplateChange={handleTemplateChange} />
                 <StoryHistory familyId={familyId} />
