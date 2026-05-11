@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && next export",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "preview": "next start",
+    "lint": "next lint",
+    "test": "next lint",
+    "test:smoke": "npm run build",
+    "validate": "npm run lint && npm run build && npm run test:smoke"
   },
   "dependencies": {
     "firebase": "^12.10.0",
