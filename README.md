@@ -10,10 +10,11 @@ This repository currently ships a standalone static demo. Stories are generated 
 
 ## Stack
 
-- Vanilla HTML/CSS/JavaScript
+- Vanilla HTML/CSS/JavaScript in the connected GitHub branch
 - Node.js built-in HTTP server for local dev and preview
 - Node test runner for smoke tests
 - Static `dist/` build output
+- Compatibility guardrails for a Next.js checkout if those files are pushed later
 
 ## Features in this build
 
@@ -27,6 +28,8 @@ This repository currently ships a standalone static demo. Stories are generated 
 - SEO basics: metadata, favicon, Open Graph SVG, robots.txt, sitemap.xml
 - Mobile responsive UI
 - Explicit disabled states for unlaunched auth, billing, admin, creator, and cloud dashboard features
+- CI validation workflow
+- Compatibility check for required scripts and possible Next.js/AuthContext mismatch
 
 ## Not launched yet
 
@@ -48,20 +51,20 @@ See `.env.example`. This demo does not require secrets.
 - `npm run dev` – run local server at `http://localhost:4173`
 - `npm run build` – copy production files to `dist/`
 - `npm run preview` – serve `dist/` after build
+- `npm run compat` – verify required scripts and app-structure compatibility
 - `npm run test` – run Node tests
 - `npm run test:smoke` – run smoke test
 - `npm run test:e2e` – currently aliases smoke test
 - `npm run lint` – custom lint script
 - `npm run typecheck` – custom typecheck script
 - `npm run format` – custom format check
+- `npm run validate` – run compatibility, format, lint, typecheck, tests, smoke, and build
 
 ## Local verification
 
 ```bash
 npm ci
-npm run build
-npm run test
-npm run test:smoke
+npm run validate
 npm run preview
 ```
 
@@ -75,6 +78,12 @@ Then manually verify:
 6. Pricing clearly says billing is not launched.
 7. Login/signup/dashboard/admin routes do not imply live auth.
 8. Privacy, Terms, Safety, robots.txt, sitemap.xml, favicon, and Open Graph assets load.
+
+## Next.js local-build recovery
+
+A reported local checkout showed a Next.js app with missing `../context/AuthContext`, missing `autoprefixer`, and missing `test`, `test:smoke`, and `preview` scripts. Those exact Next.js files were not present in the connected GitHub branches during this audit, so this PR adds compatibility files and documents the recovery path.
+
+See `docs/NEXT_BUILD_RECOVERY.md`.
 
 ## Deployment
 
