@@ -32,8 +32,13 @@ The open PR therefore adds compatibility/fallback pieces, but the exact failing 
 
 - `src/context/AuthContext.js` provides a demo-safe `AuthProvider` and `useAuth` fallback.
 - `postcss.config.js` loads `autoprefixer`.
-- `package.json` includes `autoprefixer`, `postcss`, and a `validate` script.
-- `.github/workflows/validate.yml` runs `npm ci` and `npm run validate` in CI.
+- `package.json` includes `autoprefixer`, `postcss`, `compat`, and `validate` scripts.
+- `scripts/compat-check.mjs` detects missing required scripts and common Next.js mismatch issues.
+- `.github/workflows/validate.yml` runs `npm install` and `npm run validate` in CI.
+
+## Lockfile note
+
+The workflow currently uses `npm install` instead of `npm ci` because this PR adds dependencies and the lockfile has not been regenerated in a real checkout. After running `npm install` locally and committing the updated `package-lock.json`, switch CI back to `npm ci`.
 
 ## Required fix if the local app is Next.js
 
@@ -49,7 +54,8 @@ If your actual app is Next.js, verify `package.json` includes scripts equivalent
     "lint": "next lint",
     "test": "next lint",
     "test:smoke": "npm run build",
-    "validate": "npm run lint && npm run build && npm run test:smoke"
+    "compat": "node scripts/compat-check.mjs",
+    "validate": "npm run compat && npm run lint && npm run build && npm run test:smoke"
   }
 }
 ```
@@ -118,11 +124,11 @@ If the import path differs in your repo, adjust it to the actual relative path o
 ```bash
 rm -rf .next out node_modules package-lock.json
 npm install
-npm run build
-npm run test
-npm run test:smoke
+npm run validate
 npm run preview
 ```
+
+After `npm install`, commit the regenerated `package-lock.json` so CI can safely move back to `npm ci`.
 
 ## Security warning
 
@@ -134,7 +140,8 @@ This issue is not done until:
 
 - The exact Next.js branch is pushed.
 - CI runs on that branch.
-- `npm ci` passes.
+- `npm install` passes, then the refreshed lockfile is committed.
+- CI is switched back to `npm ci` once the lockfile is in sync.
 - `npm run build` passes.
 - `npm run test` exists and passes.
 - `npm run test:smoke` exists and passes.
