@@ -1,39 +1,60 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if the user is the owner of a given family.
-    // It reads the `ownerUid` from the family document.
-    function isFamilyOwner(familyId) {
-      return get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid;
+    function signedIn() {
+      return request.auth != null;
     }
 
-    // Families Collection:
-    // - Users can read a family document ONLY if they are the owner.
-    // - Users can create a family document.
-    // - No updates or deletes are allowed for V1 to ensure data integrity.
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // A user can read their own user document
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Families can only be read or written to by members of that family
     match /families/{familyId} {
-      allow read: if isFamilyOwner(familyId);
-      allow create: if request.auth != null;
-      allow update, delete: if false;
+      allow read, write: if signedIn() && request.auth.uid in resource.data.guardianIds;
+    }
 
-      // Children Sub-collection:
-      // - Users can read and create children ONLY for a family they own.
-      // - No updates or deletes for V1.
-      match /children/{childId} {
-        allow read, create: if isFamilyOwner(familyId);
-        allow update, delete: if false;
-      }
+    // Children can only be read by members of the same family
+    match /children/{childId} {
+      allow read: if signedIn() && get(/databases/$(database)/documents/families/$(resource.data.familyId)).data.guardianIds[0] in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyIds;
+      allow write: if false; // Children data is written by trusted functions
+    }
 
-      // Stories Sub-collection:
-      // - Users can read and create stories ONLY for a family they own.
-      // - No updates or deletes for V1.
-      match /stories/{storyId} {
-        allow read, create: if isFamilyOwner(familyId);
-        allow update, delete: if false;
-      }
+    // Stories can be read by any authenticated user
+    match /stories/{storyId} {
+      allow read: if signedIn();
+      allow write: if false; // Stories are curated and added by admins
+    }
+
+    // Progression can only be read by family members, and written by functions
+    match /children/{childId}/progression/{storyId} {
+        allow read: if signedIn() && get(/databases/$(database)/documents/families/$(get(/databases/$(database)/documents/children/$(childId)).data.familyId)).data.guardianIds[0] in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyIds;
+        allow write: if false;
+    }
+
+    match /events/{eventId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    match /aggregates/{period}/{docId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /memories/{memoryId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /relationships/{relationshipId} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow write: if false;
     }
   }
 }

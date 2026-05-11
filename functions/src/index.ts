@@ -1,145 +1,175 @@
 
-import * as functions from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { getStorage } from "firebase-admin/storage";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
+
 const db = admin.firestore();
-const storage = getStorage();
+const { FieldValue, Timestamp } = admin.firestore;
 
-// A secure, server-side whitelist of approved story templates for V1.
-const ALLOWED_TEMPLATES = ["dinosaur-friends.json", "moon-explorer.json", "ocean-wonders.json", "sleepy-stars.json"];
+type IngestEventInput = {
+  familyId: string;
+  childId: string;
+  type: string;
+  timestamp: string | number;
+  payload: Record<string, unknown>;
+};
 
-/**
- * =================================================================================
- *  GENERATE STORY FUNCTION (V1)
- * =================================================================================
- */
-export const generateStory = onCall(async (request) => {
-  // 1. Authentication Check
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in to create a story.");
+function requireAuth(auth: { uid?: string } | null | undefined): string {
+  const uid = auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "auth required");
+  return uid;
+}
+
+function normalizeTimestamp(input: string | number): Timestamp {
+  if (typeof input === "number") {
+    if (!Number.isFinite(input)) {
+      throw new HttpsError("invalid-argument", "timestamp must be finite");
+    }
+    return Timestamp.fromMillis(input);
   }
 
-  const parentUid = request.auth.uid;
-  const { familyId, childId, templateId } = request.data;
-
-  // 2. Input Validation
-  if (!familyId || !childId || !templateId) {
-    throw new HttpsError("invalid-argument", "Missing required parameters: familyId, childId, or templateId.");
+  if (typeof input === "string") {
+    const ms = Date.parse(input);
+    if (Number.isNaN(ms)) {
+      throw new HttpsError("invalid-argument", "timestamp string is invalid");
+    }
+    return Timestamp.fromMillis(ms);
   }
 
-  // 3. Ownership Validation
+  throw new HttpsError("invalid-argument", "timestamp is required");
+}
+
+function toDayKey(ts: Timestamp): string {
+  const d = ts.toDate();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
+
+function toWeekKey(ts: Timestamp): string {
+  const d = ts.toDate();
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}W${String(weekNo).padStart(2, "0")}`;
+}
+
+export const ingestEvent = onCall<IngestEventInput>(async (request) => {
+  const uid = requireAuth(request.auth);
+  const data = request.data;
+
+  // Validate the input data
+  if (!data || typeof data !== "object") {
+    throw new HttpsError("invalid-argument", "data is required");
+  }
+
+  const { familyId, childId, type, payload } = data;
+
+  if (!familyId || typeof familyId !== "string") {
+    throw new HttpsError("invalid-argument", "familyId is required");
+  }
+  if (!childId || typeof childId !== "string") {
+    throw new HttpsError("invalid-argument", "childId is required");
+  }
+  if (!type || typeof type !== "string") {
+    throw new HttpsError("invalid-argument", "type is required");
+  }
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new HttpsError("invalid-argument", "payload must be an object");
+  }
+
+  // Verify that the user is a guardian of the family
   const familyRef = db.collection("families").doc(familyId);
-  const familyDoc = await familyRef.get();
+  const familySnap = await familyRef.get();
+  const familyData = familySnap.data();
 
-  if (!familyDoc.exists || familyDoc.data()?.ownerUid !== parentUid) {
-    throw new HttpsError("permission-denied", "You do not have permission to access this family's data.");
+  if (!familySnap.exists || !familyData || !familyData.guardianIds.includes(uid)) {
+    throw new HttpsError("permission-denied", "user is not a guardian of this family");
   }
 
-  // 4. Template Whitelist Validation
-  if (!ALLOWED_TEMPLATES.includes(templateId)) {
-    throw new HttpsError("invalid-argument", `The story template '${templateId}' is not valid or not enabled.`);
-  }
+  const timestamp = normalizeTimestamp(data.timestamp);
+  const eventRef = db.collection("families").doc(familyId).collection("children").doc(childId).collection("events").doc();
 
-  // 5. Core Story Generation Logic (Placeholder for V1)
-  const storyTheme = "A Tale of Friendship";
-  const storyDuration = 180;
-  const audioPath = `stories/${familyId}/${childId}/${templateId}-${Date.now()}.mp3`;
-  const imagePath = `stories/${familyId}/${childId}/${templateId}-${Date.now()}.png`;
-
-  // 6. Save to Firestore
-  const storiesRef = familyRef.collection('stories');
-  const newStoryRef = await storiesRef.add({
-    childId: childId,
-    templateId: templateId,
-    theme: storyTheme,
-    duration: storyDuration,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    isRead: false,
-    audioPath: audioPath,
-    imagePath: imagePath,
-  });
-  const newStoryId = newStoryRef.id;
-
-  // 7. Generate Signed URLs for Assets
-  const bucket = storage.bucket();
-  const signedUrlConfig: any = {
-      action: 'read',
-      expires: Date.now() + 1000 * 60 * 60 * 24, // 24 hours
+  const eventDoc = {
+    guardianId: uid,
+    familyId,
+    childId,
+    type,
+    timestamp,
+    payload,
+    createdAt: FieldValue.serverTimestamp()
   };
 
-  const [audioUrl] = await bucket.file(audioPath).getSignedUrl(signedUrlConfig);
-  const [imageUrl] = await bucket.file(imagePath).getSignedUrl(signedUrlConfig);
+  const userEventDoc = {
+    eventId: eventRef.id,
+    guardianId: uid,
+    familyId,
+    childId,
+    type,
+    timestamp,
+    createdAt: FieldValue.serverTimestamp()
+  };
 
-  // 8. Return Structured Payload
+  const batch = db.batch();
+  batch.set(eventRef, eventDoc);
+  batch.set(db.collection("users").doc(uid).collection("events").doc(eventRef.id), userEventDoc);
+  await batch.commit();
+
   return {
-    storyId: newStoryId,
-    theme: storyTheme,
-    audioUrl: audioUrl,
-    imageUrl: imageUrl,
-    duration: storyDuration,
-    createdAt: new Date().toISOString(),
+    ok: true,
+    eventId: eventRef.id
   };
 });
 
-/**
- * =================================================================================
- *  GET STORY PLAYBACK DETAILS FUNCTION (V1)
- * =================================================================================
- */
-export const getStoryPlaybackDetails = onCall(async (request) => {
-  // 1. Authentication Check
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be logged in to view a story.");
-  }
+export const onEventCreate = onDocumentCreated("families/{familyId}/children/{childId}/events/{eventId}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
 
-  const parentUid = request.auth.uid;
-  const { familyId, storyId } = request.data;
-
-  // 2. Input Validation
-  if (!familyId || !storyId) {
-    throw new HttpsError("invalid-argument", "Missing required parameters: familyId or storyId.");
-  }
-
-  // 3. Ownership Validation
-  const familyRef = db.collection("families").doc(familyId);
-  const familyDoc = await familyRef.get();
-
-  if (!familyDoc.exists || familyDoc.data()?.ownerUid !== parentUid) {
-    throw new HttpsError("permission-denied", "You do not have permission to access this family's data.");
-  }
-
-  // 4. Fetch Story Document
-  const storyRef = familyRef.collection("stories").doc(storyId);
-  const storyDoc = await storyRef.get();
-
-  if (!storyDoc.exists) {
-    throw new HttpsError("not-found", "The requested story does not exist.");
-  }
-
-  const storyData = storyDoc.data();
-  const audioPath = storyData?.audioPath;
-  const imagePath = storyData?.imagePath;
-
-  if (!audioPath || !imagePath) {
-      throw new HttpsError("internal", "Story data is incomplete and assets cannot be loaded.");
-  }
-
-  // 5. Generate Signed URLs for Assets
-  const bucket = storage.bucket();
-  const signedUrlConfig: any = {
-      action: 'read',
-      expires: Date.now() + 1000 * 60 * 15, // 15-minute expiry for playback URLs
+  const data = snap.data() as {
+    guardianId?: string;
+    timestamp?: admin.firestore.Timestamp;
   };
 
-  const [audioUrl] = await bucket.file(audioPath).getSignedUrl(signedUrlConfig);
-  const [imageUrl] = await bucket.file(imagePath).getSignedUrl(signedUrlConfig);
+  if (!data.guardianId) {
+    await snap.ref.set(
+      {
+        pipelineError: "missing_guardianId",
+        pipelineCheckedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+    return;
+  }
 
-  // 6. Return URLs
-  return {
-    audioUrl,
-    imageUrl,
-  };
+  const ts = data.timestamp instanceof Timestamp ? data.timestamp : Timestamp.now();
+  const normalized = Timestamp.fromMillis(ts.toMillis());
+
+  await snap.ref.set(
+    {
+      timestamp: normalized,
+      ingestedAt: FieldValue.serverTimestamp(),
+      dayKey: toDayKey(normalized),
+      weekKey: toWeekKey(normalized)
+    },
+    { merge: true }
+  );
+
+  await db
+    .collection("users")
+    .doc(data.guardianId)
+    .collection("events")
+    .doc(snap.id)
+    .set(
+      {
+        dayKey: toDayKey(normalized),
+        weekKey: toWeekKey(normalized),
+        ingestedAt: FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
 });
