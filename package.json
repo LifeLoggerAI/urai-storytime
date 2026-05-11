@@ -8,9 +8,10 @@
     "start": "next start",
     "preview": "next start",
     "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "test": "next lint",
     "test:smoke": "npm run build",
-    "validate": "npm run lint && npm run build && npm run test:smoke"
+    "validate": "npm run lint && npm run typecheck && npm run build && npm run test:smoke"
   },
   "dependencies": {
     "firebase": "^12.10.0",
