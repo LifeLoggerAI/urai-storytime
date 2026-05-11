@@ -13,7 +13,8 @@
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
     "format": "node scripts/format-check.mjs",
-    "validate": "npm run format && npm run lint && npm run typecheck && npm test && npm run test:smoke && npm run build"
+    "compat": "node scripts/compat-check.mjs",
+    "validate": "npm run compat && npm run format && npm run lint && npm run typecheck && npm test && npm run test:smoke && npm run build"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.21",
