@@ -24,7 +24,7 @@ const ChildView = ({ rhythm }) => {
       transition: 'background-color 0.5s ease'
     }}>
       <h1>Welcome, little explorer!</h1>
-      <p>It's currently <strong>{rhythm}</strong>.</p>
+      <p>It&apos;s currently <strong>{rhythm}</strong>.</p>
       <p>Your next story is waiting for you.</p>
       <Companion rhythm={rhythm} />
     </div>
