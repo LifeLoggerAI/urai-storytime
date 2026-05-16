@@ -13,6 +13,7 @@
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
     "test:deployment": "node scripts/validate-deployment-readiness.mjs",
+    "test:security-rules": "node scripts/validate-security-rules.mjs",
     "format": "node scripts/format-check.mjs"
   }
 }
