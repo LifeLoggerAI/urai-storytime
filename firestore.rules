@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    match /families/{familyId} {
+      allow read, write: if false;
+    }
+
+    match /childProfiles/{profileId} {
+      allow read, write: if false;
+    }
+
+    match /stories/{storyId} {
+      allow read, write: if false;
+    }
+
+    match /storyRuns/{runId} {
+      allow read, write: if false;
+    }
+
+    match /moderation/{moderationId} {
+      allow read, write: if false;
+    }
+
+    match /auditLogs/{auditLogId} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
