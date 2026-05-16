@@ -38,6 +38,7 @@ in
   packages = with pkgs; [
     nodejs_20
     git
+    chromium
     glib
     nss
     nspr
@@ -71,6 +72,7 @@ in
 
   env = {
     PLAYWRIGHT_BROWSERS_PATH = "$HOME/.cache/ms-playwright";
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH = "${pkgs.chromium}/bin/chromium";
     LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath playwrightLibs}";
   };
 }
