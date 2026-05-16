@@ -50,8 +50,36 @@ jobs:
       - name: Security rules static validation
         run: npm run test:security-rules
 
+      - name: Emulator scaffold validation
+        run: npm run test:emulator-scaffold
+
       - name: Production readiness validation
         run: npm run test:production-readiness
 
       - name: Production build
         run: npm run build
+
+  production-gates:
+    name: Verify production-only evidence gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Provider wiring validation
+        run: npm run test:provider-wiring
+
+      - name: Production evidence validation
+        run: npm run test:production-evidence
