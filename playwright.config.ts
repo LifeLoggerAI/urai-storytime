@@ -1,6 +1,24 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execSync } from 'node:child_process';
 
-const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+function resolveChromiumExecutablePath() {
+  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+    return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+  }
+
+  if (process.env.CI) {
+    return undefined;
+  }
+
+  try {
+    const path = execSync('command -v chromium', { encoding: 'utf8' }).trim();
+    return path || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const chromiumExecutablePath = resolveChromiumExecutablePath();
 
 export default defineConfig({
   testDir: './tests/e2e',
