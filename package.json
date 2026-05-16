@@ -15,9 +15,12 @@
     "test:deployment": "node scripts/validate-deployment-readiness.mjs",
     "test:security-rules": "node scripts/validate-security-rules.mjs",
     "test:emulator-scaffold": "node scripts/validate-emulator-scaffold.mjs",
+    "test:emulator-runtime": "node scripts/validate-emulator-runtime.mjs",
     "test:provider-wiring": "node scripts/validate-provider-wiring.mjs",
     "test:production-evidence": "node scripts/validate-production-evidence.mjs",
     "test:production-readiness": "node scripts/validate-production-readiness.mjs",
+    "emulators:start": "firebase emulators:start --only auth,firestore,storage --project demo-urai-storytime",
+    "emulators:test": "firebase emulators:exec --only auth,firestore,storage --project demo-urai-storytime \"npm run test:security-rules && npm run test:emulator-runtime\"",
     "format": "node scripts/format-check.mjs"
   }
 }
