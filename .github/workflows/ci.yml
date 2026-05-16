@@ -47,5 +47,8 @@ jobs:
       - name: Deployment readiness scaffold check
         run: npm run test:deployment
 
+      - name: Security rules static validation
+        run: npm run test:security-rules
+
       - name: Production build
         run: npm run build
