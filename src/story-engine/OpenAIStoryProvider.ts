@@ -3,6 +3,10 @@ import { buildStorySystemPrompt, buildStoryUserPrompt } from './prompts';
 import { generateLocalDemoStory } from './LocalDemoStoryProvider';
 
 export async function generateAIStory(request: StoryRequest): Promise<string> {
+  if (typeof window !== 'undefined') {
+    return generateLocalDemoStory(request);
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
