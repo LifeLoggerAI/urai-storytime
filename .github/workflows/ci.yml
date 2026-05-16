@@ -44,5 +44,8 @@ jobs:
       - name: E2E tests
         run: npm run test:e2e
 
+      - name: Deployment readiness scaffold check
+        run: npm run test:deployment
+
       - name: Production build
         run: npm run build
