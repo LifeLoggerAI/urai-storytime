@@ -1,15 +1,18 @@
-import { generateStory, moderatePrompt } from './story-engine.mjs';
+import { generateStory } from './story-engine.mjs';
+import { MODERATION_DECISIONS, moderatePrompt } from './moderation-boundary.mjs';
+import { addLocalStory, readLocalStories, writeLocalStories } from './story-persistence.mjs';
+import { createLocalOnlyPersistenceNotice } from './firebase-adapter.mjs';
 
 const app = document.getElementById('app');
-const LIBRARY_KEY = 'urai_library';
 const SETTINGS_KEY = 'urai_parent_settings';
 
 const escapeHtml = (value = '') =>
   String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
-const getLib = () => JSON.parse(localStorage.getItem(LIBRARY_KEY) || '[]');
-const setLib = (value) => localStorage.setItem(LIBRARY_KEY, JSON.stringify(value));
+const getLib = () => readLocalStories();
+const setLib = (value) => writeLocalStories(value);
 const getSettings = () => JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{"shareAnalytics":false,"demoOnly":true}');
 const setSettings = (value) => localStorage.setItem(SETTINGS_KEY, JSON.stringify(value));
+const localPersistenceNotice = createLocalOnlyPersistenceNotice();
 
 const routes = {
   home,
@@ -59,7 +62,7 @@ function home() {
         <p>Create gentle, family-safe story drafts locally in the browser. Cloud accounts, paid billing, admin review, and URAI ecosystem integrations are intentionally marked as not launched until verified.</p>
         <div class="actions"><a class="btn" href="#create">Start a story</a><a class="btn secondary" href="#safety">Review safety model</a></div>
       </div>
-      <aside class="card launch-card"><h2>Launch status</h2><p>${statusPill('PARTIAL')} Local demo is usable. Production cloud, auth, billing, and live domain verification remain launch blockers.</p></aside>
+      <aside class="card launch-card"><h2>Launch status</h2><p>${statusPill('PARTIAL')} Local demo is usable. Production cloud, auth, billing, and live domain verification remain launch blockers.</p><p>${escapeHtml(localPersistenceNotice.message)}</p></aside>
     </section>
     <section class="grid three">
       <article class="card"><h3>Local demo mode</h3><p>No account or API key. Stories save to this browser only.</p></article>
@@ -114,15 +117,27 @@ function create() {
     event.preventDefault();
     const fd = Object.fromEntries(new FormData(event.target));
     const precheck = moderatePrompt(Object.values(fd).join(' '));
-    if (!precheck.safe) {
-      document.getElementById('err').textContent = `Please revise unsafe terms: ${precheck.hits.join(', ')}`;
+    if (precheck.decision === MODERATION_DECISIONS.block) {
+      document.getElementById('err').textContent = `Please revise unsafe terms: ${precheck.matchedTerms.join(', ')}`;
+      return;
+    }
+    if (precheck.decision === MODERATION_DECISIONS.review) {
+      document.getElementById('err').textContent = 'Please add a little more detail so the prompt can be checked safely.';
       return;
     }
     try {
       const story = generateStory(fd);
-      const lib = getLib();
-      lib.unshift(story);
-      setLib(lib.slice(0, 50));
+      addLocalStory({
+        id: story.id,
+        title: story.title,
+        prompt: fd.prompt,
+        story: story.body,
+        moderationDecision: precheck.decision,
+        createdAt: story.createdAt,
+        narrator: story.narrator,
+        mood: story.mood,
+        summary: story.summary,
+      });
       location.hash = `#story/${story.id}`;
     } catch (err) {
       document.getElementById('err').textContent = err.message;
@@ -140,7 +155,7 @@ function library() {
     'Library',
     `<div class="card"><h1>Your Library</h1>${lib
       .map(
-        (s) => `<article class="story-row"><div><h2>${escapeHtml(s.title)}</h2><p>${new Date(s.createdAt).toLocaleString()}</p><p>${escapeHtml(s.summary || s.body.slice(0, 110))}...</p></div><div><a class="btn secondary" href="#story/${escapeHtml(s.id)}">Open</a> <button data-del="${escapeHtml(s.id)}">Delete</button></div></article>`
+        (s) => `<article class="story-row"><div><h2>${escapeHtml(s.title)}</h2><p>${new Date(s.createdAt).toLocaleString()}</p><p>${escapeHtml(s.summary || s.body || s.story || '').slice(0, 110)}...</p></div><div><a class="btn secondary" href="#story/${escapeHtml(s.id)}">Open</a> <button data-del="${escapeHtml(s.id)}">Delete</button></div></article>`
       )
       .join('')}</div>`
   );
@@ -158,9 +173,10 @@ function detail(id) {
     page('Story not found', `<div class="card"><h1>Story not found</h1><p>This story exists only in the browser where it was created.</p><a class="btn" href="#library">Back to library</a></div>`);
     return;
   }
+  const storyBody = story.body || story.story || '';
   page(
     story.title,
-    `<article class="card story-detail"><h1>${escapeHtml(story.title)}</h1><p>${escapeHtml(story.body)}</p><dl><dt>Narrator</dt><dd>${escapeHtml(story.narrator)}</dd><dt>Mood</dt><dd>${escapeHtml(story.mood)}</dd><dt>Safety mode</dt><dd>Local precheck only</dd></dl><button class="btn" id="speak">Play narration</button> <button id="share">Copy</button> <a class="btn secondary" href="#create">Regenerate</a><p id="storyStatus" role="status"></p></article>`
+    `<article class="card story-detail"><h1>${escapeHtml(story.title)}</h1><p>${escapeHtml(storyBody)}</p><dl><dt>Narrator</dt><dd>${escapeHtml(story.narrator || 'Demo narrator')}</dd><dt>Mood</dt><dd>${escapeHtml(story.mood || 'gentle')}</dd><dt>Safety mode</dt><dd>Local precheck only</dd></dl><button class="btn" id="speak">Play narration</button> <button id="share">Copy</button> <a class="btn secondary" href="#create">Regenerate</a><p id="storyStatus" role="status"></p></article>`
   );
   document.getElementById('speak').onclick = () => {
     const status = document.getElementById('storyStatus');
@@ -169,10 +185,10 @@ function detail(id) {
       return;
     }
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(story.body));
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(storyBody));
   };
   document.getElementById('share').onclick = async () => {
-    await navigator.clipboard.writeText(`${story.title}\n\n${story.body}`);
+    await navigator.clipboard.writeText(`${story.title}\n\n${storyBody}`);
     document.getElementById('storyStatus').textContent = 'Copied story text.';
   };
 }
