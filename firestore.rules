@@ -1,32 +1,82 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function familyRef(familyId) {
+      return /databases/$(database)/documents/families/$(familyId);
+    }
+
+    function familyRole(familyId) {
+      return get(familyRef(familyId)).data.members[request.auth.uid].role;
+    }
+
+    function isFamilyMember(familyId) {
+      return signedIn() && exists(familyRef(familyId)) && familyRole(familyId) in ['owner', 'guardian', 'viewer'];
+    }
+
+    function canManageFamily(familyId) {
+      return signedIn() && exists(familyRef(familyId)) && familyRole(familyId) in ['owner', 'guardian'];
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, create, update: if isSelf(userId);
+      allow delete: if false;
     }
 
     match /families/{familyId} {
-      allow read, write: if false;
+      allow read: if isFamilyMember(familyId) || isAdmin();
+      allow create: if signedIn() && request.resource.data.members[request.auth.uid].role == 'owner';
+      allow update: if canManageFamily(familyId) || isAdmin();
+      allow delete: if false;
     }
 
     match /childProfiles/{profileId} {
-      allow read, write: if false;
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update: if canManageFamily(resource.data.familyId) || isAdmin();
+      allow delete: if false;
     }
 
     match /stories/{storyId} {
-      allow read, write: if false;
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update: if canManageFamily(resource.data.familyId) || isAdmin();
+      allow delete: if false;
     }
 
     match /storyRuns/{runId} {
-      allow read, write: if false;
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update, delete: if false;
     }
 
     match /moderation/{moderationId} {
-      allow read, write: if false;
+      allow read, write: if isAdmin();
     }
 
     match /auditLogs/{auditLogId} {
-      allow read, write: if false;
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    match /privacyRequests/{requestId} {
+      allow read: if isSelf(resource.data.userId) || isAdmin();
+      allow create: if isSelf(request.resource.data.userId);
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     match /{document=**} {
