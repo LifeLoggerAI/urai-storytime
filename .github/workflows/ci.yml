@@ -50,5 +50,8 @@ jobs:
       - name: Security rules static validation
         run: npm run test:security-rules
 
+      - name: Production readiness validation
+        run: npm run test:production-readiness
+
       - name: Production build
         run: npm run build
