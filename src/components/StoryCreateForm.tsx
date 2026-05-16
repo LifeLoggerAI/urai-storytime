@@ -64,7 +64,13 @@ export function StoryCreateForm() {
       <h1>Create a Story</h1>
       <p className="notice">Local demo mode saves this story in your browser only. Avoid entering sensitive real child information.</p>
 
-      <form action={submit} className="form">
+      <form
+        className="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submit(new FormData(event.currentTarget));
+        }}
+      >
         <label>
           Child display name
           <input name="childDisplayName" maxLength={32} defaultValue="Ari" required />
