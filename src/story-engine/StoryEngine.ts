@@ -14,6 +14,11 @@ function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function getProviderName(): StoryRun['provider'] {
+  if (typeof window !== 'undefined') return 'local_demo';
+  return process.env.OPENAI_API_KEY ? 'openai' : 'local_demo';
+}
+
 export async function createStoryManifest(request: StoryRequest): Promise<{
   story: Story;
   run: StoryRun;
@@ -112,7 +117,7 @@ export async function createStoryManifest(request: StoryRequest): Promise<{
     id: runId,
     requestId: request.id,
     familyId: request.familyId,
-    provider: process.env.OPENAI_API_KEY ? 'openai' : 'local_demo',
+    provider: getProviderName(),
     status: post.safe ? 'complete' : 'blocked',
     safetyPrecheckId: precheck.id,
     safetyPostcheckId: postcheck.id,
