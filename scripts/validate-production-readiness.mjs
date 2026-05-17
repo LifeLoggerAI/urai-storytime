@@ -50,6 +50,8 @@ const requiredFiles = [
   'src/monitoring-alerting.mjs',
   'docs/PRODUCTION_RELEASE_GATE.md',
   'docs/PRODUCTION_SMOKE_CHECKLIST.md',
+  'docs/PRODUCTION_READINESS_STATUS.md',
+  'docs/FINAL_PRODUCTION_BLOCKERS.md',
   'docs/FIREBASE_RUNTIME_VERIFICATION.md',
   'docs/RELEASE_EVIDENCE_LOG.md',
   'docs/DEPLOYMENT_RUNBOOK.md',
