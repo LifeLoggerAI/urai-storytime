@@ -1,12 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LIVE_PERSISTENCE_STATUS } from '../src/live-persistence-boundary.mjs';
+import { createLivePersistence } from '../src/live-persistence.mjs';
 
-test('live persistence remains blocked without verified Firebase runtime', () => {
-  assert.equal(LIVE_PERSISTENCE_STATUS.productionVerified, false);
+test('live persistence remains disabled without verified Firebase runtime', () => {
+  const persistence = createLivePersistence();
+
+  assert.equal(persistence.enabled, false);
+  assert.match(persistence.blocker, /blocked/i);
 });
 
-test('live persistence requires verified Firebase project evidence', () => {
-  assert.equal(LIVE_PERSISTENCE_STATUS.requiresVerifiedFirebaseProject, true);
+test('live persistence refuses writes while disabled', async () => {
+  const persistence = createLivePersistence();
+
+  await assert.rejects(() => persistence.saveStory({ title: 'Blocked' }), /not enabled/i);
 });
