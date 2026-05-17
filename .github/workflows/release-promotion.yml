@@ -1,0 +1,86 @@
+name: URAI Storytime Release Promotion Verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment to verify.
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      base_url:
+        description: Deployed base URL to verify.
+        required: true
+        type: string
+      rollback_sha:
+        description: Expected rollback SHA for rollback verification.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release-promotion:
+    name: Verify release promotion gates
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run baseline verification
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+          npm run test:smoke
+          npm run test:e2e
+          npm run test:deployment
+          npm run test:security-rules
+          npm run test:emulator-scaffold
+          npm run test:emulator-runtime
+          npm run test:production-readiness
+          npm run build
+
+      - name: Verify provider wiring
+        env:
+          URAI_ANALYTICS_PROVIDER: ${{ secrets.URAI_ANALYTICS_PROVIDER }}
+          URAI_MONITORING_PROVIDER: ${{ secrets.URAI_MONITORING_PROVIDER }}
+          URAI_ALERTING_PROVIDER: ${{ secrets.URAI_ALERTING_PROVIDER }}
+        run: npm run test:provider-wiring
+
+      - name: Verify production evidence
+        env:
+          URAI_FIREBASE_PROJECT_ID: ${{ secrets.URAI_FIREBASE_PROJECT_ID }}
+          URAI_FIREBASE_STAGING_TARGET: ${{ secrets.URAI_FIREBASE_STAGING_TARGET }}
+          URAI_FIREBASE_PRODUCTION_TARGET: ${{ secrets.URAI_FIREBASE_PRODUCTION_TARGET }}
+          URAI_DEPLOY_VERIFIED: ${{ secrets.URAI_DEPLOY_VERIFIED }}
+          URAI_SECRETS_VERIFIED: ${{ secrets.URAI_SECRETS_VERIFIED }}
+          URAI_LEGAL_APPROVED: ${{ secrets.URAI_LEGAL_APPROVED }}
+          URAI_BILLING_PROVIDER: ${{ secrets.URAI_BILLING_PROVIDER }}
+          URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
+        run: npm run test:production-evidence
+
+      - name: Verify production smoke evidence
+        env:
+          URAI_PRODUCTION_URL: ${{ inputs.base_url }}
+          URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
+          URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
+        run: npm run test:production-smoke
+
+      - name: Record rollback expectation
+        run: echo "Rollback SHA evidence required: ${{ inputs.rollback_sha }}"
