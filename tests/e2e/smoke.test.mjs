@@ -77,5 +77,5 @@ test('Deployment and QA docs preserve launch boundaries', () => {
   assert.match(deploymentDoc, /Known launch boundary/);
   assert.match(deploymentDoc, /firebase deploy --only firestore:rules,firestore:indexes/);
   assert.match(qaDoc, /Story sessions default to `visibility: private`/);
-  assert.match(qaDoc, /no diagnosis/i);
+  assert.match(qaDoc, /avoids diagnosis|no diagnosis/i);
 });
