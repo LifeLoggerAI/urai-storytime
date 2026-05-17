@@ -1,0 +1,110 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function ownerOnlyCreate() {
+      return signedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    function ownerOnlyReadWrite(userId) {
+      return isOwner(userId) || isAdmin();
+    }
+
+    match /storySessions/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /storyChapters/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /storyMoments/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /memoryScenes/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /narratorScripts/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /ritualStorycards/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /userStoryPreferences/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /storyExports/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /voiceoverJobs/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /timelineReplayEvents/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /emotionalArcSummaries/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /relationshipStoryThreads/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /weeklyStoryScrolls/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /monthlyStoryScrolls/{id} {
+      allow create: if ownerOnlyCreate() || isAdmin();
+      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /storyAnalyticsEvents/{id} {
+      allow create: if ownerOnlyCreate();
+      allow read: if isAdmin() || ownerOnlyReadWrite(resource.data.userId);
+      allow update, delete: if false;
+    }
+
+    match /publicStoryShares/{id} {
+      allow read: if resource.data.revoked == false;
+      allow create: if ownerOnlyCreate()
+        && request.resource.data.revoked == false
+        && request.resource.data.safeBody is string
+        && request.resource.data.safeSummary is string;
+      allow update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+  }
+}
