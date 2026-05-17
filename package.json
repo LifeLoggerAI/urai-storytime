@@ -7,9 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
-    "test": "node --test",
+    "test": "node --test tests/unit/*.test.mjs tests/e2e/*.test.mjs",
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
 

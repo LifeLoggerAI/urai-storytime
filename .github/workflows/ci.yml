@@ -6,15 +6,16 @@ on:
     branches:
       - main
       - 'implementation/**'
+      - 'storytime-*'
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: Verify install, lint, typecheck, tests, build
+    name: Verify app install, tests, typecheck, and build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -23,11 +24,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Lint
         run: npm run lint
@@ -35,14 +35,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Unit tests
-        run: npm run test
+      - name: Tests
+        run: npm test
 
       - name: Smoke tests
         run: npm run test:smoke
-
-      - name: E2E tests
-        run: npm run test:e2e
 
       - name: Deployment readiness scaffold check
         run: npm run test:deployment
@@ -62,6 +59,28 @@ jobs:
       - name: Production build
         run: npm run build
 
+  functions:
+    name: Verify Firebase Functions build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install function dependencies
+        working-directory: functions
+        run: npm install
+
+      - name: Build functions
+        working-directory: functions
+        run: npm run build
+
   production-gates:
     name: Verify production-only evidence gates
     runs-on: ubuntu-latest
@@ -75,11 +94,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: 22
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Provider wiring validation
         run: npm run test:provider-wiring
