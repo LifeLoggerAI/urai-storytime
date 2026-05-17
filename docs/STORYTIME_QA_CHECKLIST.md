@@ -33,7 +33,7 @@
 - [ ] Public share text redacts names, addresses, emails, and phone numbers.
 - [ ] Every session includes `whyGenerated`.
 - [ ] Safety checks mark sensitive terms as `needs_review`.
-- [ ] Narrator copy avoids diagnosis, manipulation, or medical certainty.
+- [ ] Narrator copy makes no diagnosis, manipulation, or medical certainty claims.
 - [ ] UI does not claim therapy, diagnosis, live passive sensing, or child/family compliance without deployment evidence.
 
 ## Storytime system-of-systems
