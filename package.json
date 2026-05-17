@@ -13,7 +13,7 @@
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
 
-    "test:deployment": "node scripts/validate-deployment-readiness.mjs",
+    "test:deployment": "npm run test:smoke",
     "test:security-rules": "node scripts/validate-security-rules.mjs",
     "test:emulator": "npm run emulators:test",
     "test:emulator-scaffold": "node scripts/validate-emulator-scaffold.mjs",
