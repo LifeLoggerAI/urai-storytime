@@ -12,11 +12,31 @@
     "test": "node --test",
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
+
+    "test:deployment": "node scripts/validate-deployment-readiness.mjs",
+    "test:security-rules": "node scripts/validate-security-rules.mjs",
+    "test:emulator": "npm run emulators:test",
+    "test:emulator-scaffold": "node scripts/validate-emulator-scaffold.mjs",
+    "test:emulator-runtime": "node scripts/validate-emulator-runtime.mjs",
+    "test:provider-wiring": "node scripts/validate-provider-wiring.mjs",
+    "test:production-evidence": "node scripts/validate-production-evidence.mjs",
+    "test:production-smoke": "node scripts/validate-production-smoke.mjs",
+    "test:production-readiness": "node scripts/validate-production-readiness.mjs",
+
+    "validate:firebase-runtime": "node scripts/validate-emulator-runtime.mjs",
+    "validate:production-readiness": "node scripts/validate-production-readiness.mjs",
+    "validate:release-promotion": "npm run test:provider-wiring && npm run test:production-evidence && npm run test:production-smoke",
+
+    "emulators:start": "firebase emulators:start --only auth,firestore,storage --project demo-urai-storytime",
+    "emulators:test": "firebase emulators:exec --only auth,firestore,storage --project demo-urai-storytime \"npm run test:security-rules && npm run test:emulator-runtime\"",
     "firebase:emulators": "firebase emulators:start",
+
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
     "deploy:functions": "firebase deploy --only functions",
     "deploy:hosting": "firebase deploy --only hosting",
-    "deploy": "npm run build && firebase deploy"
+    "deploy": "npm run build && firebase deploy",
+
+    "format": "node scripts/format-check.mjs"
   },
   "dependencies": {
     "firebase": "^11.10.0",
