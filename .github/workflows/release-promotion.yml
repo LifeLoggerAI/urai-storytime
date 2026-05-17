@@ -68,11 +68,16 @@ jobs:
           URAI_FIREBASE_PROJECT_ID: ${{ secrets.URAI_FIREBASE_PROJECT_ID }}
           URAI_FIREBASE_STAGING_TARGET: ${{ secrets.URAI_FIREBASE_STAGING_TARGET }}
           URAI_FIREBASE_PRODUCTION_TARGET: ${{ secrets.URAI_FIREBASE_PRODUCTION_TARGET }}
+          URAI_FIREBASE_AUTH_VERIFIED: ${{ secrets.URAI_FIREBASE_AUTH_VERIFIED }}
+          URAI_FIRESTORE_VERIFIED: ${{ secrets.URAI_FIRESTORE_VERIFIED }}
+          URAI_STORAGE_RULES_VERIFIED: ${{ secrets.URAI_STORAGE_RULES_VERIFIED }}
           URAI_DEPLOY_VERIFIED: ${{ secrets.URAI_DEPLOY_VERIFIED }}
           URAI_SECRETS_VERIFIED: ${{ secrets.URAI_SECRETS_VERIFIED }}
-          URAI_LEGAL_APPROVED: ${{ secrets.URAI_LEGAL_APPROVED }}
           URAI_BILLING_PROVIDER: ${{ secrets.URAI_BILLING_PROVIDER }}
+          URAI_LEGAL_APPROVED: ${{ secrets.URAI_LEGAL_APPROVED }}
+          URAI_PRODUCTION_URL: ${{ inputs.base_url }}
           URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
+          URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
         run: npm run test:production-evidence
 
       - name: Verify production smoke evidence
