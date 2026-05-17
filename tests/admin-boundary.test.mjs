@@ -1,12 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ADMIN_SYSTEM_STATUS } from '../src/admin-system-status.mjs';
+import {
+  ADMIN_ROLES,
+  ADMIN_ACTIONS,
+  canPerformAdminAction,
+} from '../src/admin-boundary.mjs';
 
-test('admin systems default to non-production verified state', () => {
-  assert.equal(ADMIN_SYSTEM_STATUS.productionVerified, false);
+test('owner role can manage release actions', () => {
+  assert.equal(
+    canPerformAdminAction(ADMIN_ROLES.owner, ADMIN_ACTIONS.manageRelease),
+    true,
+  );
 });
 
-test('admin systems require verified auth provider', () => {
-  assert.equal(ADMIN_SYSTEM_STATUS.requiresVerifiedAuthProvider, true);
+test('moderator role cannot process deletion requests', () => {
+  assert.equal(
+    canPerformAdminAction(ADMIN_ROLES.moderator, ADMIN_ACTIONS.processDeletion),
+    false,
+  );
 });
