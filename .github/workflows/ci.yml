@@ -86,3 +86,6 @@ jobs:
 
       - name: Production evidence validation
         run: npm run test:production-evidence
+
+      - name: Production smoke validation
+        run: npm run test:production-smoke
