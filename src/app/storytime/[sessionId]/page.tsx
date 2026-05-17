@@ -7,6 +7,12 @@ import { StoryPlayer } from "@/components/storytime/StoryPlayer";
 import { StoryScrollExportPreview } from "@/components/storytime/StoryScrollExportPreview";
 import { buildStorySession } from "@/lib/storytime/story-builder";
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return [{ sessionId: "demo" }];
+}
+
 export default async function StorySessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   const story = buildStorySession({
