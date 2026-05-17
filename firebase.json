@@ -1,6 +1,9 @@
 {
   "hosting": {
-    "public": "dist",
+    "source": ".",
+    "frameworksBackend": {
+      "region": "us-central1"
+    },
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -28,12 +31,6 @@
           }
         ]
       }
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
     ]
   },
   "firestore": {
@@ -43,9 +40,18 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "storytime"
+    }
+  ],
   "emulators": {
     "auth": {
       "port": 9099
+    },
+    "functions": {
+      "port": 5001
     },
     "firestore": {
       "port": 8080

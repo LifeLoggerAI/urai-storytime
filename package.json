@@ -1,17 +1,18 @@
 {
   "name": "urai-storytime",
-  "version": "1.0.0",
+  "version": "2.5.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/server.mjs",
-    "build": "node scripts/build.mjs",
-    "preview": "node dist/server.mjs",
-    "lint": "node scripts/lint.mjs",
-    "typecheck": "node scripts/typecheck.mjs",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
     "test": "node --test",
     "test:smoke": "node tests/e2e/smoke.test.mjs",
     "test:e2e": "node tests/e2e/smoke.test.mjs",
+
     "test:deployment": "node scripts/validate-deployment-readiness.mjs",
     "test:security-rules": "node scripts/validate-security-rules.mjs",
     "test:emulator": "npm run emulators:test",
@@ -21,11 +22,35 @@
     "test:production-evidence": "node scripts/validate-production-evidence.mjs",
     "test:production-smoke": "node scripts/validate-production-smoke.mjs",
     "test:production-readiness": "node scripts/validate-production-readiness.mjs",
+
     "validate:firebase-runtime": "node scripts/validate-emulator-runtime.mjs",
     "validate:production-readiness": "node scripts/validate-production-readiness.mjs",
     "validate:release-promotion": "npm run test:provider-wiring && npm run test:production-evidence && npm run test:production-smoke",
+
     "emulators:start": "firebase emulators:start --only auth,firestore,storage --project demo-urai-storytime",
     "emulators:test": "firebase emulators:exec --only auth,firestore,storage --project demo-urai-storytime \"npm run test:security-rules && npm run test:emulator-runtime\"",
+    "firebase:emulators": "firebase emulators:start",
+
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:functions": "firebase deploy --only functions",
+    "deploy:hosting": "firebase deploy --only hosting",
+    "deploy": "npm run build && firebase deploy",
+
     "format": "node scripts/format-check.mjs"
+  },
+  "dependencies": {
+    "firebase": "^11.10.0",
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.3.2",
+    "next": "^15.3.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.32",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "^5.8.3"
   }
 }
