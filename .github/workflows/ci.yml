@@ -53,6 +53,9 @@ jobs:
       - name: Emulator scaffold validation
         run: npm run test:emulator-scaffold
 
+      - name: Emulator runtime validation
+        run: npm run test:emulator-runtime
+
       - name: Production readiness validation
         run: npm run test:production-readiness
 
