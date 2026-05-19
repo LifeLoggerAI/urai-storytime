@@ -1,4 +1,4 @@
-import type { StoryChapter, StorySession } from "./types";
+import type { StoryChapter, StoryExport, StorySession } from "./types";
 
 export interface AssetFactoryStoryInput {
   story_input: {
@@ -24,6 +24,7 @@ export interface AssetFactoryJobStatus {
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | string;
   asset_bundle_url?: string;
   download_url?: string;
+  storage_path?: string;
   error?: string;
   metadata?: Record<string, unknown>;
 }
@@ -33,6 +34,7 @@ export interface StorytimeAssetIngestionRecord {
   assetFactoryJobId: string;
   status: AssetFactoryJobStatus["status"];
   bundleUrl?: string;
+  storagePath?: string;
   recordedAt: string;
   source: "asset_factory";
 }
@@ -64,6 +66,13 @@ async function requestAssetFactory<T>(path: string, init: RequestInit = {}): Pro
   }
 
   return res.json() as Promise<T>;
+}
+
+function toStoryExportStatus(status: AssetFactoryJobStatus["status"]): StoryExport["status"] {
+  if (status === "succeeded") return "completed";
+  if (status === "failed" || status === "cancelled") return "failed";
+  if (status === "running") return "running";
+  return "queued";
 }
 
 export function toAssetFactoryInput(session: StorySession, chapters: StoryChapter[]): AssetFactoryStoryInput {
@@ -110,7 +119,28 @@ export function toStorytimeAssetIngestionRecord(
     assetFactoryJobId: status.job_id,
     status: status.status,
     bundleUrl: status.asset_bundle_url || status.download_url,
+    storagePath: status.storage_path,
     recordedAt: new Date().toISOString(),
     source: "asset_factory"
+  };
+}
+
+export function toStoryExportFromAssetFactoryStatus(
+  session: StorySession,
+  status: AssetFactoryJobStatus
+): StoryExport {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: `storyExport_${status.job_id}`,
+    userId: session.userId,
+    sessionId: session.id,
+    exportType: "asset_factory_zip",
+    status: toStoryExportStatus(status.status),
+    storagePath: status.storage_path,
+    downloadUrl: status.asset_bundle_url || status.download_url,
+    assetFactoryJobId: status.job_id,
+    createdAt: timestamp,
+    updatedAt: timestamp
   };
 }
