@@ -239,6 +239,7 @@ export const prepareVoiceoverJob = onCall(async (request) => {
   const createdAt = now();
   const voiceoverJobId = id("voiceoverJob");
   const exportId = id("storyExport");
+  const timelineEventId = id("timelineReplayEvent");
   const narratorScriptId = input.narratorScriptId || session.data.narratorScriptIds?.[0];
 
   if (!narratorScriptId) {
@@ -270,8 +271,8 @@ export const prepareVoiceoverJob = onCall(async (request) => {
   const batch = db.batch();
   batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), voiceoverJob);
   batch.set(db.collection("storyExports").doc(exportId), storyExport);
-  batch.set(db.collection("timelineReplayEvents").doc(id("timelineReplayEvent")), {
-    id: id("timelineReplayEvent"),
+  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
+    id: timelineEventId,
     userId,
     sessionId: input.sessionId,
     eventType: "exported",
