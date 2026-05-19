@@ -30,3 +30,20 @@ test('Asset-Factory adapter exposes polling and ingestion records for the Storyt
   assert.match(source, /bundleUrl/);
   assert.match(source, /source: "asset_factory"/);
 });
+
+test('Asset-Factory adapter maps provider status into StoryExport records', () => {
+  assert.match(source, /import type \{ StoryChapter, StoryExport, StorySession \}/);
+  assert.match(source, /toStoryExportFromAssetFactoryStatus/);
+  assert.match(source, /exportType: "asset_factory_zip"/);
+  assert.match(source, /id: `storyExport_\$\{status\.job_id\}`/);
+  assert.match(source, /downloadUrl: status\.asset_bundle_url \|\| status\.download_url/);
+  assert.match(source, /storagePath: status\.storage_path/);
+  assert.match(source, /assetFactoryJobId: status\.job_id/);
+});
+
+test('Asset-Factory status mapping preserves queued, running, completed, and failed states', () => {
+  assert.match(source, /if \(status === "succeeded"\) return "completed"/);
+  assert.match(source, /if \(status === "failed" \|\| status === "cancelled"\) return "failed"/);
+  assert.match(source, /if \(status === "running"\) return "running"/);
+  assert.match(source, /return "queued"/);
+});
