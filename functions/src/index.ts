@@ -1,6 +1,5 @@
 export {
   generateStorySession,
-  generateWeeklyStoryScroll,
   createPublicStoryShare,
   prepareVoiceoverJob,
   refreshStoryTimeline,
@@ -9,3 +8,4 @@ export {
 
 export { generateNarratorScript } from "./generate-narrator-script.js";
 export { generateEmotionalArcSummary } from "./generate-emotional-arc-summary.js";
+export { generateWeeklyStoryScroll } from "./generate-weekly-story-scroll.js";
