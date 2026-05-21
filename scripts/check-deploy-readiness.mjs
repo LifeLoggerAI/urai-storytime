@@ -40,6 +40,9 @@ if (!functionsPackage.scripts?.build) {
 if (functionsPackage.main !== 'lib/index.js') {
   fail('functions/package.json main must point to lib/index.js.');
 }
+if (!fs.existsSync('functions/lib/index.js')) {
+  fail('Missing compiled Functions output: functions/lib/index.js. Run npm --prefix functions run build before deploying.');
+}
 
 const firebaseConfig = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
 const functionsEntry = fs.readFileSync('functions/src/index.ts', 'utf8');
