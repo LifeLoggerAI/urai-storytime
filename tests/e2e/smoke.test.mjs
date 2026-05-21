@@ -8,6 +8,8 @@ const packageJson = JSON.parse(read('package.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
 const storyBuilder = read('src/lib/storytime/story-builder.ts');
+const storySettings = read('src/components/storytime/StorySettings.tsx');
+const globals = read('src/app/globals.css');
 const shareRoute = read('src/app/share/story/[shareId]/page.tsx');
 const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
@@ -59,6 +61,14 @@ test('Storytime builder normalizes bounded user input', () => {
   assert.match(storyBuilder, /title = normalizeText\(input\.title/);
   assert.match(storyBuilder, /source = normalizeText\(input\.sourceText/);
   assert.match(storyBuilder, /symbolicMotifs = normalizeList\(input\.symbolicMotifs/);
+});
+
+test('Storytime settings preserve consent and launch boundaries', () => {
+  assert.match(storySettings, /private by default/i);
+  assert.match(storySettings, /read-only in the demo build/i);
+  assert.match(storySettings, /Firebase auth, Firestore persistence, security rules/);
+  assert.match(storySettings, /Public-safe shares require consent, redaction, and safety review/);
+  assert.match(globals, /\.storytime-button:disabled/);
 });
 
 test('Firestore rules enforce owner and public-share boundaries', () => {
