@@ -2,15 +2,22 @@ export default function OnboardingPage() {
   return (
     <section className="card">
       <h1>Family Onboarding</h1>
-      <p>Cloud onboarding creates a parent account, family workspace, child profile, age band, narrator preference, privacy settings, and first story. Local demo users can start immediately without an account.</p>
+      <p>
+        Family onboarding is currently a preview of the future cloud setup flow. Local demo users
+        can start immediately without an account.
+      </p>
+      <p className="notice">
+        Live onboarding remains disabled until account setup, family workspace setup, privacy
+        settings, recovery, and data controls are verified end to end.
+      </p>
       <ol>
-        <li>Create parent account.</li>
-        <li>Create family workspace.</li>
-        <li>Add child profile and age band.</li>
-        <li>Choose narrator and bedtime defaults.</li>
-        <li>Create the first story.</li>
+        <li>Preview parent account setup.</li>
+        <li>Preview family workspace setup.</li>
+        <li>Preview child profile and age band setup.</li>
+        <li>Preview narrator and bedtime defaults.</li>
+        <li>Create a local demo story.</li>
       </ol>
-      <a className="btn" href="/create">Create first story</a>
+      <a className="btn" href="/create">Create local demo story</a>
     </section>
   );
 }
