@@ -34,4 +34,18 @@ describe('StoryEngine', () => {
     expect(result.story.status).toBe('blocked');
     expect(result.precheck.blockedReasons.length).toBeGreaterThan(0);
   });
+
+  it('normalizes direct engine request text', async () => {
+    const result = await createStoryManifest({
+      ...request,
+      childDisplayName: '   ',
+      theme: ` ${'Moon Garden '.repeat(40)} `,
+      prompt: ` ${'Kindness and calm. '.repeat(300)} `
+    });
+
+    expect(result.story.status).toBe('ready');
+    expect(result.story.title).toMatch(/^Your child's /);
+    expect(result.story.theme.length).toBeLessThanOrEqual(120);
+    expect(result.story.summary).toContain(result.story.theme);
+  });
 });
