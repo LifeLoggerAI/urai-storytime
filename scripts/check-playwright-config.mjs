@@ -27,13 +27,14 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+const skipRuntimeCheck = process.env.URAI_SKIP_PLAYWRIGHT_RUNTIME_CHECK === 'true';
 const hasLinuxGlib =
   process.platform !== 'linux' ||
   commandSucceeds('ldconfig -p | grep -q libglib-2.0.so.0') ||
   Boolean(process.env.LD_LIBRARY_PATH?.includes('glib')) ||
   Boolean(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH);
 
-if (!hasLinuxGlib) {
+if (!skipRuntimeCheck && !hasLinuxGlib) {
   console.error('Playwright environment preflight failed: missing libglib-2.0.so.0.');
   console.error('Chromium cannot launch until browser runtime libraries are available.');
   console.error('In IDX/Nix, pull latest and rebuild/restart the workspace so .idx/dev.nix reloads.');
@@ -41,4 +42,4 @@ if (!hasLinuxGlib) {
   process.exit(1);
 }
 
-console.log('Playwright config preflight passed.');
+console.log(skipRuntimeCheck ? 'Playwright config preflight passed; runtime library check skipped.' : 'Playwright config preflight passed.');
