@@ -24,6 +24,18 @@ for (const file of requiredFiles) {
   if (!fs.existsSync(file)) fail(`Missing required file: ${file}`);
 }
 
+const firebaseConfig = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
+const functionsEntry = fs.existsSync('functions/src/index.ts')
+  ? fs.readFileSync('functions/src/index.ts', 'utf8')
+  : '';
+const hostingRewrites = firebaseConfig.hosting?.rewrites || [];
+
+for (const rewrite of hostingRewrites) {
+  if (rewrite.function && !functionsEntry.includes(`export const ${rewrite.function}`)) {
+    fail(`firebase.json rewrites to missing function export: ${rewrite.function}`);
+  }
+}
+
 const target = process.env.URAI_DEPLOY_TARGET;
 if (!target || !['staging', 'production'].includes(target)) {
   fail('Set URAI_DEPLOY_TARGET=staging or URAI_DEPLOY_TARGET=production before deploying.');
