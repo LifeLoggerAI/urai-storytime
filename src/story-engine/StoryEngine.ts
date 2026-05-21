@@ -5,6 +5,9 @@ import { generateAIStory } from './OpenAIStoryProvider';
 import { splitIntoScenes } from './SceneSplitter';
 
 const safety = new LocalSafetyProvider();
+const MAX_CHILD_DISPLAY_NAME_CHARS = 80;
+const MAX_THEME_CHARS = 120;
+const MAX_PROMPT_CHARS = 2000;
 
 function now() {
   return new Date().toISOString();
@@ -14,17 +17,32 @@ function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizeText(value: string, fallback: string, maxLength: number) {
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  return (normalized || fallback).slice(0, maxLength);
+}
+
+function normalizeStoryRequest(request: StoryRequest): StoryRequest {
+  return {
+    ...request,
+    childDisplayName: normalizeText(request.childDisplayName, 'Your child', MAX_CHILD_DISPLAY_NAME_CHARS),
+    theme: normalizeText(request.theme, 'Kindness Adventure', MAX_THEME_CHARS),
+    prompt: normalizeText(request.prompt, 'A calm, family-safe bedtime story.', MAX_PROMPT_CHARS)
+  };
+}
+
 function getProviderName(): StoryRun['provider'] {
   if (typeof window !== 'undefined') return 'local_demo';
   return process.env.OPENAI_API_KEY ? 'openai' : 'local_demo';
 }
 
-export async function createStoryManifest(request: StoryRequest): Promise<{
+export async function createStoryManifest(rawRequest: StoryRequest): Promise<{
   story: Story;
   run: StoryRun;
   precheck: SafetyReview;
   postcheck: SafetyReview;
 }> {
+  const request = normalizeStoryRequest(rawRequest);
   const pre = safety.check(`${request.childDisplayName} ${request.theme} ${request.mood} ${request.prompt}`);
   const runId = makeId('run');
   const storyId = makeId('story');
