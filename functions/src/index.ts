@@ -6,17 +6,13 @@ initializeApp();
 
 const db = getFirestore();
 
-type ModerationClaims = {
-  admin?: unknown;
-  moderator?: unknown;
-};
-
 function requireAuth(uid?: string) {
   if (!uid) throw new HttpsError('unauthenticated', 'Please sign in.');
 }
 
-function hasModeratorRole(token: ModerationClaims = {}) {
-  return token.admin === true || token.moderator === true;
+function hasModeratorRole(token: unknown) {
+  const claims = token as { admin?: unknown; moderator?: unknown } | undefined;
+  return claims?.admin === true || claims?.moderator === true;
 }
 
 function id(prefix: string) {
