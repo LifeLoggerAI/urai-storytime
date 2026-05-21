@@ -33,6 +33,16 @@ test('Storytime app routes are wired', () => {
   assert.match(shareRoute, /redacted/);
 });
 
+test('Storytime create form opens a bounded demo session', () => {
+  assert.match(storytimeHome, /onSubmit=\{handleCreateStory\}/);
+  assert.match(storytimeHome, /type="submit"/);
+  assert.match(storytimeHome, /MAX_DEMO_SOURCE_CHARS/);
+  assert.match(storytimeHome, /window\.location\.assign\(`\/storytime\/demo\?\$\{params\.toString\(\)\}`\)/);
+  assert.match(storytimeSessionRoute, /searchParams\?: Promise<StorySearchParams>/);
+  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.title/);
+  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.source/);
+});
+
 test('Firestore rules enforce owner and public-share boundaries', () => {
   assert.match(rules, /function isOwner/);
   assert.match(rules, /match \/storySessions\/{id}/);
