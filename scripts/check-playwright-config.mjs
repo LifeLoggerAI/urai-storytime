@@ -1,4 +1,14 @@
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
+
+function commandSucceeds(command) {
+  try {
+    execSync(command, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const configPath = 'playwright.config.ts';
 const config = fs.readFileSync(configPath, 'utf8');
@@ -14,6 +24,20 @@ if (failures.length > 0) {
   for (const [pattern, message] of failures) {
     console.error(`- Found ${pattern}: ${message}`);
   }
+  process.exit(1);
+}
+
+const hasLinuxGlib =
+  process.platform !== 'linux' ||
+  commandSucceeds('ldconfig -p | grep -q libglib-2.0.so.0') ||
+  Boolean(process.env.LD_LIBRARY_PATH?.includes('glib')) ||
+  Boolean(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH);
+
+if (!hasLinuxGlib) {
+  console.error('Playwright environment preflight failed: missing libglib-2.0.so.0.');
+  console.error('Chromium cannot launch until browser runtime libraries are available.');
+  console.error('In IDX/Nix, pull latest and rebuild/restart the workspace so .idx/dev.nix reloads.');
+  console.error('In a normal Ubuntu shell, install Playwright system dependencies with root access or use npm run test:e2e:install-with-deps.');
   process.exit(1);
 }
 
