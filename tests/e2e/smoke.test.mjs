@@ -32,7 +32,7 @@ test('Storytime app routes are wired', () => {
   assert.match(storytimeSessionRoute, /StoryPlayer/);
   assert.match(storytimeSessionRoute, /ChapterTimeline/);
   assert.match(storytimeSessionRoute, /EmotionalArcViewer/);
-  assert.match(shareRoute, /Public-safe share/);
+  assert.match(shareRoute, /Public-safe share demo/);
   assert.match(shareRoute, /redacted/);
 });
 
@@ -69,6 +69,14 @@ test('Storytime settings preserve consent and launch boundaries', () => {
   assert.match(storySettings, /Firebase auth, Firestore persistence, security rules/);
   assert.match(storySettings, /Public-safe shares require consent, redaction, and safety review/);
   assert.match(globals, /\.storytime-button:disabled/);
+});
+
+test('Public share route preserves demo-only safety boundaries', () => {
+  assert.match(shareRoute, /MAX_SHARE_ID_CHARS/);
+  assert.match(shareRoute, /normalizeShareId/);
+  assert.match(shareRoute, /Real public links must stay disabled/);
+  assert.match(shareRoute, /Consent required/);
+  assert.match(shareRoute, /Revocable/);
 });
 
 test('Firestore rules enforce owner and public-share boundaries', () => {
