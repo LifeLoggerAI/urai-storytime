@@ -9,6 +9,9 @@ export function StoryReplay({ story }: { story: Story }) {
   const [activeScene, setActiveScene] = useState(0);
   const [status, setStatus] = useState('');
   const scene = story.scenes[activeScene];
+  const hasScenes = story.scenes.length > 0;
+  const isFirstScene = activeScene <= 0;
+  const isLastScene = !hasScenes || activeScene >= story.scenes.length - 1;
   const exportData = useMemo(() => createStoryExport(story), [story]);
 
   async function speak() {
@@ -25,6 +28,11 @@ export function StoryReplay({ story }: { story: Story }) {
   }
 
   async function copyShareCard() {
+    if (!navigator.clipboard?.writeText) {
+      setStatus('Copy is not supported in this browser. You can still download the story export.');
+      return;
+    }
+
     await navigator.clipboard.writeText(createShareCardText(story));
     setStatus('Share card text copied.');
     await trackEvent('story_export_created', { storyId: story.id, type: 'share_text' });
@@ -59,8 +67,8 @@ export function StoryReplay({ story }: { story: Story }) {
 
       <div className="actions">
         <button className="btn" onClick={speak}>Play narration</button>
-        <button onClick={() => setActiveScene(Math.max(0, activeScene - 1))}>Previous</button>
-        <button onClick={() => setActiveScene(Math.min(story.scenes.length - 1, activeScene + 1))}>Next</button>
+        <button onClick={() => setActiveScene(Math.max(0, activeScene - 1))} disabled={isFirstScene}>Previous</button>
+        <button onClick={() => setActiveScene(Math.min(story.scenes.length - 1, activeScene + 1))} disabled={isLastScene}>Next</button>
         <button onClick={copyShareCard}>Copy share card</button>
         <button onClick={downloadJson}>Download export</button>
       </div>
