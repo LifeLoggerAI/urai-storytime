@@ -13,6 +13,15 @@ function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function formText(formData: FormData, key: string, fallback: string, maxLength: number) {
+  return String(formData.get(key) || fallback).trim().slice(0, maxLength) || fallback;
+}
+
+function formEnum<T extends string>(formData: FormData, key: string, allowedValues: readonly T[], fallback: T): T {
+  const value = String(formData.get(key) || '');
+  return allowedValues.includes(value as T) ? (value as T) : fallback;
+}
+
 export function StoryCreateForm() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'blocked' | 'error'>('idle');
   const [story, setStory] = useState<Story | null>(null);
@@ -28,12 +37,12 @@ export function StoryCreateForm() {
       familyId: 'local_demo_family',
       childProfileId: 'local_demo_child',
       requestedByUserId: 'local_demo_parent',
-      childDisplayName: String(formData.get('childDisplayName') || 'Ari').slice(0, 32),
-      ageBand: String(formData.get('ageBand') || 'early_reader_6_8') as AgeBand,
-      theme: String(formData.get('theme') || 'Moon Garden').slice(0, 80),
-      mood: String(formData.get('mood') || 'gentle') as StoryMood,
-      narratorId: String(formData.get('narratorId') || 'gentle_firefly'),
-      prompt: String(formData.get('prompt') || '').slice(0, 700),
+      childDisplayName: formText(formData, 'childDisplayName', 'Ari', 32),
+      ageBand: formEnum(formData, 'ageBand', ageBands, 'early_reader_6_8'),
+      theme: formText(formData, 'theme', 'Moon Garden', 80),
+      mood: formEnum(formData, 'mood', moods, 'gentle'),
+      narratorId: formText(formData, 'narratorId', 'gentle_firefly', 80),
+      prompt: formText(formData, 'prompt', '', 700),
       memorySeedIds: [],
       bedtimeMode: formData.get('bedtimeMode') === 'on',
       createdAt: new Date().toISOString()
