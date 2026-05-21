@@ -17,17 +17,26 @@ const requiredFiles = [
   'firestore.indexes.json',
   'storage.rules',
   'playwright.config.ts',
-  'scripts/check-playwright-config.mjs'
+  'scripts/check-playwright-config.mjs',
+  'functions/package.json',
+  'functions/tsconfig.json',
+  'functions/src/index.ts'
 ];
 
 for (const file of requiredFiles) {
   if (!fs.existsSync(file)) fail(`Missing required file: ${file}`);
 }
 
+const functionsPackage = JSON.parse(fs.readFileSync('functions/package.json', 'utf8'));
+if (!functionsPackage.scripts?.build) {
+  fail('functions/package.json must expose a build script before Firebase deployment.');
+}
+if (functionsPackage.main !== 'lib/index.js') {
+  fail('functions/package.json main must point to lib/index.js.');
+}
+
 const firebaseConfig = JSON.parse(fs.readFileSync('firebase.json', 'utf8'));
-const functionsEntry = fs.existsSync('functions/src/index.ts')
-  ? fs.readFileSync('functions/src/index.ts', 'utf8')
-  : '';
+const functionsEntry = fs.readFileSync('functions/src/index.ts', 'utf8');
 const hostingRewrites = firebaseConfig.hosting?.rewrites || [];
 
 for (const rewrite of hostingRewrites) {
