@@ -1,24 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
-import { execSync } from 'node:child_process';
 
-function resolveChromiumExecutablePath() {
-  if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
-    return process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-  }
-
-  if (process.env.CI) {
-    return undefined;
-  }
-
-  try {
-    const path = execSync('command -v chromium', { encoding: 'utf8' }).trim();
-    return path || undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-const chromiumExecutablePath = resolveChromiumExecutablePath();
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 const launchOptions = chromiumExecutablePath
   ? {
       executablePath: chromiumExecutablePath,
@@ -27,10 +9,8 @@ const launchOptions = chromiumExecutablePath
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-gpu',
-        '--disable-software-rasterizer',
         '--disable-background-networking',
-        '--disable-features=VizDisplayCompositor,UseChromeOSDirectVideoDecoder',
-        '--single-process'
+        '--disable-features=VizDisplayCompositor,UseChromeOSDirectVideoDecoder'
       ]
     }
   : undefined;
