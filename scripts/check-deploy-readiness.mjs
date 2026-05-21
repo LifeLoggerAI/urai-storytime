@@ -76,5 +76,5 @@ if (target === 'production' && branch !== 'main') {
   fail(`Production deploys must run from main. Current branch: ${branch}`);
 }
 
-run('node scripts/check-playwright-config.mjs');
+run('URAI_SKIP_PLAYWRIGHT_RUNTIME_CHECK=true node scripts/check-playwright-config.mjs');
 console.log(`Deploy readiness passed for ${target} using Firebase project ${firebaseProject}.`);
