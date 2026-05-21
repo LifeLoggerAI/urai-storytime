@@ -9,16 +9,44 @@ import { buildStorySession } from "@/lib/storytime/story-builder";
 
 export const dynamicParams = false;
 
+const DEFAULT_DEMO_SOURCE =
+  "A quiet URAI signal became a private story replay, with each moment handled gently and kept private by default.";
+const MAX_DEMO_SOURCE_CHARS = 1200;
+const MAX_DEMO_TITLE_CHARS = 120;
+
+type StorySearchParams = {
+  title?: string | string[];
+  source?: string | string[];
+};
+
+function firstQueryValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function normalizeQueryText(value: string | string[] | undefined, fallback: string, maxLength: number) {
+  const normalized = firstQueryValue(value)?.trim();
+  return (normalized || fallback).slice(0, maxLength);
+}
+
 export function generateStaticParams() {
   return [{ sessionId: "demo" }];
 }
 
-export default async function StorySessionPage({ params }: { params: Promise<{ sessionId: string }> }) {
+export default async function StorySessionPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ sessionId: string }>;
+  searchParams?: Promise<StorySearchParams>;
+}) {
   const { sessionId } = await params;
+  const query = searchParams ? await searchParams : {};
+  const storyTitle = normalizeQueryText(query.title, `Story Session ${sessionId}`, MAX_DEMO_TITLE_CHARS);
+  const storySource = normalizeQueryText(query.source, DEFAULT_DEMO_SOURCE, MAX_DEMO_SOURCE_CHARS);
   const story = buildStorySession({
     userId: "demo-user",
-    title: `Story Session ${sessionId}`,
-    sourceText: "A quiet URAI signal became a private story replay, with each moment handled gently and kept private by default.",
+    title: storyTitle,
+    sourceText: storySource,
     emotionalTone: "reflective",
     symbolicMotifs: ["star", "path", "soft glow"],
     sourceSignals: ["demo story seed"]
