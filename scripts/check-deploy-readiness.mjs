@@ -7,7 +7,13 @@ function fail(message) {
 }
 
 function run(command) {
-  return execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    return execSync(command, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  } catch (error) {
+    const stdout = typeof error === 'object' && error && 'stdout' in error ? String(error.stdout || '') : '';
+    const stderr = typeof error === 'object' && error && 'stderr' in error ? String(error.stderr || '') : '';
+    fail(`${command} failed. ${stdout || stderr || 'No command output was captured.'}`.trim());
+  }
 }
 
 const requiredFiles = [
