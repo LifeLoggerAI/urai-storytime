@@ -6,8 +6,17 @@ initializeApp();
 
 const db = getFirestore();
 
+type ModerationClaims = {
+  admin?: unknown;
+  moderator?: unknown;
+};
+
 function requireAuth(uid?: string) {
   if (!uid) throw new HttpsError('unauthenticated', 'Please sign in.');
+}
+
+function hasModeratorRole(token: ModerationClaims = {}) {
+  return token.admin === true || token.moderator === true;
 }
 
 function id(prefix: string) {
@@ -215,8 +224,7 @@ export const requestPrivacyDelete = onCall(async (request) => {
 
 export const reviewModerationEvent = onCall(async (request) => {
   requireAuth(request.auth?.uid);
-  const token = request.auth?.token || {};
-  if (!token.admin && !token.moderator) throw new HttpsError('permission-denied', 'Moderator role required.');
+  if (!hasModeratorRole(request.auth?.token)) throw new HttpsError('permission-denied', 'Moderator role required.');
   const { eventId, decision, reason } = request.data || {};
   if (!eventId || !['approved', 'rejected', 'escalated', 'resolved'].includes(decision)) throw new HttpsError('invalid-argument', 'Valid eventId and decision are required.');
   await db.collection('moderationEvents').doc(String(eventId)).update({ status: decision, resolvedAt: new Date().toISOString(), resolutionReason: reason || '' });
