@@ -1,4 +1,4 @@
-import type { StoryChapter, StorySession } from "./types";
+import type { StoryChapter, StoryExport, StorySession } from "./types";
 
 export interface AssetFactoryStoryInput {
   story_input: {
@@ -12,6 +12,67 @@ export interface AssetFactoryStoryInput {
   mood: string;
   audience: "private_user" | "family" | "public_safe";
   platform_targets: string[];
+}
+
+export interface AssetFactoryJobResponse {
+  job_id: string;
+  status: string;
+}
+
+export interface AssetFactoryJobStatus {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | string;
+  asset_bundle_url?: string;
+  download_url?: string;
+  storage_path?: string;
+  error?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface StorytimeAssetIngestionRecord {
+  sessionId: string;
+  assetFactoryJobId: string;
+  status: AssetFactoryJobStatus["status"];
+  bundleUrl?: string;
+  storagePath?: string;
+  recordedAt: string;
+  source: "asset_factory";
+}
+
+function getAssetFactoryConfig() {
+  const baseUrl = process.env.ASSET_FACTORY_BASE_URL?.replace(/\/$/, "");
+  const apiKey = process.env.ASSET_FACTORY_API_KEY;
+
+  if (!baseUrl || !apiKey) {
+    throw new Error("Asset-Factory is not configured.");
+  }
+
+  return { baseUrl, apiKey };
+}
+
+async function requestAssetFactory<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const { baseUrl, apiKey } = getAssetFactoryConfig();
+  const res = await fetch(`${baseUrl}${path}`, {
+    ...init,
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+      ...(init.headers || {})
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`Asset-Factory request failed: ${res.status}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+function toStoryExportStatus(status: AssetFactoryJobStatus["status"]): StoryExport["status"] {
+  if (status === "succeeded") return "completed";
+  if (status === "failed" || status === "cancelled") return "failed";
+  if (status === "running") return "running";
+  return "queued";
 }
 
 export function toAssetFactoryInput(session: StorySession, chapters: StoryChapter[]): AssetFactoryStoryInput {
@@ -30,26 +91,56 @@ export function toAssetFactoryInput(session: StorySession, chapters: StoryChapte
   };
 }
 
-export async function createAssetFactoryJob(input: AssetFactoryStoryInput) {
-  const baseUrl = process.env.ASSET_FACTORY_BASE_URL;
-  const apiKey = process.env.ASSET_FACTORY_API_KEY;
-
-  if (!baseUrl || !apiKey) {
-    throw new Error("Asset-Factory is not configured.");
-  }
-
-  const res = await fetch(`${baseUrl}/v1/jobs`, {
+export async function createAssetFactoryJob(input: AssetFactoryStoryInput): Promise<AssetFactoryJobResponse> {
+  return requestAssetFactory<AssetFactoryJobResponse>("/v1/jobs", {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${apiKey}`
-    },
     body: JSON.stringify(input)
   });
+}
 
-  if (!res.ok) {
-    throw new Error(`Asset-Factory job failed: ${res.status}`);
+export async function getAssetFactoryJobStatus(jobId: string): Promise<AssetFactoryJobStatus> {
+  if (!jobId.trim()) {
+    throw new Error("Asset-Factory job id is required.");
   }
 
-  return res.json() as Promise<{ job_id: string; status: string }>;
+  return requestAssetFactory<AssetFactoryJobStatus>(`/v1/jobs/${encodeURIComponent(jobId)}`);
+}
+
+export function toStorytimeAssetIngestionRecord(
+  sessionId: string,
+  status: AssetFactoryJobStatus
+): StorytimeAssetIngestionRecord {
+  if (!sessionId.trim()) {
+    throw new Error("Storytime session id is required for asset ingestion.");
+  }
+
+  return {
+    sessionId,
+    assetFactoryJobId: status.job_id,
+    status: status.status,
+    bundleUrl: status.asset_bundle_url || status.download_url,
+    storagePath: status.storage_path,
+    recordedAt: new Date().toISOString(),
+    source: "asset_factory"
+  };
+}
+
+export function toStoryExportFromAssetFactoryStatus(
+  session: StorySession,
+  status: AssetFactoryJobStatus
+): StoryExport {
+  const timestamp = new Date().toISOString();
+
+  return {
+    id: `storyExport_${status.job_id}`,
+    userId: session.userId,
+    sessionId: session.id,
+    exportType: "asset_factory_zip",
+    status: toStoryExportStatus(status.status),
+    storagePath: status.storage_path,
+    downloadUrl: status.asset_bundle_url || status.download_url,
+    assetFactoryJobId: status.job_id,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  };
 }
