@@ -1,10 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
+
+const MAX_DEMO_SOURCE_CHARS = 1200;
 
 export function StorytimeHome() {
   const [title, setTitle] = useState("A Quiet Signal Became a Story");
   const [sourceText, setSourceText] = useState("");
+
+  function handleCreateStory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const cleanTitle = title.trim() || "Untitled Story Session";
+    const cleanSource = sourceText.trim().slice(0, MAX_DEMO_SOURCE_CHARS);
+    const params = new URLSearchParams({ title: cleanTitle });
+
+    if (cleanSource) {
+      params.set("source", cleanSource);
+    }
+
+    window.location.assign(`/storytime/demo?${params.toString()}`);
+  }
 
   return (
     <main className="storytime-shell">
@@ -38,7 +54,7 @@ export function StorytimeHome() {
           ))}
         </section>
 
-        <form className="storytime-card storytime-form">
+        <form className="storytime-card storytime-form" onSubmit={handleCreateStory}>
           <h2>Create a private story seed</h2>
           <label className="storytime-field">
             Story title
@@ -54,11 +70,11 @@ export function StorytimeHome() {
               placeholder="Paste a private moment, weekly reflection, or story seed."
             />
           </label>
-          <button className="storytime-button" type="button">
+          <button className="storytime-button" type="submit" disabled={!title.trim()}>
             Generate Story Session
           </button>
           <p>
-            Cloud generation is wired through Firebase callable functions once Firebase env vars and auth are configured. This UI intentionally remains privacy-clear while deployment is completed.
+            Cloud generation is wired through Firebase callable functions once Firebase env vars and auth are configured. Until then, this form opens a private demo session from the title and source text you provide.
           </p>
         </form>
       </div>

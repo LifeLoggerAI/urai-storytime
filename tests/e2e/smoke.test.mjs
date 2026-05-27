@@ -7,6 +7,9 @@ const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 const packageJson = JSON.parse(read('package.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
+const storyBuilder = read('src/lib/storytime/story-builder.ts');
+const storySettings = read('src/components/storytime/StorySettings.tsx');
+const globals = read('src/app/globals.css');
 const shareRoute = read('src/app/share/story/[shareId]/page.tsx');
 const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
@@ -29,8 +32,51 @@ test('Storytime app routes are wired', () => {
   assert.match(storytimeSessionRoute, /StoryPlayer/);
   assert.match(storytimeSessionRoute, /ChapterTimeline/);
   assert.match(storytimeSessionRoute, /EmotionalArcViewer/);
-  assert.match(shareRoute, /Public-safe share/);
+  assert.match(shareRoute, /Public-safe share demo/);
   assert.match(shareRoute, /redacted/);
+});
+
+test('Storytime create form opens a bounded demo session', () => {
+  assert.match(storytimeHome, /onSubmit=\{handleCreateStory\}/);
+  assert.match(storytimeHome, /type="submit"/);
+  assert.match(storytimeHome, /MAX_DEMO_SOURCE_CHARS/);
+  assert.match(storytimeHome, /window\.location\.assign\(`\/storytime\/demo\?\$\{params\.toString\(\)\}`\)/);
+  assert.match(storytimeSessionRoute, /searchParams\?: Promise<StorySearchParams>/);
+  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.title/);
+  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.source/);
+});
+
+test('Storytime builder normalizes bounded user input', () => {
+  for (const marker of [
+    'MAX_TITLE_CHARS',
+    'MAX_SOURCE_CHARS',
+    'MAX_TONE_CHARS',
+    'MAX_MOTIFS',
+    'MAX_SOURCE_SIGNALS',
+    'normalizeText',
+    'normalizeList'
+  ]) {
+    assert.match(storyBuilder, new RegExp(marker));
+  }
+  assert.match(storyBuilder, /title = normalizeText\(input\.title/);
+  assert.match(storyBuilder, /source = normalizeText\(input\.sourceText/);
+  assert.match(storyBuilder, /symbolicMotifs = normalizeList\(input\.symbolicMotifs/);
+});
+
+test('Storytime settings preserve consent and launch boundaries', () => {
+  assert.match(storySettings, /private by default/i);
+  assert.match(storySettings, /read-only in the demo build/i);
+  assert.match(storySettings, /Firebase auth, Firestore persistence, security rules/);
+  assert.match(storySettings, /Public-safe shares require consent, redaction, and safety review/);
+  assert.match(globals, /\.storytime-button:disabled/);
+});
+
+test('Public share route preserves demo-only safety boundaries', () => {
+  assert.match(shareRoute, /MAX_SHARE_ID_CHARS/);
+  assert.match(shareRoute, /normalizeShareId/);
+  assert.match(shareRoute, /Real public links must stay disabled/);
+  assert.match(shareRoute, /Consent required/);
+  assert.match(shareRoute, /Revocable/);
 });
 
 test('Firestore rules enforce owner and public-share boundaries', () => {
