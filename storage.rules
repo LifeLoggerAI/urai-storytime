@@ -1,7 +1,7 @@
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
+
     function signedIn() {
       return request.auth != null;
     }
@@ -10,29 +10,26 @@ service firebase.storage {
       return signedIn() && request.auth.token.admin == true;
     }
 
-    function familyDoc(familyId) {
-      return firestore.get(/databases/(default)/documents/families/$(familyId));
+    function isFamilyAsset(familyId) {
+      return signedIn() && request.auth.token.familyIds != null && familyId in request.auth.token.familyIds;
     }
 
-    function isFamilyMember(familyId) {
-      return signedIn()
-        && firestore.exists(/databases/(default)/documents/families/$(familyId))
-        && request.auth.uid in familyDoc(familyId).data.memberUserIds;
+    match /families/{familyId}/stories/{storyId}/{fileName} {
+      allow read: if isFamilyAsset(familyId) || isAdmin();
+      allow write: if isFamilyAsset(familyId) || isAdmin();
     }
 
-    match /families/{familyId}/{allPaths=**} {
-      allow read: if isFamilyMember(familyId) || isAdmin();
-      allow write: if isFamilyMember(familyId) || isAdmin();
-    }
-
-    match /creatorSubmissions/{creatorId}/{allPaths=**} {
-      allow read: if signedIn() && (request.auth.uid == creatorId || request.auth.token.admin == true || request.auth.token.moderator == true);
-      allow write: if signedIn() && (request.auth.uid == creatorId || request.auth.token.admin == true);
-    }
-
-    match /public/{allPaths=**} {
-      allow read: if true;
+    match /families/{familyId}/exports/{fileName} {
+      allow read: if isFamilyAsset(familyId) || isAdmin();
       allow write: if isAdmin();
+    }
+
+    match /moderation/{fileName} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
