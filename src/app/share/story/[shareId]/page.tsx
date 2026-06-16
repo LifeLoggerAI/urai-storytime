@@ -1,5 +1,11 @@
 import { redactForPublicShare } from "@/lib/storytime/redaction";
 
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return [{ shareId: "demo" }];
+}
+
 export default async function PublicStorySharePage({ params }: { params: Promise<{ shareId: string }> }) {
   const { shareId } = await params;
   const title = redactForPublicShare(`Public-safe URAI Story ${shareId}`);

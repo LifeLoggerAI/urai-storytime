@@ -6,12 +6,36 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
+    function isSelf(userId) {
       return signedIn() && request.auth.uid == userId;
+    }
+
+    function isOwner(userId) {
+      return isSelf(userId);
     }
 
     function isAdmin() {
       return signedIn() && request.auth.token.admin == true;
+    }
+
+    function familyRef(familyId) {
+      return /databases/$(database)/documents/families/$(familyId);
+    }
+
+    function familyRole(familyId) {
+      return get(familyRef(familyId)).data.members[request.auth.uid].role;
+    }
+
+    function isFamilyMember(familyId) {
+      return signedIn()
+        && exists(familyRef(familyId))
+        && familyRole(familyId) in ['owner', 'guardian', 'viewer'];
+    }
+
+    function canManageFamily(familyId) {
+      return signedIn()
+        && exists(familyRef(familyId))
+        && familyRole(familyId) in ['owner', 'guardian'];
     }
 
     function ownerOnlyCreate() {
@@ -20,6 +44,56 @@ service cloud.firestore {
 
     function ownerOnlyReadWrite(userId) {
       return isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if isSelf(userId);
+      allow delete: if false;
+    }
+
+    match /families/{familyId} {
+      allow read: if isFamilyMember(familyId) || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.members[request.auth.uid].role == 'owner';
+      allow update: if canManageFamily(familyId) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /childProfiles/{profileId} {
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update: if canManageFamily(resource.data.familyId) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /stories/{storyId} {
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update: if canManageFamily(resource.data.familyId) || isAdmin();
+      allow delete: if false;
+    }
+
+    match /storyRuns/{runId} {
+      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
+      allow create: if canManageFamily(request.resource.data.familyId);
+      allow update, delete: if false;
+    }
+
+    match /moderation/{moderationId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /auditLogs/{auditLogId} {
+      allow read: if isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    match /privacyRequests/{requestId} {
+      allow read: if isSelf(resource.data.userId) || isAdmin();
+      allow create: if isSelf(request.resource.data.userId);
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     match /storySessions/{id} {
@@ -94,7 +168,7 @@ service cloud.firestore {
 
     match /storyAnalyticsEvents/{id} {
       allow create: if ownerOnlyCreate();
-      allow read: if isAdmin() || ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
       allow update, delete: if false;
     }
 
@@ -105,6 +179,10 @@ service cloud.firestore {
         && request.resource.data.safeBody is string
         && request.resource.data.safeSummary is string;
       allow update, delete: if ownerOnlyReadWrite(resource.data.userId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

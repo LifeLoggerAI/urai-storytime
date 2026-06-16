@@ -1,0 +1,35 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    function isFamilyAsset(familyId) {
+      return signedIn() && request.auth.token.familyIds != null && familyId in request.auth.token.familyIds;
+    }
+
+    match /families/{familyId}/stories/{storyId}/{fileName} {
+      allow read: if isFamilyAsset(familyId) || isAdmin();
+      allow write: if isFamilyAsset(familyId) || isAdmin();
+    }
+
+    match /families/{familyId}/exports/{fileName} {
+      allow read: if isFamilyAsset(familyId) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /moderation/{fileName} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

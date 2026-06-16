@@ -23,6 +23,12 @@ const GenerateStorySchema = z.object({
   })
 });
 
+const PrepareVoiceoverJobSchema = z.object({
+  sessionId: z.string().min(1),
+  narratorScriptId: z.string().min(1).optional(),
+  provider: z.enum(["web_speech_fallback", "asset_factory", "tts_provider"]).default("asset_factory")
+});
+
 const blockedTerms = ["suicide", "self-harm", "kill", "blood", "weapon", "explicit", "nude", "abuse", "diagnosis"];
 
 function requireAuth(uid?: string) {
@@ -41,6 +47,15 @@ function redact(text: string) {
     .replace(/\b\d{1,5}\s+[A-Za-z0-9 .'-]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln)\b/gi, "a private place")
     .replace(/\b\d{3}[-.)\s]?\d{3}[-.\s]?\d{4}\b/g, "a private number")
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "a private email");
+}
+
+async function readOwnedStorySession(sessionId: string, userId: string) {
+  const sessionSnap = await db.collection("storySessions").doc(sessionId).get();
+  if (!sessionSnap.exists || sessionSnap.data()?.userId !== userId) {
+    throw new HttpsError("permission-denied", "Story not found.");
+  }
+
+  return { ref: sessionSnap.ref, data: sessionSnap.data()! };
 }
 
 export const generateStorySession = onCall(async (request) => {
@@ -175,29 +190,24 @@ export const createPublicStoryShare = onCall(async (request) => {
 
   if (!input.consent) throw new HttpsError("failed-precondition", "Public sharing requires explicit consent.");
 
-  const sessionSnap = await db.collection("storySessions").doc(input.sessionId).get();
-  if (!sessionSnap.exists || sessionSnap.data()?.userId !== userId) {
-    throw new HttpsError("permission-denied", "Story not found.");
-  }
-
-  const session = sessionSnap.data()!;
+  const session = await readOwnedStorySession(input.sessionId, userId);
   const shareId = id("publicStoryShare");
-  const slug = `${String(session.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${shareId.slice(-6)}`;
+  const slug = `${String(session.data.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${shareId.slice(-6)}`;
 
   await db.collection("publicStoryShares").doc(shareId).set({
     id: shareId,
     userId,
     sessionId: input.sessionId,
     slug,
-    title: redact(String(session.title)),
-    safeSummary: redact(String(session.subtitle || session.title)),
+    title: redact(String(session.data.title)),
+    safeSummary: redact(String(session.data.subtitle || session.data.title)),
     safeBody: "A private URAI story was transformed into a public-safe reflection.",
     revoked: false,
     createdAt: now(),
     updatedAt: now()
   });
 
-  await sessionSnap.ref.update({ publicShareId: shareId, visibility: "public_safe", updatedAt: now() });
+  await session.ref.update({ publicShareId: shareId, visibility: "public_safe", updatedAt: now() });
   return { shareId, slug };
 });
 
@@ -218,7 +228,66 @@ export const generateWeeklyStoryScroll = onCall(async (request) => {
 
 export const prepareVoiceoverJob = onCall(async (request) => {
   requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Voiceover job hook ready." };
+  const userId = request.auth!.uid;
+  const input = PrepareVoiceoverJobSchema.parse(request.data);
+  const session = await readOwnedStorySession(input.sessionId, userId);
+
+  if (session.data.consentSnapshot?.voiceover !== true) {
+    throw new HttpsError("failed-precondition", "Voiceover consent is required.");
+  }
+
+  const createdAt = now();
+  const voiceoverJobId = id("voiceoverJob");
+  const exportId = id("storyExport");
+  const timelineEventId = id("timelineReplayEvent");
+  const narratorScriptId = input.narratorScriptId || session.data.narratorScriptIds?.[0];
+
+  if (!narratorScriptId) {
+    throw new HttpsError("failed-precondition", "A narrator script is required before voiceover can be queued.");
+  }
+
+  const voiceoverJob = {
+    id: voiceoverJobId,
+    userId,
+    sessionId: input.sessionId,
+    narratorScriptId,
+    status: "queued",
+    provider: input.provider,
+    createdAt,
+    updatedAt: createdAt
+  };
+
+  const storyExport = {
+    id: exportId,
+    userId,
+    sessionId: input.sessionId,
+    exportType: input.provider === "asset_factory" ? "asset_factory_zip" : "voiceover",
+    status: "queued",
+    assetFactoryJobId: input.provider === "asset_factory" ? voiceoverJobId : null,
+    createdAt,
+    updatedAt: createdAt
+  };
+
+  const batch = db.batch();
+  batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), voiceoverJob);
+  batch.set(db.collection("storyExports").doc(exportId), storyExport);
+  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
+    id: timelineEventId,
+    userId,
+    sessionId: input.sessionId,
+    eventType: "exported",
+    label: "Voiceover export queued",
+    metadata: {
+      provider: input.provider,
+      voiceoverJobId,
+      exportId
+    },
+    createdAt,
+    updatedAt: createdAt
+  });
+  await batch.commit();
+
+  return { status: "queued", voiceoverJobId, exportId, provider: input.provider };
 });
 
 export const refreshStoryTimeline = onCall(async (request) => {

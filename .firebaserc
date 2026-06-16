@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "REPLACE_WITH_URAI_STORYTIME_STAGING"
+  },
+  "targets": {
+    "REPLACE_WITH_URAI_STORYTIME_STAGING": {
+      "hosting": {
+        "web": [
+          "urai-storytime-staging"
+        ]
+      }
+    }
+  }
+}
