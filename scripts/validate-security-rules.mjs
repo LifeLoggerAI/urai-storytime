@@ -16,27 +16,54 @@ function readRequired(filePath) {
   return fs.readFileSync(absolutePath, 'utf8');
 }
 
+function requireRule(source, snippet, message) {
+  if (!source.includes(snippet)) {
+    failures.push(message);
+  }
+}
+
 const firestoreRules = readRequired('firestore.rules');
 const storageRules = readRequired('storage.rules');
 
+const requiredStorytimeCollections = [
+  'storySessions',
+  'storyChapters',
+  'storyMoments',
+  'memoryScenes',
+  'narratorScripts',
+  'ritualStorycards',
+  'userStoryPreferences',
+  'storyExports',
+  'voiceoverJobs',
+  'timelineReplayEvents',
+  'emotionalArcSummaries',
+  'relationshipStoryThreads',
+  'weeklyStoryScrolls',
+  'monthlyStoryScrolls',
+  'storyAnalyticsEvents',
+  'publicStoryShares'
+];
+
 if (firestoreRules) {
-  if (!firestoreRules.includes("match /{document=**}")) {
-    failures.push('Firestore rules must include a fallback match for all documents.');
-  }
+  requireRule(firestoreRules, 'match /{document=**}', 'Firestore rules must include a fallback match for all documents.');
+  requireRule(firestoreRules, 'allow read, write: if false', 'Firestore rules must include deny-by-default access.');
+  requireRule(firestoreRules, 'request.auth.uid == userId', 'Firestore user document access must be scoped to the authenticated user.');
+  requireRule(firestoreRules, 'function ownerOnlyCreate()', 'Firestore rules must define owner-only create helper.');
+  requireRule(firestoreRules, 'function ownerOnlyReadWrite(userId)', 'Firestore rules must define owner-only read/write helper.');
+  requireRule(firestoreRules, 'resource.data.revoked == false', 'Public Storytime shares must only be readable when not revoked.');
+  requireRule(firestoreRules, 'allow update, delete: if false', 'Append-only Storytime event collections must forbid mutation where required.');
 
-  if (!firestoreRules.includes('allow read, write: if false')) {
-    failures.push('Firestore rules must include deny-by-default access.');
-  }
-
-  if (!firestoreRules.includes('request.auth.uid == userId')) {
-    failures.push('Firestore user document access must be scoped to the authenticated user.');
+  for (const collectionName of requiredStorytimeCollections) {
+    requireRule(
+      firestoreRules,
+      `match /${collectionName}/{id}`,
+      `Firestore rules must cover Storytime collection: ${collectionName}`
+    );
   }
 }
 
 if (storageRules) {
-  if (!storageRules.includes('allow read, write: if false')) {
-    failures.push('Storage rules must deny access by default until ownership rules are verified.');
-  }
+  requireRule(storageRules, 'allow read, write: if false', 'Storage rules must deny access by default until ownership rules are verified.');
 }
 
 if (failures.length > 0) {
@@ -48,4 +75,5 @@ if (failures.length > 0) {
 }
 
 console.log('Static security rules validation passed.');
+console.log('Storytime collection rule coverage is present.');
 console.log('Emulator tests are still required before production deployment.');

@@ -1,107 +1,164 @@
 # URAI Storytime
 
-URAI Storytime is a privacy-first, family-safe storytelling web demo that turns a few parent inputs into gentle bedtime stories.
+URAI Storytime is the URAI narrative engine for turning opted-in life signals, private reflections, and story seeds into structured story sessions, chapters, memory moments, narrator scripts, emotional arcs, and public-safe story shares.
 
 ## Current launch status
 
-**Status: Local Demo Preview.**
+**Status: Next.js + Firebase cloud scaffold. Not production/live-published verified.**
 
-This repository currently ships a standalone static demo. Stories are generated locally and saved in the current browser only. Production cloud accounts, Firebase/Firestore persistence, paid billing, admin moderation, and wider URAI Labs integrations are **not launched** until verified by code, configuration, tests, deployment, and security review.
+This repository has moved beyond the older standalone static demo. The current implementation uses Next.js, React, Firebase client/admin/functions, Firestore rules/index scaffolding, CI validation, runtime readiness gates, and Storytime deployment/QA documentation.
+
+Production launch is still blocked until Firebase credentials, auth configuration, provider secrets, staging/production deploys, DNS/SSL, live smoke tests, child-safety/legal review, and release evidence are verified and recorded.
 
 ## Stack
 
-- Vanilla HTML/CSS/JavaScript
-- Node.js built-in HTTP server for local dev and preview
-- Node test runner for smoke tests
-- Static `dist/` build output
+- Next.js 15
+- React 19
+- TypeScript
+- Firebase client SDK
+- Firebase Admin SDK
+- Firebase Functions v2
+- Firestore rules and indexes
+- Zod validation
+- Node test runner
+- GitHub Actions CI
 
-## Features in this build
+## Current surfaces
 
-- Public launch shell with Home, Features, Pricing, Demo, Create, Library, Safety, About, Contact, Privacy, Terms, Login, Signup, Dashboard, Admin, and Creator hash routes
-- Local story generation engine
-- Conservative demo prompt precheck
-- Story library/history in `localStorage`
-- Story detail/playback with Web Speech narration fallback
-- Save/replay/delete/copy flows
-- Local parent settings
-- SEO basics: metadata, favicon, Open Graph SVG, robots.txt, sitemap.xml
-- Mobile responsive UI
-- Explicit disabled states for unlaunched auth, billing, admin, creator, and cloud dashboard features
+- `/storytime` – Storytime home and private story seed UI
+- `/storytime/settings` – Storytime settings surface
+- `/storytime/[sessionId]` – Story session playback route
+- `/share/story/[shareId]` – public-safe/redacted share route
+- `/` – legacy demo entry where still retained
 
-## Not launched yet
+## Current backend hooks
 
-- Real user accounts/auth
-- Firebase/Firestore cloud persistence
-- Firestore/Storage security rules
-- Shared URAI Labs auth, analytics, admin, communications, privacy, content, or billing systems
-- Paid subscriptions or entitlement enforcement
-- Production-grade child safety/moderation
-- Final legal privacy/terms/child-consent policy
+Firebase callable functions include:
+
+- `generateStorySession`
+- `createPublicStoryShare`
+- `generateNarratorScript`
+- `generateEmotionalArcSummary`
+- `generateWeeklyStoryScroll`
+- `prepareVoiceoverJob`
+- `refreshStoryTimeline`
+- `rebuildUserStoryArchive`
+
+These functions enforce auth boundaries, consent checks, private-by-default story sessions, public sharing consent, and public-share redaction scaffolds. They still require Firebase environment configuration and staging/production verification before public launch claims.
+
+## Current production boundary
+
+Launched/scaffolded in code:
+
+- Next.js Storytime routes
+- Firebase callable lifecycle hooks
+- Firestore rules/index scaffolding
+- Storytime domain models and safety helpers
+- Runtime readiness gates that default production status to blocked
+- CI validation workflow
+- Deployment and QA checklists
+- Asset-Factory adapter path documented for future media jobs
+
+Not verified as live production:
+
+- Production Firebase project and credentials
+- Live auth/account lifecycle
+- Live Firestore/Storage writes under production rules
+- Production AI provider generation
+- Production TTS/media generation
+- Asset-Factory production credentials and end-to-end job ingestion
+- Paid billing or entitlement enforcement
+- Final legal/privacy/child-consent approval
 - Verified deployment at `https://www.uraistorytime.com`
+- DNS, SSL, redirect, and rollback evidence
 
 ## Environment variables
 
-See `.env.example`. This demo does not require secrets.
+Copy `.env.example` and configure staging/production values outside source control. Important variables include:
+
+```bash
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+
+STORYTIME_CLOUD_MODE=false
+STORYTIME_PUBLIC_SHARING=false
+ASSET_FACTORY_BASE_URL=
+ASSET_FACTORY_API_KEY=
+OPENAI_API_KEY=
+```
 
 ## Scripts
 
-- `npm run dev` – run local server at `http://localhost:4173`
-- `npm run build` – copy production files to `dist/`
-- `npm run preview` – serve `dist/` after build
-- `npm run test` – run Node tests
-- `npm run test:smoke` – run smoke test
+- `npm run dev` – run Next.js development server
+- `npm run build` – build the Next.js app
+- `npm run start` – start the built Next.js app
+- `npm run lint` – currently aliases typecheck
+- `npm run typecheck` – run TypeScript without emitting files
+- `npm run test` – run unit and e2e Node tests
+- `npm run test:smoke` – run Storytime smoke test
 - `npm run test:e2e` – currently aliases smoke test
-- `npm run lint` – custom lint script
-- `npm run typecheck` – custom typecheck script
-- `npm run format` – custom format check
+- `npm run test:security-rules` – validate Firestore/security-rule scaffolding
+- `npm run test:emulator-scaffold` – validate emulator scaffolding
+- `npm run test:emulator-runtime` – validate emulator runtime wiring
+- `npm run test:provider-wiring` – validate provider wiring evidence
+- `npm run test:production-evidence` – validate production evidence records
+- `npm run test:production-smoke` – validate production smoke records
+- `npm run test:production-readiness` – validate production readiness artifacts
+- `npm run deploy` – build and run Firebase deploy
 
 ## Local verification
 
 ```bash
-npm ci
-npm run build
-npm run test
+npm install
+npm run lint
+npm run typecheck
+npm test
 npm run test:smoke
-npm run preview
+npm run test:security-rules
+npm run test:emulator-scaffold
+npm run test:emulator-runtime
+npm run test:production-readiness
+npm run build
+
+cd functions
+npm install
+npm run build
 ```
-
-Then manually verify:
-
-1. Home page loads and shows URAI Storytime branding.
-2. Nav links open all public routes.
-3. Create generates a story.
-4. Story detail renders and narration button behaves safely.
-5. Library lists and deletes a created story.
-6. Pricing clearly says billing is not launched.
-7. Login/signup/dashboard/admin routes do not imply live auth.
-8. Privacy, Terms, Safety, robots.txt, sitemap.xml, favicon, and Open Graph assets load.
 
 ## Deployment
 
-Recommended target: Vercel, Netlify, Firebase Hosting, or any static host.
+See `docs/STORYTIME_DEPLOYMENT.md` for deploy order, required environment variables, Firebase setup, post-deploy smoke checks, rollback, and known launch boundaries.
 
-### Static deploy command
-
-```bash
-npm run build
-```
-
-Publish the `dist/` folder.
-
-### Node preview command
+Core deploy order:
 
 ```bash
-npm run preview
+firebase deploy --only firestore:rules,firestore:indexes
+firebase deploy --only functions
+firebase deploy --only hosting
 ```
 
-## Done-done launch audit
+Do not claim production launch until staging and production deploy evidence, live route checks, callable function checks, DNS/SSL checks, and rollback notes are recorded.
 
-See `docs/DONE_DONE_LAUNCH_AUDIT.md` for the strict launch contract, evidence matrix, route audit, tier audit, roadmap audit, URAI Labs integration audit, backend/security gaps, deployment checks, and final punch list.
+## System-of-systems audit
+
+See `docs/STORYTIME_SYSTEM_OF_SYSTEMS_AUDIT_2026-05-19.md` for the current audit record, roadmap, integration map, production blockers, verification record, and next implementation pass.
+
+Historical launch-audit material remains in `docs/DONE_DONE_LAUNCH_AUDIT.md`, but some sections describe the older static demo and should be treated as stale until reconciled.
 
 ## Security & privacy
 
-- No secrets are required for the local demo.
-- Demo mode stores data in browser `localStorage` only.
-- Prompt safety filtering is a demo precheck, not a production moderation system.
-- Do not collect real child-sensitive information in this build.
-- Production launch requires verified auth, database rules, deletion/export, consent, safety review, and legal approval.
+- Story sessions must remain private by default.
+- Public sharing must require explicit consent.
+- Public shares must be redacted and revocable.
+- Story generation must record why a story was generated and what consent snapshot applied.
+- Sensitive prompts/outputs must go through moderation and review before production use.
+- Do not collect real child-sensitive information in unverified environments.
+- Production launch requires verified auth, database rules, deletion/export, consent, safety review, legal approval, and release evidence.
