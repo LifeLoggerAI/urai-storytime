@@ -41,6 +41,7 @@ button, input, textarea, select { font: inherit; }
 .storytime-input { width: 100%; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,0.08); color: var(--text); padding: 13px 14px; outline: none; }
 .storytime-input:focus { border-color: rgba(196, 181, 253, 0.72); box-shadow: 0 0 0 4px rgba(196, 181, 253, 0.1); }
 .storytime-button { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 999px; background: #fff; color: #080812; padding: 12px 18px; font-weight: 700; cursor: pointer; }
+.storytime-button:disabled { cursor: not-allowed; opacity: 0.48; }
 .storytime-button.secondary { background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid var(--line); }
 .storytime-stack { display: grid; gap: 16px; }
 .storytime-pill { display: inline-flex; width: fit-content; border-radius: 999px; border: 1px solid var(--line); background: rgba(255,255,255,0.08); padding: 6px 10px; color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; }
