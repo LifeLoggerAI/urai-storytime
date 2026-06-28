@@ -14,11 +14,16 @@ const requiredVariables = [
   'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
   'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
   'NEXT_PUBLIC_FIREBASE_APP_ID',
+  'NEXT_PUBLIC_STORYTIME_CLOUD_MODE',
+  'NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING',
+  'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
   'FIREBASE_CLIENT_EMAIL',
   'FIREBASE_PRIVATE_KEY',
   'STORYTIME_CLOUD_MODE',
   'STORYTIME_PUBLIC_SHARING',
+  'STORYTIME_GENERATION_PROVIDER',
+  'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER',
   'ASSET_FACTORY_BASE_URL',
   'ASSET_FACTORY_API_KEY',
   'OPENAI_API_KEY'
@@ -34,12 +39,19 @@ if (!fs.existsSync(envPath)) {
     }
   }
 
-  if (!envTemplate.includes('STORYTIME_CLOUD_MODE=false')) {
-    failures.push('STORYTIME_CLOUD_MODE must default to false in .env.example.');
+  for (const gatedFlag of [
+    'NEXT_PUBLIC_STORYTIME_CLOUD_MODE=false',
+    'NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING=false',
+    'NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false',
+    'STORYTIME_CLOUD_MODE=false',
+    'STORYTIME_PUBLIC_SHARING=false',
+    'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false'
+  ]) {
+    if (!envTemplate.includes(gatedFlag)) failures.push(`${gatedFlag} must be present in .env.example.`);
   }
 
-  if (!envTemplate.includes('STORYTIME_PUBLIC_SHARING=false')) {
-    failures.push('STORYTIME_PUBLIC_SHARING must default to false in .env.example.');
+  if (!envTemplate.includes('STORYTIME_GENERATION_PROVIDER=disabled')) {
+    failures.push('STORYTIME_GENERATION_PROVIDER must default to disabled in .env.example.');
   }
 }
 
