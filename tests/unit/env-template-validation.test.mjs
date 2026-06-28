@@ -13,11 +13,16 @@ const requiredVariables = [
   'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
   'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
   'NEXT_PUBLIC_FIREBASE_APP_ID',
+  'NEXT_PUBLIC_STORYTIME_CLOUD_MODE',
+  'NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING',
+  'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
   'FIREBASE_CLIENT_EMAIL',
   'FIREBASE_PRIVATE_KEY',
   'STORYTIME_CLOUD_MODE',
   'STORYTIME_PUBLIC_SHARING',
+  'STORYTIME_GENERATION_PROVIDER',
+  'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER',
   'ASSET_FACTORY_BASE_URL',
   'ASSET_FACTORY_API_KEY',
   'OPENAI_API_KEY'
@@ -30,13 +35,18 @@ test('.env.example includes every required Storytime variable', () => {
 });
 
 test('environment-sensitive feature flags default off in the template', () => {
+  assert.match(envTemplate, /^NEXT_PUBLIC_STORYTIME_CLOUD_MODE=false$/m);
+  assert.match(envTemplate, /^NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING=false$/m);
+  assert.match(envTemplate, /^NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false$/m);
   assert.match(envTemplate, /^STORYTIME_CLOUD_MODE=false$/m);
   assert.match(envTemplate, /^STORYTIME_PUBLIC_SHARING=false$/m);
+  assert.match(envTemplate, /^STORYTIME_GENERATION_PROVIDER=disabled$/m);
+  assert.match(envTemplate, /^STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false$/m);
 });
 
 test('env template validator is wired into package scripts', () => {
   assert.equal(packageJson.scripts['test:env-template'], 'node scripts/validate-env-template.mjs');
   assert.match(validator, /requiredVariables/);
-  assert.match(validator, /STORYTIME_CLOUD_MODE=false/);
-  assert.match(validator, /STORYTIME_PUBLIC_SHARING=false/);
+  assert.match(validator, /NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false/);
+  assert.match(validator, /STORYTIME_GENERATION_PROVIDER=disabled/);
 });
