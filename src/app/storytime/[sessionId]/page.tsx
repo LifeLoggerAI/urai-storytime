@@ -1,16 +1,7 @@
-import { ChapterTimeline } from "@/components/storytime/ChapterTimeline";
-import { EmotionalArcViewer } from "@/components/storytime/EmotionalArcViewer";
-import { MemorySceneCard } from "@/components/storytime/MemorySceneCard";
-import { RelationshipStoryThreadView } from "@/components/storytime/RelationshipStoryThreadView";
-import { RitualStorycardViewer } from "@/components/storytime/RitualStorycardViewer";
+import { CloudSession } from "@/components/storytime/CloudSession";
 import { StoryPlayer } from "@/components/storytime/StoryPlayer";
-import { StoryScrollExportPreview } from "@/components/storytime/StoryScrollExportPreview";
 import { buildStorySession } from "@/lib/storytime/story-builder";
 
-export const dynamicParams = false;
-
-const DEFAULT_DEMO_SOURCE =
-  "A quiet URAI signal became a private story replay, with each moment handled gently and kept private by default.";
 const MAX_DEMO_SOURCE_CHARS = 1200;
 const MAX_DEMO_TITLE_CHARS = 120;
 
@@ -41,56 +32,6 @@ export default async function StorySessionPage({
 }) {
   const { sessionId } = await params;
   const query = searchParams ? await searchParams : {};
-  const storyTitle = normalizeQueryText(query.title, `Story Session ${sessionId}`, MAX_DEMO_TITLE_CHARS);
-  const storySource = normalizeQueryText(query.source, DEFAULT_DEMO_SOURCE, MAX_DEMO_SOURCE_CHARS);
-  const story = buildStorySession({
-    userId: "demo-user",
-    title: storyTitle,
-    sourceText: storySource,
-    emotionalTone: "reflective",
-    symbolicMotifs: ["star", "path", "soft glow"],
-    sourceSignals: ["demo story seed"]
-  });
-
-  const thread = {
-    id: "relationshipThread_demo",
-    userId: "demo-user",
-    sessionId: story.session.id,
-    relationshipKey: "demo",
-    displayLabel: "someone important",
-    threadTitle: "A gentle connection thread",
-    emotionalPattern: "steady return",
-    safeReflection: "This thread describes observable warmth and rhythm without guessing intent or making accusations.",
-    momentIds: story.moments.map((moment) => moment.id),
-    redacted: true,
-    createdAt: story.session.createdAt,
-    updatedAt: story.session.updatedAt
-  };
-
-  const ritual = {
-    id: "ritual_demo",
-    userId: "demo-user",
-    sessionId: story.session.id,
-    title: "Return to the Small Star",
-    ritualType: "reflection",
-    prompt: "Take one quiet breath and name the part of the story that felt most true.",
-    visualMotif: "small star",
-    narratorLine: "You do not need to solve the whole sky tonight. One small star is enough.",
-    createdAt: story.session.createdAt,
-    updatedAt: story.session.updatedAt
-  };
-
-  const scroll = {
-    id: "weeklyScroll_demo",
-    userId: "demo-user",
-    weekStart: "private",
-    weekEnd: "private",
-    title: "A Week of Quiet Signals",
-    summary: "A private weekly scroll prepared for export only after consent and redaction.",
-    sessionIds: [story.session.id],
-    createdAt: story.session.createdAt,
-    updatedAt: story.session.updatedAt
-  };
 
   return (
     <main className="storytime-shell">
@@ -99,18 +40,30 @@ export default async function StorySessionPage({
           <a className="storytime-brand" href="/storytime">URAI Storytime</a>
           <div className="storytime-links"><a href="/storytime/settings">Settings</a></div>
         </nav>
-        <StoryPlayer session={story.session} chapters={story.chapters} narratorScripts={story.narratorScripts} />
-        <section className="storytime-grid">
-          <ChapterTimeline chapters={story.chapters} />
-          <MemorySceneCard scene={story.scenes[0]} />
-          <EmotionalArcViewer arc={story.arc} />
-        </section>
-        <section className="storytime-grid">
-          <RelationshipStoryThreadView thread={thread} />
-          <RitualStorycardViewer card={ritual} />
-          <StoryScrollExportPreview scroll={scroll} />
-        </section>
+        {sessionId === "demo" ? <DemoSession query={query} /> : <CloudSession sessionId={sessionId} />}
       </div>
     </main>
+  );
+}
+
+function DemoSession({ query }: { query: StorySearchParams }) {
+  const story = buildStorySession({
+    userId: "demo-user",
+    title: normalizeQueryText(query.title, "Demo Story Session", MAX_DEMO_TITLE_CHARS),
+    sourceText: normalizeQueryText(query.source, "A private demo story seed became a small replay.", MAX_DEMO_SOURCE_CHARS),
+    emotionalTone: "reflective",
+    symbolicMotifs: ["star", "path", "soft glow"],
+    sourceSignals: ["demo story seed"]
+  });
+
+  return (
+    <section className="storytime-stack">
+      <article className="storytime-card storytime-stack">
+        <p className="storytime-pill">Demo mode</p>
+        <h2>Deterministic demo session</h2>
+        <p className="storytime-helper">This route is local and deterministic. It is not saved to a user account and does not prove provider generation.</p>
+      </article>
+      <StoryPlayer session={story.session} chapters={story.chapters} narratorScripts={story.narratorScripts} />
+    </section>
   );
 }
