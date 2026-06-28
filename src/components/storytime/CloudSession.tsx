@@ -1,10 +1,22 @@
 "use client";
 
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
-import type { StorySession } from "@/lib/storytime/types";
+import type { EmotionalArcSummary, MemoryScene, NarratorScript, StoryChapter, StorySession } from "@/lib/storytime/types";
+import { ChapterTimeline } from "./ChapterTimeline";
+import { EmotionalArcViewer } from "./EmotionalArcViewer";
+import { MemorySceneCard } from "./MemorySceneCard";
+import { StoryPlayer } from "./StoryPlayer";
+
+type Bundle = {
+  session: StorySession;
+  chapters: StoryChapter[];
+  scenes: MemoryScene[];
+  scripts: NarratorScript[];
+  arc: EmotionalArcSummary | null;
+};
 
 type State =
   | { status: "blocked"; message: string }
@@ -12,10 +24,37 @@ type State =
   | { status: "signedOut"; message: string }
   | { status: "notFound"; message: string }
   | { status: "error"; message: string }
-  | { status: "ready"; session: StorySession };
+  | { status: "ready"; bundle: Bundle };
 
 function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Cloud session load failed.";
+}
+
+async function loadBundle(sessionId: string): Promise<Bundle | null> {
+  const db = getFirebaseDb();
+  const snapshot = await getDoc(doc(db, "storySessions", sessionId));
+  if (!snapshot.exists()) return null;
+
+  const session = { id: snapshot.id, ...snapshot.data() } as StorySession;
+  const [chapterDocs, sceneDocs, scriptDocs] = await Promise.all([
+    getDocs(query(collection(db, "storyChapters"), where("sessionId", "==", sessionId), orderBy("order", "asc"))),
+    getDocs(query(collection(db, "memoryScenes"), where("sessionId", "==", sessionId))),
+    getDocs(query(collection(db, "narratorScripts"), where("sessionId", "==", sessionId)))
+  ]);
+
+  let arc: EmotionalArcSummary | null = null;
+  if (session.emotionalArcSummaryId) {
+    const arcDoc = await getDoc(doc(db, "emotionalArcSummaries", session.emotionalArcSummaryId));
+    if (arcDoc.exists()) arc = { id: arcDoc.id, ...arcDoc.data() } as EmotionalArcSummary;
+  }
+
+  return {
+    session,
+    chapters: chapterDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryChapter),
+    scenes: sceneDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as MemoryScene),
+    scripts: scriptDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as NarratorScript),
+    arc
+  };
 }
 
 export function CloudSession({ sessionId }: { sessionId: string }) {
@@ -23,7 +62,7 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
   const [state, setState] = useState<State>(() =>
     cloudReady
       ? { status: "loading", message: "Loading cloud session..." }
-      : { status: "blocked", message: "Cloud session loading is gated until Firebase env vars and cloud mode are configured." }
+      : { status: "blocked", message: "Cloud session loading is gated until Firebase env vars, provider readiness, and cloud mode are configured." }
   );
 
   useEffect(() => {
@@ -36,13 +75,13 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
         return;
       }
       try {
-        const snapshot = await getDoc(doc(getFirebaseDb(), "storySessions", sessionId));
+        const bundle = await loadBundle(sessionId);
         if (!active) return;
-        if (!snapshot.exists()) {
+        if (!bundle) {
           setState({ status: "notFound", message: "No saved cloud session was found for this id." });
           return;
         }
-        setState({ status: "ready", session: { id: snapshot.id, ...snapshot.data() } as StorySession });
+        setState({ status: "ready", bundle });
       } catch (error) {
         if (active) setState({ status: "error", message: toMessage(error) });
       }
@@ -54,14 +93,16 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
   }, [cloudReady, sessionId]);
 
   if (state.status === "ready") {
+    const { bundle } = state;
     return (
-      <article className="storytime-card storytime-stack">
-        <p className="storytime-pill">Cloud Session</p>
-        <h1>{state.session.title}</h1>
-        <p>{state.session.whyGenerated}</p>
-        <p>Status: {state.session.status}. Visibility: {state.session.visibility}. Safety: {state.session.safetyStatus}.</p>
-        <p className="storytime-helper">Full chapter/media hydration is intentionally gated until Firestore indexes, rules, and callable deployment are verified in staging.</p>
-      </article>
+      <section className="storytime-stack" aria-label="Cloud Storytime session">
+        <StoryPlayer session={bundle.session} chapters={bundle.chapters} narratorScripts={bundle.scripts} />
+        <section className="storytime-grid">
+          <ChapterTimeline chapters={bundle.chapters} />
+          {bundle.scenes[0] ? <MemorySceneCard scene={bundle.scenes[0]} /> : <article className="storytime-card"><h2>No saved scene</h2><p>This cloud session has no saved memory scene yet.</p></article>}
+          {bundle.arc ? <EmotionalArcViewer arc={bundle.arc} /> : <article className="storytime-card"><h2>No saved arc</h2><p>This cloud session has no saved emotional arc yet.</p></article>}
+        </section>
+      </section>
     );
   }
 
