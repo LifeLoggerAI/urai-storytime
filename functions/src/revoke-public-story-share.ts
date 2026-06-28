@@ -7,6 +7,7 @@ if (!getApps().length) initializeApp();
 
 const db = getFirestore();
 const now = () => new Date().toISOString();
+const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const RequestSchema = z.object({ shareId: z.string().min(1) });
 
 export const revokePublicStoryShare = onCall(async (request) => {
@@ -22,21 +23,23 @@ export const revokePublicStoryShare = onCall(async (request) => {
   }
 
   const share = shareSnap.data()!;
+  const updatedAt = now();
   const batch = db.batch();
-  batch.update(shareRef, { revoked: true, updatedAt: now(), revokedAt: now() });
+  batch.update(shareRef, { revoked: true, updatedAt, revokedAt: updatedAt });
 
   if (typeof share.sessionId === "string" && share.sessionId) {
     const sessionRef = db.collection("storySessions").doc(share.sessionId);
-    batch.update(sessionRef, { visibility: "private", publicShareId: null, updatedAt: now() });
-    batch.set(db.collection("timelineReplayEvents").doc(`timelineReplayEvent_${Date.now()}`), {
-      id: `timelineReplayEvent_${Date.now()}`,
+    const timelineEventId = id("timelineReplayEvent");
+    batch.update(sessionRef, { visibility: "private", publicShareId: null, updatedAt });
+    batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
+      id: timelineEventId,
       userId,
       sessionId: share.sessionId,
       eventType: "revoked",
       label: "Public Storytime share revoked",
       metadata: { shareId: input.shareId },
-      createdAt: now(),
-      updatedAt: now()
+      createdAt: updatedAt,
+      updatedAt
     });
   }
 
