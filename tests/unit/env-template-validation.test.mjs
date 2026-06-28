@@ -25,7 +25,8 @@ const requiredVariables = [
   'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER',
   'ASSET_FACTORY_BASE_URL',
   'ASSET_FACTORY_API_KEY',
-  'OPENAI_API_KEY'
+  'OPENAI_API_KEY',
+  'STORYTIME_OPENAI_MODEL'
 ];
 
 test('.env.example includes every required Storytime variable', () => {
@@ -47,6 +48,7 @@ test('environment-sensitive feature flags default off in the template', () => {
 test('env template validator is wired into package scripts', () => {
   assert.equal(packageJson.scripts['test:env-template'], 'node scripts/validate-env-template.mjs');
   assert.match(validator, /requiredVariables/);
+  assert.match(validator, /STORYTIME_OPENAI_MODEL/);
   assert.match(validator, /NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false/);
   assert.match(validator, /STORYTIME_GENERATION_PROVIDER=disabled/);
 });
