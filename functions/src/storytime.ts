@@ -35,6 +35,25 @@ function requireAuth(uid?: string) {
   if (!uid) throw new HttpsError("unauthenticated", "Sign in is required.");
 }
 
+function requireConfiguredStoryProvider() {
+  const provider = process.env.STORYTIME_GENERATION_PROVIDER;
+  const allowLocalBuilder = process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true";
+
+  if (allowLocalBuilder && process.env.NODE_ENV !== "production") return;
+
+  if (provider !== "openai" || !process.env.OPENAI_API_KEY) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Story generation provider is not configured. The callable is deployed-safe but blocked until real provider credentials and review are enabled."
+    );
+  }
+
+  throw new HttpsError(
+    "failed-precondition",
+    "OpenAI provider credentials are present but provider generation is intentionally disabled until the reviewed prompt/output pipeline is implemented."
+  );
+}
+
 function moderate(text: string) {
   const lower = text.toLowerCase();
   const hits = blockedTerms.filter((term) => lower.includes(term));
@@ -60,6 +79,7 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
 
 export const generateStorySession = onCall(async (request) => {
   requireAuth(request.auth?.uid);
+  requireConfiguredStoryProvider();
   const userId = request.auth!.uid;
   const input = GenerateStorySchema.parse(request.data);
 
