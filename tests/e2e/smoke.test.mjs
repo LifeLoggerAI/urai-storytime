@@ -7,6 +7,10 @@ const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 const packageJson = JSON.parse(read('package.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
+const cloudSession = read('src/components/storytime/CloudSession.tsx');
+const sessionLibrary = read('src/components/storytime/SessionLibrary.tsx');
+const shareStory = read('src/components/storytime/ShareStory.tsx');
+const runtimeConfig = read('src/lib/storytime/runtime-config.ts');
 const storyBuilder = read('src/lib/storytime/story-builder.ts');
 const storySettings = read('src/components/storytime/StorySettings.tsx');
 const globals = read('src/app/globals.css');
@@ -29,21 +33,29 @@ test('Next and Firebase scripts are present', () => {
 test('Storytime app routes are wired', () => {
   assert.match(storytimeHome, /URAI Narrative Engine/);
   assert.match(storytimeHome, /Private by default/);
-  assert.match(storytimeSessionRoute, /StoryPlayer/);
-  assert.match(storytimeSessionRoute, /ChapterTimeline/);
-  assert.match(storytimeSessionRoute, /EmotionalArcViewer/);
+  assert.match(storytimeSessionRoute, /CloudSession/);
+  assert.match(storytimeSessionRoute, /Demo mode/);
+  assert.match(shareRoute, /ShareStory/);
   assert.match(shareRoute, /Public-safe share demo/);
-  assert.match(shareRoute, /redacted/);
 });
 
-test('Storytime create form opens a bounded demo session', () => {
+test('Storytime create form has cloud and demo paths', () => {
   assert.match(storytimeHome, /onSubmit=\{handleCreateStory\}/);
-  assert.match(storytimeHome, /type="submit"/);
+  assert.match(storytimeHome, /httpsCallable/);
+  assert.match(storytimeHome, /generateStorySession/);
+  assert.match(storytimeHome, /Cloud generation unavailable/);
+  assert.match(storytimeHome, /Open Demo Story Session/);
+  assert.match(storytimeHome, /Create Story/);
   assert.match(storytimeHome, /MAX_DEMO_SOURCE_CHARS/);
-  assert.match(storytimeHome, /window\.location\.assign\(`\/storytime\/demo\?\$\{params\.toString\(\)\}`\)/);
-  assert.match(storytimeSessionRoute, /searchParams\?: Promise<StorySearchParams>/);
-  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.title/);
-  assert.match(storytimeSessionRoute, /normalizeQueryText\(query\.source/);
+});
+
+test('Storytime session route preserves demo while allowing real ids', () => {
+  assert.doesNotMatch(storytimeSessionRoute, /dynamicParams = false/);
+  assert.match(storytimeSessionRoute, /sessionId === "demo"/);
+  assert.match(storytimeSessionRoute, /<CloudSession sessionId=\{sessionId\}/);
+  assert.match(cloudSession, /storySessions/);
+  assert.match(cloudSession, /Sign in is required/);
+  assert.match(cloudSession, /No saved cloud session/);
 });
 
 test('Storytime builder normalizes bounded user input', () => {
@@ -71,12 +83,22 @@ test('Storytime settings preserve consent and launch boundaries', () => {
   assert.match(globals, /\.storytime-button:disabled/);
 });
 
-test('Public share route preserves demo-only safety boundaries', () => {
+test('Public share route has real fetch states and demo safety boundaries', () => {
   assert.match(shareRoute, /MAX_SHARE_ID_CHARS/);
   assert.match(shareRoute, /normalizeShareId/);
-  assert.match(shareRoute, /Real public links must stay disabled/);
-  assert.match(shareRoute, /Consent required/);
-  assert.match(shareRoute, /Revocable/);
+  assert.match(shareRoute, /safeShareId === "demo"/);
+  assert.match(shareStory, /publicStoryShares/);
+  assert.match(shareStory, /revoked/);
+  assert.match(shareStory, /expired/);
+  assert.match(shareStory, /Public sharing is gated/);
+});
+
+test('Runtime config gates cloud, provider, and public sharing', () => {
+  assert.match(runtimeConfig, /NEXT_PUBLIC_STORYTIME_CLOUD_MODE/);
+  assert.match(runtimeConfig, /NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING/);
+  assert.match(runtimeConfig, /NEXT_PUBLIC_STORYTIME_PROVIDER_READY/);
+  assert.match(runtimeConfig, /providerConfigured/);
+  assert.match(sessionLibrary, /NEXT_PUBLIC_STORYTIME_CLOUD_MODE=true/);
 });
 
 test('Firestore rules enforce owner and public-share boundaries', () => {
@@ -102,7 +124,7 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /firestore\.rules/);
 });
 
-test('Callable functions cover Storytime lifecycle hooks', () => {
+test('Callable functions cover Storytime lifecycle hooks and fail closed for provider generation', () => {
   for (const name of [
     'generateStorySession',
     'createPublicStoryShare',
@@ -116,6 +138,8 @@ test('Callable functions cover Storytime lifecycle hooks', () => {
     assert.match(functions, new RegExp(`export const ${name}`));
   }
   assert.match(functions, /Story generation consent is required/);
+  assert.match(functions, /requireConfiguredStoryProvider/);
+  assert.match(functions, /provider generation is intentionally disabled/);
   assert.match(functions, /Public sharing requires explicit consent/);
 });
 
