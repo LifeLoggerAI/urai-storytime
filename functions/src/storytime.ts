@@ -2,6 +2,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
 
 initializeApp();
 
@@ -35,23 +36,34 @@ function requireAuth(uid?: string) {
   if (!uid) throw new HttpsError("unauthenticated", "Sign in is required.");
 }
 
+function allowLocalBuilder() {
+  return process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true" && process.env.NODE_ENV !== "production";
+}
+
 function requireConfiguredStoryProvider() {
-  const provider = process.env.STORYTIME_GENERATION_PROVIDER;
-  const allowLocalBuilder = process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true";
-
-  if (allowLocalBuilder && process.env.NODE_ENV !== "production") return;
-
-  if (provider !== "openai" || !process.env.OPENAI_API_KEY) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Story generation provider is not configured. The callable is deployed-safe but blocked until real provider credentials and review are enabled."
-    );
-  }
-
+  const readiness = getStoryProviderReadiness();
+  if (readiness.ready || allowLocalBuilder()) return readiness;
   throw new HttpsError(
     "failed-precondition",
-    "OpenAI provider credentials are present but provider generation is intentionally disabled until the reviewed prompt/output pipeline is implemented."
+    `Story generation provider is not configured. Missing: ${readiness.missing.join(", ")}. The callable is deployed-safe but blocked until real provider credentials and review are enabled.`
   );
+}
+
+function fallbackProviderOutput(input: z.infer<typeof GenerateStorySchema>, source: string): StoryProviderOutput {
+  return {
+    chapterTitle: "Chapter One: The Signal Becomes a Story",
+    chapterSummary: source.slice(0, 500),
+    momentTitle: "A moment worth remembering",
+    momentBody: source.slice(0, 1200),
+    narratorText: "This moment did not need to be loud to matter. URAI shaped it into a story so you could return to it with more tenderness and less noise.",
+    scenePrompt: `A private URAI memory scene using motifs: ${input.symbolicMotifs.join(", ") || "soft light"}.`,
+    visualMood: input.emotionalTone,
+    audioMood: "warm, slow, spacious",
+    arcLabel: "gentle return",
+    arcSummary: "The story moves from signal to meaning, then returns the user to a calmer frame.",
+    peakTone: "noticed",
+    resolutionTone: "settled"
+  };
 }
 
 function moderate(text: string) {
@@ -79,12 +91,27 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
 
 export const generateStorySession = onCall(async (request) => {
   requireAuth(request.auth?.uid);
-  requireConfiguredStoryProvider();
   const userId = request.auth!.uid;
   const input = GenerateStorySchema.parse(request.data);
 
   if (!input.consentSnapshot.storyGeneration) {
     throw new HttpsError("failed-precondition", "Story generation consent is required.");
+  }
+
+  const source = input.sourceText || "A quiet signal became a private URAI story.";
+  const mod = moderate(`${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`);
+  if (mod.hits.length) {
+    throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
+  }
+
+  const readiness = requireConfiguredStoryProvider();
+  let generated: StoryProviderOutput;
+  try {
+    generated = readiness.ready
+      ? await generateStoryWithProvider({ title: input.title, sourceText: source, emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs })
+      : fallbackProviderOutput(input, source);
+  } catch (error) {
+    throw new HttpsError("internal", error instanceof Error ? error.message : "Story provider failed.");
   }
 
   const createdAt = now();
@@ -94,15 +121,13 @@ export const generateStorySession = onCall(async (request) => {
   const sceneId = id("memoryScene");
   const scriptId = id("narratorScript");
   const arcId = id("emotionalArc");
-  const source = input.sourceText || "A quiet signal became a private URAI story.";
-  const mod = moderate(source);
 
   const session = {
     id: sessionId,
     userId,
     title: input.title,
     subtitle: "A private URAI story replay",
-    status: mod.hits.length ? "draft" : "ready",
+    status: "ready",
     visibility: "private",
     sourceSignals: input.sourceSignals,
     emotionalTone: input.emotionalTone,
@@ -110,6 +135,7 @@ export const generateStorySession = onCall(async (request) => {
     chapterIds: [chapterId],
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
+    provider: readiness.ready ? readiness.provider : "local_builder",
     whyGenerated: input.sourceSignals.length
       ? `Generated from opted-in signals: ${input.sourceSignals.join(", ")}.`
       : "Generated from your direct Storytime input.",
@@ -124,8 +150,8 @@ export const generateStorySession = onCall(async (request) => {
     userId,
     sessionId,
     order: 1,
-    title: "Chapter One: The Signal Becomes a Story",
-    summary: source.slice(0, 500),
+    title: generated.chapterTitle,
+    summary: generated.chapterSummary,
     emotionalTone: input.emotionalTone,
     momentIds: [momentId],
     narratorScriptId: scriptId,
@@ -139,8 +165,8 @@ export const generateStorySession = onCall(async (request) => {
     sessionId,
     chapterId,
     order: 1,
-    title: "A moment worth remembering",
-    body: source.slice(0, 1200),
+    title: generated.momentTitle,
+    body: generated.momentBody,
     moodTags: [input.emotionalTone],
     peopleRefs: [],
     memorySceneId: sceneId,
@@ -155,9 +181,9 @@ export const generateStorySession = onCall(async (request) => {
     sessionId,
     momentId,
     title: "Soft replay scene",
-    scenePrompt: `A private URAI memory scene using motifs: ${input.symbolicMotifs.join(", ") || "soft light"}.`,
-    visualMood: input.emotionalTone,
-    audioMood: "warm, slow, spacious",
+    scenePrompt: generated.scenePrompt,
+    visualMood: generated.visualMood,
+    audioMood: generated.audioMood,
     symbolicObjects: input.symbolicMotifs,
     redacted: false,
     createdAt,
@@ -171,7 +197,7 @@ export const generateStorySession = onCall(async (request) => {
     chapterId,
     scriptType: "memory_replay",
     voiceTone: "warm",
-    text: "This moment did not need to be loud to matter. URAI shaped it into a story so you could return to it with more tenderness and less noise.",
+    text: generated.narratorText,
     safetyStatus: mod.safetyStatus,
     createdAt,
     updatedAt: createdAt
@@ -181,11 +207,11 @@ export const generateStorySession = onCall(async (request) => {
     id: arcId,
     userId,
     sessionId,
-    arcLabel: "gentle return",
+    arcLabel: generated.arcLabel,
     startTone: input.emotionalTone,
-    peakTone: "noticed",
-    resolutionTone: "settled",
-    summary: "The story moves from signal to meaning, then returns the user to a calmer frame.",
+    peakTone: generated.peakTone,
+    resolutionTone: generated.resolutionTone,
+    summary: generated.arcSummary,
     caution: "Reflective storytelling only. Not a diagnosis or clinical interpretation.",
     createdAt,
     updatedAt: createdAt
@@ -200,7 +226,7 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
   await batch.commit();
 
-  return { sessionId, status: session.status, safetyStatus: mod.safetyStatus };
+  return { sessionId, status: session.status, safetyStatus: mod.safetyStatus, provider: session.provider };
 });
 
 export const createPublicStoryShare = onCall(async (request) => {
