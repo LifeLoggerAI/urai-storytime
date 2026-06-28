@@ -32,13 +32,14 @@ export function getStorytimeRuntimeConfig(env: Record<string, string | undefined
   const missingFirebaseClientEnv = missingKeys(env, FIREBASE_CLIENT_ENV_KEYS);
   const missingFirebaseAdminEnv = missingKeys(env, FIREBASE_ADMIN_ENV_KEYS);
   const providerName = env.STORYTIME_GENERATION_PROVIDER === "openai" ? "openai" : env.STORYTIME_GENERATION_PROVIDER ? "unknown" : "disabled";
+  const providerConfigured = truthyEnv(env.NEXT_PUBLIC_STORYTIME_PROVIDER_READY) || (providerName === "openai" && Boolean(env.OPENAI_API_KEY?.trim()));
 
   return {
     cloudModeEnabled: truthyEnv(env.NEXT_PUBLIC_STORYTIME_CLOUD_MODE) || truthyEnv(env.STORYTIME_CLOUD_MODE),
     publicSharingEnabled: truthyEnv(env.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING) || truthyEnv(env.STORYTIME_PUBLIC_SHARING),
     firebaseClientConfigured: missingFirebaseClientEnv.length === 0,
     firebaseAdminConfigured: missingFirebaseAdminEnv.length === 0,
-    providerConfigured: providerName === "openai" && Boolean(env.OPENAI_API_KEY?.trim()),
+    providerConfigured,
     missingFirebaseClientEnv,
     missingFirebaseAdminEnv,
     providerName
@@ -47,7 +48,7 @@ export function getStorytimeRuntimeConfig(env: Record<string, string | undefined
 
 export function isStorytimeCloudCallableReady(env: Record<string, string | undefined> = process.env): boolean {
   const config = getStorytimeRuntimeConfig(env);
-  return config.cloudModeEnabled && config.firebaseClientConfigured;
+  return config.cloudModeEnabled && config.firebaseClientConfigured && config.providerConfigured;
 }
 
 export function isPublicSharingReady(env: Record<string, string | undefined> = process.env): boolean {
