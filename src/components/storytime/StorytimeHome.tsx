@@ -71,10 +71,12 @@ export function StorytimeHome() {
             />
           </label>
           <button className="storytime-button" type="submit" disabled={!title.trim()}>
-            Generate Story Session
+            Open Demo Story Session
           </button>
           <p>
-            Cloud generation is wired through Firebase callable functions once Firebase env vars and auth are configured. Until then, this form opens a private demo session from the title and source text you provide.
+            Cloud-generation callable functions exist in the backend scaffold, but this form does not call them until
+            Firebase env vars, auth, and client wiring are configured. Until then, this form opens a private demo
+            session from the title and source text you provide.
           </p>
         </form>
       </div>
