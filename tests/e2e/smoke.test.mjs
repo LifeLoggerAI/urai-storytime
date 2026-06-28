@@ -19,6 +19,7 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const storyProvider = read('functions/src/story-provider.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
 
@@ -124,7 +125,7 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /firestore\.rules/);
 });
 
-test('Callable functions cover Storytime lifecycle hooks and fail closed for provider generation', () => {
+test('Callable functions cover Storytime lifecycle hooks and provider generation wiring', () => {
   for (const name of [
     'generateStorySession',
     'createPublicStoryShare',
@@ -139,7 +140,9 @@ test('Callable functions cover Storytime lifecycle hooks and fail closed for pro
   }
   assert.match(functions, /Story generation consent is required/);
   assert.match(functions, /requireConfiguredStoryProvider/);
-  assert.match(functions, /provider generation is intentionally disabled/);
+  assert.match(functions, /generateStoryWithProvider/);
+  assert.match(storyProvider, /response_format/);
+  assert.match(storyProvider, /Do not diagnose/);
   assert.match(functions, /Public sharing requires explicit consent/);
 });
 
