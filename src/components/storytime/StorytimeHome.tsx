@@ -29,7 +29,6 @@ export function StorytimeHome() {
           <a className="storytime-brand" href="/storytime">URAI Storytime</a>
           <div className="storytime-links">
             <a href="/storytime/settings">Settings</a>
-            <a href="/">Legacy demo</a>
           </div>
         </nav>
 
