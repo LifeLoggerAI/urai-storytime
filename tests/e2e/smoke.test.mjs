@@ -9,6 +9,7 @@ const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
 const cloudSession = read('src/components/storytime/CloudSession.tsx');
 const sessionLibrary = read('src/components/storytime/SessionLibrary.tsx');
+const shareControls = read('src/components/storytime/ShareControls.tsx');
 const shareStory = read('src/components/storytime/ShareStory.tsx');
 const runtimeConfig = read('src/lib/storytime/runtime-config.ts');
 const storyBuilder = read('src/lib/storytime/story-builder.ts');
@@ -19,6 +20,8 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const functionsIndex = read('functions/src/index.ts');
+const revokeShareFunction = read('functions/src/revoke-public-story-share.ts');
 const storyProvider = read('functions/src/story-provider.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
@@ -55,6 +58,9 @@ test('Storytime session route preserves demo while allowing real ids', () => {
   assert.match(storytimeSessionRoute, /sessionId === "demo"/);
   assert.match(storytimeSessionRoute, /<CloudSession sessionId=\{sessionId\}/);
   assert.match(cloudSession, /storySessions/);
+  assert.match(cloudSession, /storyChapters/);
+  assert.match(cloudSession, /memoryScenes/);
+  assert.match(cloudSession, /narratorScripts/);
   assert.match(cloudSession, /Sign in is required/);
   assert.match(cloudSession, /No saved cloud session/);
 });
@@ -92,6 +98,17 @@ test('Public share route has real fetch states and demo safety boundaries', () =
   assert.match(shareStory, /revoked/);
   assert.match(shareStory, /expired/);
   assert.match(shareStory, /Public sharing is gated/);
+});
+
+test('Public share owner controls create and revoke through callables', () => {
+  assert.match(cloudSession, /ShareControls/);
+  assert.match(shareControls, /createPublicStoryShare/);
+  assert.match(shareControls, /revokePublicStoryShare/);
+  assert.match(shareControls, /Explicit public-sharing consent is required/);
+  assert.match(functionsIndex, /revokePublicStoryShare/);
+  assert.match(revokeShareFunction, /Public share not found/);
+  assert.match(revokeShareFunction, /revoked: true/);
+  assert.match(revokeShareFunction, /visibility: "private"/);
 });
 
 test('Runtime config gates cloud, provider, and public sharing', () => {
