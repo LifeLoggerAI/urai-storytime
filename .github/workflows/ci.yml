@@ -102,6 +102,9 @@ jobs:
       - name: Provider wiring validation
         run: npm run test:provider-wiring
 
+      - name: Live production config validation
+        run: node scripts/validate-live-production-config.mjs
+
       - name: Production evidence validation
         run: npm run test:production-evidence
 
