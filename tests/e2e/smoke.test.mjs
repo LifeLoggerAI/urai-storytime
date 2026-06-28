@@ -6,6 +6,7 @@ const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 
 const packageJson = JSON.parse(read('package.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
+const authPanel = read('src/components/storytime/AuthPanel.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
 const cloudSession = read('src/components/storytime/CloudSession.tsx');
 const sessionLibrary = read('src/components/storytime/SessionLibrary.tsx');
@@ -51,6 +52,14 @@ test('Storytime create form has cloud and demo paths', () => {
   assert.match(storytimeHome, /Open Demo Story Session/);
   assert.match(storytimeHome, /Create Story/);
   assert.match(storytimeHome, /MAX_DEMO_SOURCE_CHARS/);
+});
+
+test('Storytime account panel supports Firebase email authentication', () => {
+  assert.match(storytimeHome, /AuthPanel/);
+  assert.match(authPanel, /createUserWithEmailAndPassword/);
+  assert.match(authPanel, /signInWithEmailAndPassword/);
+  assert.match(authPanel, /signOut/);
+  assert.match(authPanel, /Firebase client config is required/);
 });
 
 test('Storytime session route preserves demo while allowing real ids', () => {
