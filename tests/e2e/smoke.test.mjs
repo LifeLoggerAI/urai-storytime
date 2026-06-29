@@ -129,11 +129,13 @@ test('Runtime config gates cloud, provider, and public sharing', () => {
   assert.match(sessionLibrary, /NEXT_PUBLIC_STORYTIME_CLOUD_MODE=true/);
 });
 
-test('Firestore rules enforce owner and public-share boundaries', () => {
+test('Firestore rules enforce owner, public-share, and quota-counter boundaries', () => {
   assert.match(rules, /function isOwner/);
   assert.match(rules, /match \/storySessions\/{id}/);
   assert.match(rules, /match \/publicStoryShares\/{id}/);
   assert.match(rules, /revoked == false/);
+  assert.match(rules, /match \/storytimeUsageCounters\/{id}/);
+  assert.match(rules, /allow read, write: if false/);
   assert.match(rules, /allow update, delete: if false/);
 });
 
