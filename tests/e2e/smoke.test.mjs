@@ -150,6 +150,8 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /frameworksBackend/);
   assert.match(firebaseConfig, /storytime/);
   assert.match(firebaseConfig, /firestore\.rules/);
+  assert.match(firebaseConfig, /predeploy/);
+  assert.match(firebaseConfig, /npm --prefix functions run build/);
 });
 
 test('Callable functions cover Storytime lifecycle hooks, provider wiring, and quota gate', () => {
