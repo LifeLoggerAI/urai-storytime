@@ -21,6 +21,7 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const auditLog = read('functions/src/audit-log.ts');
 const functionsIndex = read('functions/src/index.ts');
 const revokeShareFunction = read('functions/src/revoke-public-story-share.ts');
 const storyProvider = read('functions/src/story-provider.ts');
@@ -175,6 +176,22 @@ test('Callable functions cover Storytime lifecycle hooks, provider wiring, and q
   assert.match(storyProvider, /response_format/);
   assert.match(storyProvider, /Do not diagnose/);
   assert.match(functions, /Public sharing requires explicit consent/);
+});
+
+test('Storytime Functions emit privacy-safe audit log events', () => {
+  assert.match(auditLog, /StorytimeAuditEvent/);
+  assert.match(auditLog, /generation_requested/);
+  assert.match(auditLog, /generation_blocked_safety/);
+  assert.match(auditLog, /generation_blocked_quota/);
+  assert.match(auditLog, /provider_failed/);
+  assert.match(auditLog, /story_persisted/);
+  assert.match(auditLog, /public_share_created/);
+  assert.match(auditLog, /voiceover_export_queued/);
+  assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
+  assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
+  assert.match(functions, /auditLog\(\{ event: "public_share_created"/);
+  assert.match(functions, /auditLog\(\{ event: "voiceover_export_queued"/);
+  assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
 });
 
 test('Deployment and QA docs preserve launch boundaries', () => {
