@@ -2,6 +2,7 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { auditLog } from "./audit-log.js";
 
 if (!getApps().length) initializeApp();
 
@@ -12,13 +13,17 @@ const RequestSchema = z.object({ shareId: z.string().min(1) });
 
 export const revokePublicStoryShare = onCall(async (request) => {
   const userId = request.auth?.uid;
-  if (!userId) throw new HttpsError("unauthenticated", "Sign in is required.");
+  if (!userId) {
+    auditLog({ event: "generation_blocked_auth", errorCode: "revoke_share_unauthenticated" });
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
 
   const input = RequestSchema.parse(request.data);
   const shareRef = db.collection("publicStoryShares").doc(input.shareId);
   const shareSnap = await shareRef.get();
 
   if (!shareSnap.exists || shareSnap.data()?.userId !== userId) {
+    auditLog({ event: "public_share_revoked", userId, shareId: input.shareId, errorCode: "permission_denied" });
     throw new HttpsError("permission-denied", "Public share not found.");
   }
 
@@ -44,5 +49,6 @@ export const revokePublicStoryShare = onCall(async (request) => {
   }
 
   await batch.commit();
+  auditLog({ event: "public_share_revoked", userId, sessionId: typeof share.sessionId === "string" ? share.sessionId : undefined, shareId: input.shareId });
   return { status: "revoked", shareId: input.shareId };
 });
