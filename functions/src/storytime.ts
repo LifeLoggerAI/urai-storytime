@@ -2,6 +2,7 @@ import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
+import { auditLog } from "./audit-log.js";
 import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
 
 initializeApp();
@@ -35,16 +36,20 @@ const PrepareVoiceoverJobSchema = z.object({
 const blockedTerms = ["suicide", "self-harm", "kill", "blood", "weapon", "explicit", "nude", "abuse", "diagnosis"];
 
 function requireAuth(uid?: string) {
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in is required.");
+  if (!uid) {
+    auditLog({ event: "generation_blocked_auth" });
+    throw new HttpsError("unauthenticated", "Sign in is required.");
+  }
 }
 
 function allowLocalBuilder() {
   return process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true" && process.env.NODE_ENV !== "production";
 }
 
-function requireConfiguredStoryProvider() {
+function requireConfiguredStoryProvider(userId?: string) {
   const readiness = getStoryProviderReadiness();
   if (readiness.ready || allowLocalBuilder()) return readiness;
+  auditLog({ event: "provider_unavailable", userId, provider: readiness.provider, errorCode: "missing_provider_config" });
   throw new HttpsError(
     "failed-precondition",
     `Story generation provider is not configured. Missing: ${readiness.missing.join(", ")}. The callable is deployed-safe but blocked until real provider credentials and review are enabled.`
@@ -70,9 +75,11 @@ async function enforceGenerationQuota(userId: string) {
     const dailyCount = Number(dailySnap.data()?.count || 0);
 
     if (hourlyCount >= MAX_GENERATIONS_PER_HOUR) {
+      auditLog({ event: "generation_blocked_quota", userId, quotaScope: "hour", errorCode: "hourly_limit" });
       throw new HttpsError("resource-exhausted", "Hourly Storytime generation limit reached. Try again later.");
     }
     if (dailyCount >= MAX_GENERATIONS_PER_DAY) {
+      auditLog({ event: "generation_blocked_quota", userId, quotaScope: "day", errorCode: "daily_limit" });
       throw new HttpsError("resource-exhausted", "Daily Storytime generation limit reached. Try again tomorrow.");
     }
 
@@ -124,26 +131,30 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
 export const generateStorySession = onCall(async (request) => {
   requireAuth(request.auth?.uid);
   const userId = request.auth!.uid;
+  auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
 
   if (!input.consentSnapshot.storyGeneration) {
+    auditLog({ event: "generation_blocked_consent", userId, errorCode: "story_generation_consent_missing" });
     throw new HttpsError("failed-precondition", "Story generation consent is required.");
   }
 
   const source = input.sourceText || "A quiet signal became a private URAI story.";
   const mod = moderate(`${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`);
   if (mod.hits.length) {
+    auditLog({ event: "generation_blocked_safety", userId, safetyStatus: mod.safetyStatus, errorCode: "unsafe_input" });
     throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
   }
 
   await enforceGenerationQuota(userId);
-  const readiness = requireConfiguredStoryProvider();
+  const readiness = requireConfiguredStoryProvider(userId);
   let generated: StoryProviderOutput;
   try {
     generated = readiness.ready
       ? await generateStoryWithProvider({ title: input.title, sourceText: source, emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs })
       : fallbackProviderOutput(input, source);
   } catch (error) {
+    auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
     throw new HttpsError("internal", error instanceof Error ? error.message : "Story provider failed.");
   }
 
@@ -259,6 +270,7 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
   await batch.commit();
 
+  auditLog({ event: "story_persisted", userId, sessionId, provider: session.provider, safetyStatus: mod.safetyStatus });
   return { sessionId, status: session.status, safetyStatus: mod.safetyStatus, provider: session.provider };
 });
 
@@ -287,6 +299,7 @@ export const createPublicStoryShare = onCall(async (request) => {
   });
 
   await session.ref.update({ publicShareId: shareId, visibility: "public_safe", updatedAt: now() });
+  auditLog({ event: "public_share_created", userId, sessionId: input.sessionId, shareId });
   return { shareId, slug };
 });
 
@@ -366,6 +379,7 @@ export const prepareVoiceoverJob = onCall(async (request) => {
   });
   await batch.commit();
 
+  auditLog({ event: "voiceover_export_queued", userId, sessionId: input.sessionId, provider: input.provider });
   return { status: "queued", voiceoverJobId, exportId, provider: input.provider };
 });
 
