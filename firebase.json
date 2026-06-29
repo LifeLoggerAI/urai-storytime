@@ -43,7 +43,10 @@
   "functions": [
     {
       "source": "functions",
-      "codebase": "storytime"
+      "codebase": "storytime",
+      "predeploy": [
+        "npm --prefix functions run build"
+      ]
     }
   ],
   "emulators": {
@@ -51,7 +54,7 @@
       "port": 9099
     },
     "functions": {
-      "port": 5001
+      "port": 5001"
     },
     "firestore": {
       "port": 8080
