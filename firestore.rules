@@ -172,6 +172,10 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /storytimeUsageCounters/{id} {
+      allow read, write: if false;
+    }
+
     match /publicStoryShares/{id} {
       allow read: if resource.data.revoked == false;
       allow create: if ownerOnlyCreate()
