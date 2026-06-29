@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
@@ -9,6 +9,8 @@ initializeApp();
 const db = getFirestore();
 const now = () => new Date().toISOString();
 const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
+const MAX_GENERATIONS_PER_DAY = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_DAY || 24);
 
 const GenerateStorySchema = z.object({
   title: z.string().min(1).max(120),
@@ -47,6 +49,36 @@ function requireConfiguredStoryProvider() {
     "failed-precondition",
     `Story generation provider is not configured. Missing: ${readiness.missing.join(", ")}. The callable is deployed-safe but blocked until real provider credentials and review are enabled.`
   );
+}
+
+function quotaWindowId(date: Date, scope: "hour" | "day") {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  return scope === "hour" ? `${year}${month}${day}${hour}` : `${year}${month}${day}`;
+}
+
+async function enforceGenerationQuota(userId: string) {
+  const current = new Date();
+  const hourlyRef = db.collection("storytimeUsageCounters").doc(`${userId}_hour_${quotaWindowId(current, "hour")}`);
+  const dailyRef = db.collection("storytimeUsageCounters").doc(`${userId}_day_${quotaWindowId(current, "day")}`);
+
+  await db.runTransaction(async (transaction) => {
+    const [hourlySnap, dailySnap] = await Promise.all([transaction.get(hourlyRef), transaction.get(dailyRef)]);
+    const hourlyCount = Number(hourlySnap.data()?.count || 0);
+    const dailyCount = Number(dailySnap.data()?.count || 0);
+
+    if (hourlyCount >= MAX_GENERATIONS_PER_HOUR) {
+      throw new HttpsError("resource-exhausted", "Hourly Storytime generation limit reached. Try again later.");
+    }
+    if (dailyCount >= MAX_GENERATIONS_PER_DAY) {
+      throw new HttpsError("resource-exhausted", "Daily Storytime generation limit reached. Try again tomorrow.");
+    }
+
+    transaction.set(hourlyRef, { userId, scope: "hour", count: FieldValue.increment(1), updatedAt: now() }, { merge: true });
+    transaction.set(dailyRef, { userId, scope: "day", count: FieldValue.increment(1), updatedAt: now() }, { merge: true });
+  });
 }
 
 function fallbackProviderOutput(input: z.infer<typeof GenerateStorySchema>, source: string): StoryProviderOutput {
@@ -104,6 +136,7 @@ export const generateStorySession = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
   }
 
+  await enforceGenerationQuota(userId);
   const readiness = requireConfiguredStoryProvider();
   let generated: StoryProviderOutput;
   try {
