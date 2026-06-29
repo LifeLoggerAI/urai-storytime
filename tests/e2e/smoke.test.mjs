@@ -151,7 +151,7 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /firestore\.rules/);
 });
 
-test('Callable functions cover Storytime lifecycle hooks and provider generation wiring', () => {
+test('Callable functions cover Storytime lifecycle hooks, provider wiring, and quota gate', () => {
   for (const name of [
     'generateStorySession',
     'createPublicStoryShare',
@@ -167,6 +167,11 @@ test('Callable functions cover Storytime lifecycle hooks and provider generation
   assert.match(functions, /Story generation consent is required/);
   assert.match(functions, /requireConfiguredStoryProvider/);
   assert.match(functions, /generateStoryWithProvider/);
+  assert.match(functions, /MAX_GENERATIONS_PER_HOUR/);
+  assert.match(functions, /MAX_GENERATIONS_PER_DAY/);
+  assert.match(functions, /enforceGenerationQuota/);
+  assert.match(functions, /storytimeUsageCounters/);
+  assert.match(functions, /resource-exhausted/);
   assert.match(storyProvider, /response_format/);
   assert.match(storyProvider, /Do not diagnose/);
   assert.match(functions, /Public sharing requires explicit consent/);
