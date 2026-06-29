@@ -186,11 +186,13 @@ test('Storytime Functions emit privacy-safe audit log events', () => {
   assert.match(auditLog, /provider_failed/);
   assert.match(auditLog, /story_persisted/);
   assert.match(auditLog, /public_share_created/);
+  assert.match(auditLog, /public_share_revoked/);
   assert.match(auditLog, /voiceover_export_queued/);
   assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
   assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
   assert.match(functions, /auditLog\(\{ event: "public_share_created"/);
   assert.match(functions, /auditLog\(\{ event: "voiceover_export_queued"/);
+  assert.match(revokeShareFunction, /auditLog\(\{ event: "public_share_revoked"/);
   assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
 });
 
