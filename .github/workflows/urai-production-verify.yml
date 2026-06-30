@@ -1,8 +1,10 @@
-name: URAI Production Verify
+name: URAI Storytime Verify
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -11,19 +13,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - run: corepack enable
-      - name: Install dependencies
+      - name: Install root dependencies
         run: |
-          if [ -f pnpm-lock.yaml ]; then
-            corepack prepare pnpm@latest --activate
-            pnpm install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
+          if [ -f package-lock.json ]; then
             npm ci
-          elif [ -f package.json ]; then
-            npm install
           else
-            echo "No package.json found; skipping install."
+            npm install
+          fi
+      - name: Install Functions dependencies
+        run: |
+          if [ -f functions/package-lock.json ]; then
+            npm --prefix functions ci
+          elif [ -f functions/package.json ]; then
+            npm --prefix functions install
+          else
+            echo "No functions package found; skipping."
           fi
       - name: Verify
         run: node scripts/urai-production-verify.mjs
