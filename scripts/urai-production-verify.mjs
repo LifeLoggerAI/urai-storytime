@@ -15,6 +15,7 @@ if (existsSync('package.json')) {
   add('security rules validation', 'npm', ['run', 'test:security-rules', '--if-present']);
   add('emulator scaffold validation', 'npm', ['run', 'test:emulator-scaffold', '--if-present']);
   add('emulator runtime validation', 'npm', ['run', 'test:emulator-runtime', '--if-present']);
+  add('emulator behavior spec validation', 'npm', ['run', 'test:emulator-behavior-spec', '--if-present']);
   add('provider wiring validation', 'npm', ['run', 'test:provider-wiring', '--if-present']);
   add('production readiness validation', 'npm', ['run', 'test:production-readiness', '--if-present']);
   add('root build', 'npm', ['run', 'build', '--if-present']);
