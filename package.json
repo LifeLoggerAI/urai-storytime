@@ -10,7 +10,7 @@
     "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/unit/*.test.mjs",
-    "test:smoke": "node tests/e2e/smoke.test.mjs",
+    "test:smoke": "node scripts/storytime-smoke.mjs",
     "test:e2e": "node --import tsx --test tests/e2e/*.test.mjs",
     "test:deployment": "node scripts/validate-deployment-readiness.mjs",
     "test:security-rules": "node scripts/validate-security-rules.mjs",
