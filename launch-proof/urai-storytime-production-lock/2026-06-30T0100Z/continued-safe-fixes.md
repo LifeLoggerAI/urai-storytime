@@ -34,9 +34,17 @@
    - Verifies Firestore/Storage private-by-default and revoked-share boundaries are present.
    - Verifies demo routes and runtime readiness preserve the non-production launch boundary.
 
+6. Added `docs/STORYTIME_EMULATOR_BEHAVIOR_SPEC.md`.
+   - Defines required synthetic users, records, allow cases, deny cases, and sanitized proof output.
+   - Covers owner, other-user, admin, signed-out, private session, public share, revoke, quota, privacy request, audit/moderation, voiceover/export, and Storage artifact protections.
+
+7. Added `scripts/validate-emulator-behavior-spec.mjs` and wired it into `package.json` plus `scripts/urai-production-verify.mjs`.
+   - CI now checks that the emulator behavior proof spec exists and contains the required safety/privacy scenarios.
+   - `emulators:test` now includes the behavior spec validator alongside static rules and emulator runtime checks.
+
 ## Expected impact
 
-The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks. It also has explicit regression coverage for the product claims that must not be overclaimed before deployment proof exists.
+The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks. It also has explicit regression coverage for the product claims that must not be overclaimed before deployment proof exists, plus a required behavioral emulator proof spec for owner/non-owner/share/revoke/storage scenarios.
 
 ## Still not claimed
 
@@ -44,12 +52,13 @@ The CI verification path is now aligned to the actual Storytime repo instead of 
 - No Firebase deployment was run.
 - No OpenAI provider call was made.
 - No live persistence/share/export proof was produced.
+- No behavioral Firebase emulator test was executed in this runtime.
 
 ## Remaining hard blockers
 
 - Real Firebase staging/production targets.
 - CI run proof from GitHub Actions.
-- Firebase emulator behavioral tests.
+- Firebase emulator behavioral execution.
 - Provider-backed generation smoke.
 - Persistence readback proof.
 - Share create/fetch/revoke proof.
