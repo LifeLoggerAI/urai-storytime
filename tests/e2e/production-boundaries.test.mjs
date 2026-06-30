@@ -79,8 +79,11 @@ test('generation persistence bundle writes all expected private Storytime record
   ]);
 });
 
-test('public sharing exposes only redacted public-safe fields and supports owner revoke', () => {
+test('public sharing exposes only redacted public-safe fields, expires by default, and supports owner revoke', () => {
   includesAll(functions, [
+    'PUBLIC_SHARE_TTL_DAYS',
+    'daysFromNow(PUBLIC_SHARE_TTL_DAYS)',
+    'expiresAt',
     'Public sharing requires explicit consent',
     'readOwnedStorySession',
     'publicStoryShares',
