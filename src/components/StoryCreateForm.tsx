@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import type { AgeBand, Story, StoryMood, StoryRequest } from '../types/story';
+import { CloudFamilyModePanel } from './CloudFamilyModePanel';
+import { createCloudStory } from '../lib/cloudStoryService';
+import { canAttemptCloudFamilyWrite, useCloudFamily } from '../lib/cloudFamilyContext';
 import { createStoryManifest } from '../story-engine/StoryEngine';
 import { saveLocalStory } from '../lib/localStoryStorage';
 import { trackEvent } from '../lib/analytics';
@@ -23,32 +26,68 @@ function formEnum<T extends string>(formData: FormData, key: string, allowedValu
 }
 
 export function StoryCreateForm() {
+  const cloud = useCloudFamily();
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'blocked' | 'error'>('idle');
   const [story, setStory] = useState<Story | null>(null);
   const [error, setError] = useState('');
+  const [mode, setMode] = useState<'local_demo' | 'cloud_family'>('local_demo');
 
   async function submit(formData: FormData) {
     setStatus('loading');
     setError('');
-    await trackEvent('story_create_started', { mode: 'local_demo' });
 
-    const request: StoryRequest = {
-      id: makeId('request'),
-      familyId: 'local_demo_family',
-      childProfileId: 'local_demo_child',
-      requestedByUserId: 'local_demo_parent',
-      childDisplayName: formText(formData, 'childDisplayName', 'Ari', 32),
-      ageBand: formEnum(formData, 'ageBand', ageBands, 'early_reader_6_8'),
-      theme: formText(formData, 'theme', 'Moon Garden', 80),
-      mood: formEnum(formData, 'mood', moods, 'gentle'),
-      narratorId: formText(formData, 'narratorId', 'gentle_firefly', 80),
-      prompt: formText(formData, 'prompt', '', 700),
-      memorySeedIds: [],
-      bedtimeMode: formData.get('bedtimeMode') === 'on',
-      createdAt: new Date().toISOString()
-    };
+    const childDisplayName = formText(formData, 'childDisplayName', 'Ari', 32);
+    const ageBand = formEnum(formData, 'ageBand', ageBands, 'early_reader_6_8');
+    const theme = formText(formData, 'theme', 'Moon Garden', 80);
+    const mood = formEnum(formData, 'mood', moods, 'gentle');
+    const narratorId = formText(formData, 'narratorId', 'gentle_firefly', 80);
+    const prompt = formText(formData, 'prompt', '', 700);
+    const shouldTryCloud = canAttemptCloudFamilyWrite(cloud);
+
+    await trackEvent('story_create_started', {
+      mode: shouldTryCloud ? 'cloud_family' : 'local_demo'
+    });
 
     try {
+      if (shouldTryCloud && cloud.user) {
+        const cloudStory = await createCloudStory({
+          familyId: cloud.activeFamilyId,
+          childProfileId: 'cloud_child_profile_pending',
+          childDisplayName,
+          ageBand,
+          theme,
+          mood,
+          narratorId,
+          prompt
+        });
+
+        saveLocalStory(cloudStory);
+        setStory(cloudStory);
+        setMode('cloud_family');
+        setStatus('ready');
+        await trackEvent('story_create_completed', {
+          mode: 'cloud_family',
+          sceneCount: cloudStory.scenes.length
+        });
+        return;
+      }
+
+      const request: StoryRequest = {
+        id: makeId('request'),
+        familyId: 'local_demo_family',
+        childProfileId: 'local_demo_child',
+        requestedByUserId: 'local_demo_parent',
+        childDisplayName,
+        ageBand,
+        theme,
+        mood,
+        narratorId,
+        prompt,
+        memorySeedIds: [],
+        bedtimeMode: formData.get('bedtimeMode') === 'on',
+        createdAt: new Date().toISOString()
+      };
+
       const result = await createStoryManifest(request);
 
       if (result.story.status === 'blocked') {
@@ -60,18 +99,29 @@ export function StoryCreateForm() {
 
       saveLocalStory(result.story);
       setStory(result.story);
+      setMode('local_demo');
       setStatus('ready');
       await trackEvent('story_create_completed', { mode: 'local_demo', sceneCount: result.story.scenes.length });
     } catch (err) {
       setStatus('error');
-      setError(err instanceof Error ? err.message : 'Story generation failed.');
+      setMode(shouldTryCloud ? 'cloud_family' : 'local_demo');
+      setError(
+        err instanceof Error
+          ? `${err.message} Local Demo Mode is still available if Cloud Family Mode is not ready.`
+          : 'Story generation failed. Local Demo Mode is still available.'
+      );
     }
   }
 
   return (
     <section className="card">
       <h1>Create a Story</h1>
-      <p className="notice">Local demo mode saves this story in your browser only. Avoid entering sensitive real child information.</p>
+      <CloudFamilyModePanel cloud={cloud} />
+      <p className="notice">
+        {mode === 'cloud_family'
+          ? 'Cloud Family Mode attempted this story. Firebase rules and Functions enforce membership.'
+          : 'Local Demo Mode saves this story in your browser only. Avoid entering sensitive real child information.'}
+      </p>
 
       <form
         className="form"
