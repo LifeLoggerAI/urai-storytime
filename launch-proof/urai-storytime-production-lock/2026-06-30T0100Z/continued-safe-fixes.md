@@ -41,9 +41,15 @@
    - `scripts/validate-env-template.mjs` requires the TTL env template.
    - `tests/e2e/production-boundaries.test.mjs` now asserts public shares expire by default.
 
+9. Added isolated Firebase production gates.
+   - `.env.example` now documents `URAI_STORYTIME_FIREBASE_PROJECT_ID`, Storytime staging/production targets, Core/Analytics comparison IDs, and `STORYTIME_FIREBASE_ISOLATED=false` as a safe default.
+   - `scripts/validate-env-template.mjs` requires the isolated Storytime Firebase env markers.
+   - `scripts/validate-live-production-config.mjs` now requires `STORYTIME_FIREBASE_ISOLATED=true` for live production.
+   - Live production config now fails if the Storytime Firebase project matches the Core or Analytics Firebase project IDs.
+
 ## Expected impact
 
-The CI verification path is aligned to the actual Storytime repo, has regression coverage for sensitive product claims, includes an emulator behavior proof spec, and now makes new public shares time-limited by default.
+The CI verification path is aligned to the actual Storytime repo, has regression coverage for sensitive product claims, includes an emulator behavior proof spec, makes new public shares time-limited by default, and blocks production config unless Storytime uses an isolated Firebase project.
 
 ## Still not claimed
 
@@ -55,7 +61,7 @@ The CI verification path is aligned to the actual Storytime repo, has regression
 
 ## Remaining hard blockers
 
-- Real Firebase staging/production targets.
+- Real isolated Firebase staging/production targets for Storytime.
 - CI run proof from GitHub Actions.
 - Firebase emulator behavioral execution.
 - Provider-backed generation smoke.
