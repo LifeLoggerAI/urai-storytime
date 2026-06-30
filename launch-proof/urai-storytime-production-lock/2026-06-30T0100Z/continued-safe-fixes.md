@@ -26,25 +26,24 @@
    - Does not require real secrets unless `STORYTIME_GENERATION_PROVIDER=openai` is explicitly enabled in the environment.
 
 5. Added `tests/e2e/production-boundaries.test.mjs`.
-   - Locks cloud creation behind auth, cloud mode, consent, provider readiness, and safety checks.
-   - Locks OpenAI provider claims behind provider/key/model gates.
-   - Verifies the generation persistence bundle writes expected private Storytime records.
-   - Verifies public sharing uses redacted safe fields and supports owner revoke.
-   - Verifies voiceover/export remains queued job records only, not completed artifact claims.
-   - Verifies Firestore/Storage private-by-default and revoked-share boundaries are present.
-   - Verifies demo routes and runtime readiness preserve the non-production launch boundary.
+   - Locks cloud creation, provider claims, persistence records, public sharing, queued export status, private-by-default rules, and demo boundaries.
 
 6. Added `docs/STORYTIME_EMULATOR_BEHAVIOR_SPEC.md`.
-   - Defines required synthetic users, records, allow cases, deny cases, and sanitized proof output.
-   - Covers owner, other-user, admin, signed-out, private session, public share, revoke, quota, privacy request, audit/moderation, voiceover/export, and Storage artifact protections.
+   - Defines required synthetic users, records, allow cases, deny cases, and sanitized proof output for emulator behavior proof.
 
 7. Added `scripts/validate-emulator-behavior-spec.mjs` and wired it into `package.json` plus `scripts/urai-production-verify.mjs`.
-   - CI now checks that the emulator behavior proof spec exists and contains the required safety/privacy scenarios.
-   - `emulators:test` now includes the behavior spec validator alongside static rules and emulator runtime checks.
+   - CI now checks that the emulator behavior proof spec exists and includes required safety/privacy scenarios.
+
+8. Implemented default public-share expiration.
+   - `createPublicStoryShare` now writes `expiresAt` using `STORYTIME_PUBLIC_SHARE_TTL_DAYS`, defaulting to 30 days.
+   - The callable now returns `expiresAt` with `shareId` and `slug`.
+   - `.env.example` documents `STORYTIME_PUBLIC_SHARE_TTL_DAYS=30`.
+   - `scripts/validate-env-template.mjs` requires the TTL env template.
+   - `tests/e2e/production-boundaries.test.mjs` now asserts public shares expire by default.
 
 ## Expected impact
 
-The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks. It also has explicit regression coverage for the product claims that must not be overclaimed before deployment proof exists, plus a required behavioral emulator proof spec for owner/non-owner/share/revoke/storage scenarios.
+The CI verification path is aligned to the actual Storytime repo, has regression coverage for sensitive product claims, includes an emulator behavior proof spec, and now makes new public shares time-limited by default.
 
 ## Still not claimed
 
