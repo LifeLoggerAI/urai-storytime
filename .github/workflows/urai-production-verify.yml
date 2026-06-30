@@ -33,3 +33,26 @@ jobs:
           fi
       - name: Verify
         run: node scripts/urai-production-verify.mjs
+      - name: Write verification receipt
+        if: always()
+        run: |
+          mkdir -p ci-receipts
+          cat > ci-receipts/urai-storytime-verify.txt <<'EOF'
+          URAI Storytime CI verification receipt
+          Repository: ${{ github.repository }}
+          Commit: ${{ github.sha }}
+          Ref: ${{ github.ref }}
+          Workflow: ${{ github.workflow }}
+          Run ID: ${{ github.run_id }}
+          Run number: ${{ github.run_number }}
+          Actor: ${{ github.actor }}
+          Verification command: node scripts/urai-production-verify.mjs
+          Production boundary: this receipt proves CI command execution only; Firebase deploy, provider smoke, emulator behavior execution, live persistence, public share smoke, export artifacts, and safety/legal approvals still require separate receipts.
+          EOF
+      - name: Upload verification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: urai-storytime-verify-${{ github.sha }}
+          path: ci-receipts/urai-storytime-verify.txt
+          retention-days: 30
