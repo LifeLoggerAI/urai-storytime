@@ -12,6 +12,7 @@ const now = () => new Date().toISOString();
 const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
 const MAX_GENERATIONS_PER_DAY = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_DAY || 24);
+const PUBLIC_SHARE_TTL_DAYS = Number(process.env.STORYTIME_PUBLIC_SHARE_TTL_DAYS || 30);
 
 const GenerateStorySchema = z.object({
   title: z.string().min(1).max(120),
@@ -62,6 +63,11 @@ function quotaWindowId(date: Date, scope: "hour" | "day") {
   const day = String(date.getUTCDate()).padStart(2, "0");
   const hour = String(date.getUTCHours()).padStart(2, "0");
   return scope === "hour" ? `${year}${month}${day}${hour}` : `${year}${month}${day}`;
+}
+
+function daysFromNow(days: number) {
+  const safeDays = Number.isFinite(days) && days > 0 ? days : 30;
+  return new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000).toISOString();
 }
 
 async function enforceGenerationQuota(userId: string) {
@@ -284,6 +290,8 @@ export const createPublicStoryShare = onCall(async (request) => {
   const session = await readOwnedStorySession(input.sessionId, userId);
   const shareId = id("publicStoryShare");
   const slug = `${String(session.data.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${shareId.slice(-6)}`;
+  const createdAt = now();
+  const expiresAt = daysFromNow(PUBLIC_SHARE_TTL_DAYS);
 
   await db.collection("publicStoryShares").doc(shareId).set({
     id: shareId,
@@ -294,13 +302,14 @@ export const createPublicStoryShare = onCall(async (request) => {
     safeSummary: redact(String(session.data.subtitle || session.data.title)),
     safeBody: "A private URAI story was transformed into a public-safe reflection.",
     revoked: false,
-    createdAt: now(),
-    updatedAt: now()
+    createdAt,
+    updatedAt: createdAt,
+    expiresAt
   });
 
   await session.ref.update({ publicShareId: shareId, visibility: "public_safe", updatedAt: now() });
   auditLog({ event: "public_share_created", userId, sessionId: input.sessionId, shareId });
-  return { shareId, slug };
+  return { shareId, slug, expiresAt };
 });
 
 export const generateNarratorScript = onCall(async (request) => {
