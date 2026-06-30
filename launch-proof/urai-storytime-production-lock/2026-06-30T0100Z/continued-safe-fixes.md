@@ -1,0 +1,48 @@
+# Continued safe fixes
+
+## Timestamp
+
+2026-06-30T0135Z
+
+## Additional fixes completed
+
+1. Updated `scripts/validate-production-readiness.mjs`.
+   - Replaced stale required artifact list with current URAI Storytime source artifacts.
+   - Validates current app routes, Storytime components, Firebase config, rules, Functions source, provider source, tests, workflow, and proof folder.
+   - Keeps Firebase placeholder and runtime readiness as warnings/blockers instead of pretending external deployment proof exists.
+
+2. Updated `scripts/validate-emulator-scaffold.mjs`.
+   - Replaced stale `firebase.emulators.json` requirement with the actual `firebase.json` emulator config used by this repo.
+   - Verifies Auth, Functions, Firestore, Storage, Hosting, and UI emulator sections exist.
+
+3. Updated `scripts/validate-emulator-runtime.mjs`.
+   - Replaced stale `firebase.emulators.json` requirement with `firebase.json`.
+   - Verifies required emulator ports exist for Auth, Functions, Firestore, and Storage.
+   - Preserves the warning that behavioral emulator tests are still required before production.
+
+4. Updated `scripts/validate-provider-wiring.mjs`.
+   - Replaced stale analytics/monitoring provider check with Storytime generation provider source validation.
+   - Verifies provider source, Storytime callable source, and `.env.example` contain OpenAI/provider readiness markers.
+   - Does not require real secrets unless `STORYTIME_GENERATION_PROVIDER=openai` is explicitly enabled in the environment.
+
+## Expected impact
+
+The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks.
+
+## Still not claimed
+
+- No local `npm install` or build/test command was run in this runtime.
+- No Firebase deployment was run.
+- No OpenAI provider call was made.
+- No live persistence/share/export proof was produced.
+
+## Remaining hard blockers
+
+- Real Firebase staging/production targets.
+- CI run proof from GitHub Actions.
+- Firebase emulator behavioral tests.
+- Provider-backed generation smoke.
+- Persistence readback proof.
+- Share create/fetch/revoke proof.
+- Export/voiceover artifact processing proof.
+- Child-safety/legal/privacy approval proof.
