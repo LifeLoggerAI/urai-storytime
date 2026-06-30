@@ -25,9 +25,18 @@
    - Verifies provider source, Storytime callable source, and `.env.example` contain OpenAI/provider readiness markers.
    - Does not require real secrets unless `STORYTIME_GENERATION_PROVIDER=openai` is explicitly enabled in the environment.
 
+5. Added `tests/e2e/production-boundaries.test.mjs`.
+   - Locks cloud creation behind auth, cloud mode, consent, provider readiness, and safety checks.
+   - Locks OpenAI provider claims behind provider/key/model gates.
+   - Verifies the generation persistence bundle writes expected private Storytime records.
+   - Verifies public sharing uses redacted safe fields and supports owner revoke.
+   - Verifies voiceover/export remains queued job records only, not completed artifact claims.
+   - Verifies Firestore/Storage private-by-default and revoked-share boundaries are present.
+   - Verifies demo routes and runtime readiness preserve the non-production launch boundary.
+
 ## Expected impact
 
-The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks.
+The CI verification path is now aligned to the actual Storytime repo instead of failing because of outdated filenames or unrelated provider checks. It also has explicit regression coverage for the product claims that must not be overclaimed before deployment proof exists.
 
 ## Still not claimed
 
