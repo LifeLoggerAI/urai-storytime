@@ -1,6 +1,5 @@
-import { PageProps } from '@/lib/types';
 import StoryReplayClient from './StoryReplayClient';
 
-export default function StoryPage({ params }: PageProps) {
+export default function StoryPage({ params }: { params: { storyId: string } }) {
   return <StoryReplayClient storyId={params.storyId} />;
 }
