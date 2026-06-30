@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 const required = {
-  URAI_FIREBASE_PROJECT_ID: process.env.URAI_FIREBASE_PROJECT_ID,
-  URAI_FIREBASE_STAGING_TARGET: process.env.URAI_FIREBASE_STAGING_TARGET,
-  URAI_FIREBASE_PRODUCTION_TARGET: process.env.URAI_FIREBASE_PRODUCTION_TARGET,
+  URAI_STORYTIME_FIREBASE_PROJECT_ID: process.env.URAI_STORYTIME_FIREBASE_PROJECT_ID,
+  URAI_STORYTIME_STAGING_TARGET: process.env.URAI_STORYTIME_STAGING_TARGET,
+  URAI_STORYTIME_PRODUCTION_TARGET: process.env.URAI_STORYTIME_PRODUCTION_TARGET,
+  STORYTIME_FIREBASE_ISOLATED: process.env.STORYTIME_FIREBASE_ISOLATED,
   FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED: process.env.FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED,
   STORYTIME_GENERATION_PROVIDER: process.env.STORYTIME_GENERATION_PROVIDER,
   OPENAI_API_KEY: process.env.OPENAI_API_KEY,
@@ -26,6 +27,9 @@ if (process.env.NEXT_PUBLIC_STORYTIME_CLOUD_MODE && process.env.NEXT_PUBLIC_STOR
 if (process.env.NEXT_PUBLIC_STORYTIME_PROVIDER_READY && process.env.NEXT_PUBLIC_STORYTIME_PROVIDER_READY !== 'true') failures.push('NEXT_PUBLIC_STORYTIME_PROVIDER_READY must be true for live production.');
 if (process.env.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING && process.env.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING !== 'true') failures.push('NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING must be true for live production public shares.');
 if (process.env.FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED && process.env.FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED !== 'true') failures.push('FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED must be true.');
+if (process.env.STORYTIME_FIREBASE_ISOLATED && process.env.STORYTIME_FIREBASE_ISOLATED !== 'true') failures.push('STORYTIME_FIREBASE_ISOLATED must be true. Storytime cannot share Firebase with Core or Analytics.');
+if (process.env.URAI_STORYTIME_FIREBASE_PROJECT_ID && process.env.URAI_CORE_FIREBASE_PROJECT_ID && process.env.URAI_STORYTIME_FIREBASE_PROJECT_ID === process.env.URAI_CORE_FIREBASE_PROJECT_ID) failures.push('URAI Storytime Firebase project must not equal URAI Core Firebase project.');
+if (process.env.URAI_STORYTIME_FIREBASE_PROJECT_ID && process.env.URAI_ANALYTICS_FIREBASE_PROJECT_ID && process.env.URAI_STORYTIME_FIREBASE_PROJECT_ID === process.env.URAI_ANALYTICS_FIREBASE_PROJECT_ID) failures.push('URAI Storytime Firebase project must not equal URAI Analytics Firebase project.');
 if (process.env.URAI_LEGAL_APPROVED && process.env.URAI_LEGAL_APPROVED !== 'true') failures.push('URAI_LEGAL_APPROVED must be true.');
 if (process.env.URAI_PRIVACY_APPROVED && process.env.URAI_PRIVACY_APPROVED !== 'true') failures.push('URAI_PRIVACY_APPROVED must be true.');
 if (process.env.URAI_CHILD_SAFETY_APPROVED && process.env.URAI_CHILD_SAFETY_APPROVED !== 'true') failures.push('URAI_CHILD_SAFETY_APPROVED must be true.');
@@ -37,3 +41,4 @@ if (failures.length) {
 }
 
 console.log('Live production configuration gates passed.');
+console.log('Storytime Firebase isolation gate passed.');
