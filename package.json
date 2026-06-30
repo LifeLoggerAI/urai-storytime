@@ -32,7 +32,8 @@
     "deploy:hosting": "firebase deploy --only hosting",
     "deploy": "npm run build && firebase deploy",
     "format": "node scripts/format-check.mjs",
-    "build:ts": "tsc"
+    "build:ts": "tsc",
+    "test:cloud-wiring": "node scripts/validate-cloud-wiring.mjs"
   },
   "dependencies": {
     "@types/react": "^18.2.0",
