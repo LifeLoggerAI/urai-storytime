@@ -28,10 +28,12 @@ No.
 - Emulator behavior proof spec and validator.
 - Isolated Storytime Firebase production config gate.
 - CI-oriented verification workflow and production verification script.
+- CI verification receipt artifact generation: `urai-storytime-verify-${{ github.sha }}`.
 
 ## What is not verified
 
 - GitHub Actions passing run for latest commit.
+- Downloaded CI verification receipt artifact from the latest run.
 - Isolated Storytime Firebase staging/production project IDs and targets.
 - Firebase deploy.
 - Firebase emulator behavior execution.
@@ -47,15 +49,16 @@ No.
 ## Required receipts to upgrade to production-ready
 
 1. Passing GitHub Actions run for the latest `main` commit.
-2. `STORYTIME_FIREBASE_ISOLATED=true` with Storytime Firebase project ID distinct from Core and Analytics.
-3. Passing Firebase emulator behavior proof for owner, other-user, admin, signed-out, public-share, revoke, quota, and storage scenarios.
-4. Staging Firebase deploy receipt.
-5. Production Firebase deploy receipt.
-6. Provider-backed generation smoke receipt.
-7. Persistence readback receipt.
-8. Public-share create/fetch/revoke receipt.
-9. Export/voiceover artifact receipt or explicit disabled launch gate.
-10. Child-safety, privacy, and legal approval receipts.
+2. Downloaded `urai-storytime-verify-${commitSha}` artifact showing `node scripts/urai-production-verify.mjs` ran.
+3. `STORYTIME_FIREBASE_ISOLATED=true` with Storytime Firebase project ID distinct from Core and Analytics.
+4. Passing Firebase emulator behavior proof for owner, other-user, admin, signed-out, public-share, revoke, quota, and storage scenarios.
+5. Staging Firebase deploy receipt.
+6. Production Firebase deploy receipt.
+7. Provider-backed generation smoke receipt.
+8. Persistence readback receipt.
+9. Public-share create/fetch/revoke receipt.
+10. Export/voiceover artifact receipt or explicit disabled launch gate.
+11. Child-safety, privacy, and legal approval receipts.
 
 ## Coordinator verdict
 
@@ -63,4 +66,4 @@ No.
 
 ## Copy-paste global release note
 
-`urai-storytime: DONE BUT NEEDS EXTERNAL ENV. Source gates, public-share expiry, isolated Firebase enforcement, production-boundary tests, and emulator behavior proof spec are implemented. Block production-ready until GitHub Actions pass, isolated Firebase targets, emulator behavior execution, provider smoke, live persistence/share/revoke/export receipts, and safety/legal/privacy approvals are attached.`
+`urai-storytime: DONE BUT NEEDS EXTERNAL ENV. Source gates, public-share expiry, isolated Firebase enforcement, production-boundary tests, emulator behavior proof spec, and CI receipt artifact generation are implemented. Block production-ready until GitHub Actions pass, the CI receipt artifact is attached, isolated Firebase targets, emulator behavior execution, provider smoke, live persistence/share/revoke/export receipts, and safety/legal/privacy approvals are attached.`
