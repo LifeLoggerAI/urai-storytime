@@ -1,340 +1,220 @@
-# URAI-StoryTime 2.5+ Architecture
+# URAI Storytime architecture
 
-## Architecture goal
-URAI-StoryTime should evolve from a local static demo into a standalone, provider-agnostic, family-safe storytelling platform with modular integrations into the broader URAI ecosystem.
+Last reconciled: 2026-07-06  
+Evidence baseline: `main@af3b97166b23c55618ae3cdd91a96bb035fd40f2`
 
-The architecture must preserve local demo mode while enabling authenticated cloud mode, AI generation, moderation, narration, replay, and admin operations.
+## Current classification
 
-## Current baseline architecture
+URAI Storytime is a Next.js/Firebase internal-alpha product with a deterministic demo fallback. The active application is under `src/app`, `src/components/storytime`, and `src/lib`. Files such as `src/app.js`, `src/index.html`, and `src/story-engine.mjs` belong to the older static/hash-router implementation and are not the canonical runtime.
 
-```text
-src/index.html
-  └── src/app.js
-        ├── hash routes
-        ├── localStorage library
-        ├── create story form
-        ├── story detail view
-        ├── browser speech synthesis
-        └── src/story-engine.mjs
-              ├── prompt blocklist
-              └── local template story generation
+## Current runtime architecture
+
+```mermaid
+flowchart TB
+  Browser[Next.js Storytime UI]
+  Browser --> Demo[Deterministic demo builder]
+  Browser --> Auth[Firebase Auth]
+  Browser --> FS[(Firestore)]
+  Browser --> Fn[Firebase callable Functions]
+  Browser --> Storage[(Cloud Storage)]
+
+  Fn --> Quota[(storytimeUsageCounters)]
+  Fn --> OpenAI[OpenAI chat completions]
+  Fn --> FS
+  Fn --> Logs[Structured console audit events]
+
+  FS --> Sessions[Story sessions/chapters/moments/scenes/scripts/arcs]
+  FS --> Shares[Public-safe shares]
+  FS --> Jobs[Voiceover/export queue records]
+
+  Adapter[Asset-Factory TypeScript adapter] -. not dispatched by worker .-> AssetFactory[asset-factory API]
 ```
 
-Current scripts:
-- `scripts/server.mjs`: serves `src/` locally.
-- `scripts/build.mjs`: copies top-level `src` files into `dist/`.
-- `scripts/lint.mjs`: placeholder static-lint skip.
-- `scripts/typecheck.mjs`: placeholder TypeScript-not-configured note.
-- `scripts/format-check.mjs`: placeholder format-check skip.
+## Active frontend surfaces
 
-## Target architecture
+- `/` redirects to `/storytime`.
+- `/storytime` contains Firebase account UI, cloud library, and story-seed form.
+- `/storytime/settings` is a read-only description of effective defaults.
+- `/storytime/demo` renders a deterministic, non-persisted story.
+- `/storytime/[sessionId]` reads an authenticated cloud session.
+- `/share/story/demo` shows the public-share boundary.
+- `/share/story/[shareId]` reads a redacted public-safe share when enabled.
 
-```text
-Public Website
-  ├── Landing
-  ├── Demo
-  ├── Parents
-  ├── Creators
-  ├── Safety
-  ├── Pricing / Waitlist
-  └── Legal
+There are no active Next API routes. Backend operations are Firebase callable Functions.
 
-StoryTime App
-  ├── Auth
-  ├── Parent Dashboard
-  ├── Child Profiles
-  ├── Story Creation Wizard
-  ├── Story Library
-  ├── Story Playback
-  ├── Narrator Settings
-  └── Family Settings
+## Callable boundary
 
-AI Story Engine
-  ├── Story Request Normalizer
-  ├── Safety Precheck
-  ├── Story Planner
-  ├── Story Writer
-  ├── Safety Postcheck
-  ├── Scene Splitter
-  ├── Emotional Adapter
-  ├── Symbolic Motif Mapper
-  └── Replay Manifest Builder
+### Implemented but not live-verified
 
-Media Engine
-  ├── Web Speech Fallback
-  ├── TTS Provider Adapter
-  ├── Captions
-  ├── Audio Assets
-  └── Playback Timeline
+- `generateStorySession`
+- `createPublicStoryShare`
+- `revokePublicStoryShare`
+- `prepareVoiceoverJob` (queue records only)
 
-Admin / Moderation
-  ├── Flagged Content Queue
-  ├── Safety Reviews
-  ├── Story Inspection
-  ├── User / Family Lookup
-  ├── Audit Logs
-  └── System Health
+### Placeholder hooks
 
-URAI Integrations
-  ├── URAI Auth
-  ├── URAI Privacy
-  ├── URAI Memory
-  ├── URAI Companion
-  ├── URAI Symbolic Engine
-  ├── URAI Voice
-  ├── URAI Admin
-  └── URAI Analytics
+- `generateNarratorScript`
+- `generateEmotionalArcSummary`
+- `generateWeeklyStoryScroll`
+- `refreshStoryTimeline`
+- `rebuildUserStoryArchive`
+
+A callable name existing is not evidence that its business process exists.
+
+## Current data ownership
+
+Storytime owns:
+
+- story requests and generation jobs;
+- sessions, chapters, moments, scenes, narrator scripts, and emotional arcs;
+- user Storytime preferences;
+- public-safe derivatives and share lifecycle;
+- Storytime export/voiceover job metadata;
+- consent, safety, provider, cost, and provenance receipts for Storytime operations.
+
+Storytime must not own raw canonical Life Map, relationship, location, health, or calendar records. Future integrations receive a minimum-necessary, purpose-bound snapshot through versioned APIs.
+
+## Current collections
+
+Active or source-wired collections include:
+
+- `storySessions`
+- `storyChapters`
+- `storyMoments`
+- `memoryScenes`
+- `narratorScripts`
+- `emotionalArcSummaries`
+- `publicStoryShares`
+- `voiceoverJobs`
+- `storyExports`
+- `timelineReplayEvents`
+- `storytimeUsageCounters`
+
+Family-oriented scaffolding also references `users`, `families`, `childProfiles`, `stories`, `storyRuns`, `moderation`, `auditLogs`, and `privacyRequests`, but the active UI/Functions do not yet provide a complete family workspace lifecycle.
+
+## Trust boundaries
+
+1. **Browser:** untrusted. Client feature flags and validation are UX only.
+2. **Firebase Auth token:** establishes identity, not product consent or guardian authority.
+3. **Callable Function:** must enforce schema, consent, age/guardian policy, entitlement, cost, safety, and object authorization.
+4. **Firestore/Storage rules:** final client-access boundary; every supported query requires behavioral tests.
+5. **Provider:** receives only approved minimum-necessary content and returns untrusted output.
+6. **Asset Factory/media provider:** separate job and cost boundary; never invoked implicitly by text generation.
+7. **Public share:** contains only a redacted derivative, never a pointer that exposes private records.
+8. **URAI ecosystem:** integrations use versioned contracts, service identity, explicit purpose, and revocation.
+
+## Recommended production architecture
+
+```mermaid
+flowchart LR
+  UI[Guided Storytime client]
+  UI --> Gateway[Callable/API gateway]
+  Gateway --> Identity[Adult/guardian + App Check]
+  Identity --> Consent[Versioned consent/purpose policy]
+  Consent --> Idempotency[Request hash/idempotency]
+  Idempotency --> Budget[Entitlement + hard budget]
+  Budget --> PreSafety[Input moderation/PII/upload scan]
+  PreSafety --> Queue[Durable urai-jobs request]
+  Queue --> Planner[Story plan provider]
+  Planner --> Writer[Story writer provider]
+  Writer --> Schema[Structured validation/continuity]
+  Schema --> PostSafety[Output moderation/PII]
+  PostSafety --> Versioned[(Versioned Storytime store)]
+  Versioned --> Reader[Reader/editor/library]
+  Versioned --> Share[Redacted share service]
+  Versioned --> Media[Optional media jobs]
+  Media --> AF[Asset Factory]
+  Versioned --> Passport[Consent/provenance receipts]
+  Versioned -. explicit snapshot contract .-> Spatial[Replay/spatial manifest]
+  Versioned -. aggregate events only .-> Analytics[URAI analytics]
+  Versioned -. export/delete/retention .-> Privacy[URAI privacy]
 ```
 
-## Recommended repository structure
+## Generation contract
 
-```text
-/
-  public/
-  src/
-    app/
-      routes/
-      pages/
-      components/
-      layouts/
-    core/
-      types/
-      config/
-      constants/
-      errors/
-    story-engine/
-      StoryEngine.ts
-      StoryPlanner.ts
-      StoryWriter.ts
-      SceneSplitter.ts
-      StoryManifestBuilder.ts
-      providers/
-        LocalDemoStoryProvider.ts
-        AIStoryProvider.ts
-    safety/
-      SafetyProvider.ts
-      LocalSafetyProvider.ts
-      SafetyPolicy.ts
-      moderationRules.ts
-    narration/
-      NarrationProvider.ts
-      WebSpeechNarrationProvider.ts
-      TTSProvider.ts
-      CaptionBuilder.ts
-      PlaybackManifest.ts
-    family/
-      childProfiles.ts
-      parentSettings.ts
-      familyPermissions.ts
-    storage/
-      LocalDemoStorage.ts
-      FirebaseStoryStorage.ts
-      FirebaseFamilyStorage.ts
-    firebase/
-      client.ts
-      admin.ts
-      auth.ts
-      firestore.ts
-    admin/
-      moderationQueue.ts
-      auditLogs.ts
-      systemHealth.ts
-    website/
-      sitemap.ts
-      seo.ts
-      metadata.ts
-    tests/
-      unit/
-      integration/
-      e2e/
-  functions/
-    src/
-      generateStory.ts
-      safetyReview.ts
-      narrationJob.ts
-      moderationQueue.ts
-  docs/
-```
+Every generation request should include:
 
-## Core domain models
+- authenticated adult/guardian identity;
+- idempotency key;
+- story format and schema version;
+- audience/age band;
+- language, tone, length, and reading level;
+- explicit source list and consent snapshot version;
+- safety policy version;
+- maximum token and monetary budget;
+- optional approved memory snapshot references;
+- output destinations that are disabled by default.
 
-### User
-Represents an authenticated adult account or internal operator.
+Every result should record:
 
-Fields:
-- `id`
-- `email`
-- `displayName`
-- `roles`
-- `createdAt`
-- `updatedAt`
+- immutable input hash and request version;
+- provider/model/version and timestamps;
+- token/usage/cost receipt;
+- pre/post safety results;
+- source/provenance references;
+- generated story version and asset IDs;
+- retry/partial failure history;
+- deletion/retention class.
 
-### Family
-Represents a private family workspace.
+## Public-share contract
 
-Fields:
-- `id`
-- `ownerUserId`
-- `memberUserIds`
-- `defaultSafetyPolicyId`
-- `createdAt`
-- `updatedAt`
+A public share is a separate derivative record with:
 
-### ChildProfile
-Represents a parent-managed child profile.
+- server-generated ID and slug;
+- owner and source story version;
+- explicit consent and policy version;
+- redaction/moderation receipt;
+- server timestamp `createdAt`, `expiresAt`, and optional `revokedAt`;
+- active/revoked/expired state enforced by server/rules;
+- no private story body, source signals, family graph, provider prompts, or private asset URLs;
+- revocation semantics for CDN/browser caches and search-engine indexing.
 
-Fields:
-- `id`
-- `familyId`
-- `displayName`
-- `ageBand`
-- `allowedThemes`
-- `blockedThemes`
-- `narratorPreference`
-- `createdAt`
-- `updatedAt`
+## Ecosystem API boundaries
 
-### StoryRequest
-Input to the story engine.
+| Integration | Contract |
+|---|---|
+| `urai-privacy` | `POST export`, `POST delete`, retention status, consent ledger; Storytime remains data owner |
+| `urai-jobs` | idempotent job create/status/cancel/event contract; no raw secret sharing |
+| `asset-factory` | versioned media manifest, signed service auth, budget, receipt, private output paths |
+| `urai-analytics` | allow-listed aggregate events; no prompts, story bodies, names, child data, or media |
+| `urai-admin` | least-privilege moderation cases and server-written audit events |
+| Life Map/Focus/Mirror/relationships/locations | explicit consent-scoped snapshots with provenance and revocation |
+| Replay/`urai-spatial` | redacted/versioned scene manifest and signed asset access |
+| Passport | immutable provider, consent, source, and asset receipts |
 
-Fields:
-- `id`
-- `familyId`
-- `childProfileId`
-- `theme`
-- `mood`
-- `narratorId`
-- `prompt`
-- `memorySeedIds`
-- `safetyPolicyId`
-- `createdAt`
+## Reliability requirements
 
-### StoryRun
-Tracks one generation attempt.
+- request idempotency and duplicate suppression;
+- transactional state transitions;
+- timeouts, bounded retry/backoff, and circuit breakers;
+- user-visible progress, cancellation, and safe retry;
+- dead-letter/manual-recovery path;
+- no partial story marked `ready`;
+- generated media is a separate job from story text;
+- all logs exclude raw private content and secrets;
+- monitoring, cost alerts, backups, restore drills, and tested rollback.
 
-Fields:
-- `id`
-- `requestId`
-- `provider`
-- `status`
-- `safetyPrecheckId`
-- `safetyPostcheckId`
-- `errorCode`
-- `createdAt`
-- `completedAt`
+## Legacy migration
 
-### StoryManifest
-Final replay-ready object.
+Before deleting the old static implementation:
 
-Fields:
-- `id`
-- `storyRunId`
-- `title`
-- `summary`
-- `scenes`
-- `narratorId`
-- `captionTrackId`
-- `audioAssetIds`
-- `safetyReviewId`
-- `createdAt`
+1. inventory unique demo behavior and tests;
+2. migrate any still-required local-only story/library/narration behavior into explicit Next adapters;
+3. move retained historical code to `legacy/static-demo/` with a non-canonical README, or delete it;
+4. remove obsolete build/preview scripts and stale documentation references;
+5. prove active routes/tests/build are unchanged.
 
-### SafetyReview
-Records safety decisions.
+## Architecture decision gates
 
-Fields:
-- `id`
-- `targetType`
-- `targetId`
-- `ageBand`
-- `classification`
-- `blockedReasons`
-- `reviewStatus`
-- `reviewedBy`
-- `createdAt`
+The following require explicit owner/legal/product decisions before implementation:
 
-## Provider boundaries
-
-### AIStoryProvider
-Responsible for planning and drafting stories. Must not own storage or UI behavior.
-
-### SafetyProvider
-Responsible for input/output classification, age-band enforcement, and policy decisions.
-
-### NarrationProvider
-Responsible for narration scripts, speech fallback, TTS job creation, and provider-specific voice behavior.
-
-### StorageProvider
-Responsible for local demo persistence or cloud persistence.
-
-### SymbolicThemeProvider
-Responsible for translating themes/moods into safe symbolic motifs.
-
-### MemorySeedProvider
-Responsible for retrieving and redacting approved memory seeds. Must be opt-in and privacy-safe.
-
-## Data storage modes
-
-### Local demo mode
-- Uses browser localStorage.
-- Requires no account.
-- Stores only on the current device/browser.
-- Good for demo and fallback.
-
-### Cloud mode
-- Requires authenticated user.
-- Stores family, child profile, story, safety, narration, and audit data in cloud database.
-- Enforces rules by family membership and role.
-
-## Recommended Firestore collections
-
-```text
-users
-families
-childProfiles
-parentSettings
-stories
-storyRuns
-storyScenes
-narrationJobs
-audioAssets
-safetyReviews
-moderationEvents
-creatorProfiles
-creatorSubmissions
-adminAuditLogs
-```
-
-## Security architecture principles
-- Family data is private by default.
-- Stories are private by default.
-- Child profiles are never publicly writable.
-- Admin/moderator access requires role claims.
-- Safety events are append-only where possible.
-- Secrets must live in environment/secret manager only.
-- Logs must avoid child-sensitive story content unless explicitly needed for moderation with access controls.
-- Local demo mode must clearly tell users data is browser-local.
-
-## Deployment architecture
-
-Recommended environments:
-- local
-- staging
-- production
-
-Recommended launch flow:
-1. Local tests.
-2. Preview deploy.
-3. Staging deploy.
-4. Smoke test.
-5. Production deploy.
-6. Post-deploy domain smoke test.
-
-## Non-goals for Phase 0
-- Do not introduce Firebase.
-- Do not add AI provider keys.
-- Do not perform a framework rewrite.
-- Do not claim legal compliance.
-- Do not remove the local demo.
-
-## Next architecture step
-Phase 1 should introduce TypeScript domain models and provider interfaces while preserving the current local demo behavior.
+- adult-only versus child-directed launch posture;
+- guardian verification and family membership model;
+- provider and model allow-list;
+- provider data-retention/training terms;
+- public-sharing availability;
+- billing/credits/paid media generation;
+- retention/deletion/backups;
+- voice/photo/likeness and third-party subject consent;
+- classroom/creator modes;
+- spatial sensor/camera/microphone permissions.
