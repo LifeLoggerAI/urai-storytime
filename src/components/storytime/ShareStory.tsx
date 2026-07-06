@@ -37,11 +37,16 @@ export function ShareStory({ shareId }: { shareId: string }) {
       try {
         const db = getFirebaseDb();
         const publicShares = collection(db, "publicStoryShares");
-        const bySlug = await getDocs(query(publicShares, where("slug", "==", shareId), limit(1)));
+        // Firestore rules only permit anonymous reads of non-revoked shares.
+        // Keep the query constrained to the same authorization predicate so
+        // Firestore can prove the query cannot return a revoked document.
+        const bySlug = await getDocs(
+          query(publicShares, where("slug", "==", shareId), where("revoked", "==", false), limit(1))
+        );
         const snapshot = bySlug.docs[0];
         if (!active) return;
         if (!snapshot) {
-          setState({ status: "notFound", message: "No public-safe Storytime share was found." });
+          setState({ status: "notFound", message: "No active public-safe Storytime share was found." });
           return;
         }
         const share = { id: snapshot.id, ...snapshot.data() } as PublicStoryShare;
