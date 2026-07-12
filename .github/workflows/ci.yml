@@ -11,102 +11,153 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: storytime-ci-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   verify:
     name: Verify app install, tests, typecheck, and build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 24
+          node-version: '24'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install exact root dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit 2>&1 | tee /tmp/storytime-root-install.log
 
-      - name: Lint
-        run: npm run lint
+      - name: Run root source suite
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p /tmp/storytime-root
+          status=0
+          run_check() {
+            local name="$1"
+            shift
+            "$@" 2>&1 | tee "/tmp/storytime-root/${name}.log"
+            local code=${PIPESTATUS[0]}
+            if [ "$code" -ne 0 ]; then status=1; fi
+          }
+          run_check lint npm run lint
+          run_check typecheck npm run typecheck
+          run_check test npm test
+          run_check smoke npm run test:smoke
+          run_check deployment npm run test:deployment
+          run_check security-rules npm run test:security-rules
+          run_check emulator-scaffold npm run test:emulator-scaffold
+          run_check emulator-runtime npm run test:emulator-runtime
+          run_check production-readiness npm run test:production-readiness
+          run_check build npm run build
+          printf '%s\n' "$status" > /tmp/storytime-root/status.txt
+          exit 0
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Upload exact-head app evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: urai-storytime-app-${{ env.TARGET_SHA }}
+          path: |
+            /tmp/storytime-root-install.log
+            /tmp/storytime-root/**
+          if-no-files-found: warn
+          retention-days: 90
 
-      - name: Tests
-        run: npm test
-
-      - name: Smoke tests
-        run: npm run test:smoke
-
-      - name: Deployment readiness scaffold check
-        run: npm run test:deployment
-
-      - name: Security rules static validation
-        run: npm run test:security-rules
-
-      - name: Emulator scaffold validation
-        run: npm run test:emulator-scaffold
-
-      - name: Emulator runtime validation
-        run: npm run test:emulator-runtime
-
-      - name: Production readiness validation
-        run: npm run test:production-readiness
-
-      - name: Production build
-        run: npm run build
+      - name: Enforce root source result
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat /tmp/storytime-root/status.txt)" = "0"
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
 
   functions:
     name: Verify Firebase Functions build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 24
+          node-version: '24'
 
-      - name: Install function dependencies
-        working-directory: functions
-        run: npm install
+      - name: Install exact Functions dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix functions ci --no-audit 2>&1 | tee /tmp/storytime-functions-install.log
 
-      - name: Build functions
-        working-directory: functions
-        run: npm run build
+      - name: Build Functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix functions run build 2>&1 | tee /tmp/storytime-functions-build.log
+
+      - name: Upload exact-head Functions evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: urai-storytime-functions-${{ env.TARGET_SHA }}
+          path: |
+            /tmp/storytime-functions-install.log
+            /tmp/storytime-functions-build.log
+          if-no-files-found: warn
+          retention-days: 90
 
   production-gates:
     name: Verify production-only evidence gates
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: github.ref == 'refs/heads/main'
-
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Checkout exact main commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          node-version: 24
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Provider wiring validation
-        run: npm run test:provider-wiring
-
-      - name: Live production config validation
-        run: node scripts/validate-live-production-config.mjs
-
-      - name: Production evidence validation
-        run: npm run test:production-evidence
-
-      - name: Production smoke validation
-        run: npm run test:production-smoke
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit
+      - run: npm run test:provider-wiring
+      - run: node scripts/validate-live-production-config.mjs
+      - run: npm run test:production-evidence
+      - run: npm run test:production-smoke
