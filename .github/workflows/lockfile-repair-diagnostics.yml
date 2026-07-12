@@ -1,104 +1,118 @@
-name: Lockfile Repair Diagnostics
+name: Apply Verified Lockfiles Once
 
 on:
   pull_request:
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
-  group: storytime-lockfile-repair-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: true
+  group: storytime-verified-lock-apply-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 env:
-  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  TARGET_SHA: ${{ github.event.pull_request.head.sha }}
+  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+  EXPECTED_PARENT_SHA: 17f9581ac59f02383c55a5bcc12e8fc911702df3
+  EXPECTED_ROOT_LOCK_SHA256: 29fd46b02f143ccca6623df1bd92cf6668d32cda710a5059cf84fed5a5da1c54
+  EXPECTED_FUNCTIONS_LOCK_SHA256: b57974a5ffb09591ff1e6957268a860df9b927c5e77261dd3ccd5eac0f70246c
 
 jobs:
-  regenerate-lockfiles:
+  apply-verified-locks:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'audit/2026-07-06-production-truth'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
-      - name: Checkout exact candidate
+      - name: Checkout exact one-time apply head
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ env.TARGET_SHA }}
-          fetch-depth: 0
-          persist-credentials: false
+          fetch-depth: 2
+          persist-credentials: true
 
-      - name: Prove exact clean candidate and missing locks
+      - name: Prove one-time authority and clean parent
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           test ! -e package-lock.json
           test ! -e functions/package-lock.json
+          test -f .github/workflows/lockfile-repair-diagnostics.yml
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
 
-      - name: Generate only root and Functions locks
+      - name: Regenerate and bind exact verified lock bytes
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/storytime-lock
-          npm install --package-lock-only --ignore-scripts --no-audit 2>&1 | tee /tmp/storytime-lock/root-generate.log
-          npm --prefix functions install --package-lock-only --ignore-scripts --no-audit 2>&1 | tee /tmp/storytime-lock/functions-generate.log
-          changed="$({ git diff --name-only; git ls-files --others --exclude-standard; } | sort -u)"
-          printf '%s\n' "$changed" | tee /tmp/storytime-lock/changed-paths.txt
-          test "$changed" = $'functions/package-lock.json\npackage-lock.json'
-          git diff --check
+          mkdir -p /tmp/storytime-lock-apply
+          npm install --package-lock-only --ignore-scripts --no-audit 2>&1 | tee /tmp/storytime-lock-apply/root-generate.log
+          npm --prefix functions install --package-lock-only --ignore-scripts --no-audit 2>&1 | tee /tmp/storytime-lock-apply/functions-generate.log
+          test "$(sha256sum package-lock.json | awk '{print $1}')" = "$EXPECTED_ROOT_LOCK_SHA256"
+          test "$(sha256sum functions/package-lock.json | awk '{print $1}')" = "$EXPECTED_FUNCTIONS_LOCK_SHA256"
 
-      - name: Prove generated locks are installable
+      - name: Prove frozen installs and full source suite
         shell: bash
         run: |
           set -euo pipefail
-          npm ci --no-audit 2>&1 | tee /tmp/storytime-lock/root-install.log
-          npm --prefix functions ci --no-audit 2>&1 | tee /tmp/storytime-lock/functions-install.log
+          npm ci --no-audit 2>&1 | tee /tmp/storytime-lock-apply/root-install.log
+          npm --prefix functions ci --no-audit 2>&1 | tee /tmp/storytime-lock-apply/functions-install.log
+          npm run lint 2>&1 | tee /tmp/storytime-lock-apply/lint.log
+          npm test 2>&1 | tee /tmp/storytime-lock-apply/test.log
+          npm run test:smoke 2>&1 | tee /tmp/storytime-lock-apply/smoke.log
+          npm run test:security-rules 2>&1 | tee /tmp/storytime-lock-apply/security-rules.log
+          npm run test:emulator-scaffold 2>&1 | tee /tmp/storytime-lock-apply/emulator-scaffold.log
+          npm run test:emulator-runtime 2>&1 | tee /tmp/storytime-lock-apply/emulator-runtime.log
+          npm run test:production-readiness 2>&1 | tee /tmp/storytime-lock-apply/production-readiness.log
+          npm run build 2>&1 | tee /tmp/storytime-lock-apply/build.log
+          npm --prefix functions run build 2>&1 | tee /tmp/storytime-lock-apply/functions-build.log
 
-      - name: Run source suites
+      - name: Create exact self-cleaning lock commit
         shell: bash
         run: |
-          set -uo pipefail
-          status=0
-          run_check() {
-            local name="$1"
-            shift
-            "$@" 2>&1 | tee "/tmp/storytime-lock/${name}.log"
-            local code=${PIPESTATUS[0]}
-            if [ "$code" -ne 0 ]; then status=1; fi
-          }
-          run_check lint npm run lint
-          run_check test npm test
-          run_check smoke npm run test:smoke
-          run_check security-rules npm run test:security-rules
-          run_check emulator-scaffold npm run test:emulator-scaffold
-          run_check emulator-runtime npm run test:emulator-runtime
-          run_check production-readiness npm run test:production-readiness
-          run_check build npm run build
-          run_check functions-build npm --prefix functions run build
-          printf '%s\n' "$status" > /tmp/storytime-lock/status.txt
-          exit 0
+          set -euo pipefail
+          git rm .github/workflows/lockfile-repair-diagnostics.yml
+          git add package-lock.json functions/package-lock.json
+          staged="$(git diff --cached --name-only | sort)"
+          test "$staged" = $'.github/workflows/lockfile-repair-diagnostics.yml\nfunctions/package-lock.json\npackage-lock.json'
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Lock Storytime dependency graph from verified diagnostic'
+          final_sha="$(git rev-parse HEAD)"
+          cat > /tmp/storytime-lock-apply/receipt.txt <<EOF
+          Storytime verified lock apply receipt
+          Repository: ${GITHUB_REPOSITORY}
+          Diagnostic source: ${EXPECTED_PARENT_SHA}
+          One-time apply head: ${TARGET_SHA}
+          Final local commit: ${final_sha}
+          Root lock SHA-256: ${EXPECTED_ROOT_LOCK_SHA256}
+          Functions lock SHA-256: ${EXPECTED_FUNCTIONS_LOCK_SHA256}
+          Changed paths: package-lock.json, functions/package-lock.json, deleted temporary workflow
+          Provider calls: 0
+          Deployment: false
+          Production data mutation: false
+          EOF
+          test -z "$(git status --porcelain --untracked-files=all)"
 
-      - name: Upload generated locks and diagnostics
-        if: always()
+      - name: Upload immutable apply receipt before push
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: urai-storytime-lockfiles-${{ env.TARGET_SHA }}
-          path: |
-            package-lock.json
-            functions/package-lock.json
-            /tmp/storytime-lock/**
-          if-no-files-found: warn
-          retention-days: 7
+          name: urai-storytime-lock-apply-${{ env.TARGET_SHA }}
+          path: /tmp/storytime-lock-apply/**
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Enforce diagnostic result
+      - name: Push exact verified lock commit
         shell: bash
         run: |
           set -euo pipefail
-          test -s package-lock.json
-          test -s functions/package-lock.json
-          test "$(cat /tmp/storytime-lock/status.txt)" = "0"
+          test "$(git rev-parse HEAD^)" = "$TARGET_SHA"
+          git push origin "HEAD:${HEAD_REF}"
