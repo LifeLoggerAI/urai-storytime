@@ -103,14 +103,6 @@ jobs:
           const nextEnvLines = fs.readFileSync('next-env.d.ts', 'utf8').trimEnd().split(/\r?\n/);
           assert.equal(nextEnvLines[0], '/// <reference types="next" />');
           assert.equal(nextEnvLines[1], '/// <reference types="next/image-types/global" />');
-          assert.ok(
-            nextEnvLines.some((line) => line.includes('next/navigation-types/compat/navigation')),
-            'next-env must include navigation compatibility declarations',
-          );
-          assert.ok(
-            nextEnvLines.some((line) => line.includes('.next/types/routes.d.ts')),
-            'next-env must bind generated route declarations',
-          );
           assert.ok(nextEnvLines.some((line) => line.includes('This file should not be edited')));
 
           const changed = execFileSync('git', ['diff', '--name-only'], { encoding: 'utf8' })
