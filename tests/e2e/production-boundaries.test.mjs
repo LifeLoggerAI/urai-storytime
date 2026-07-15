@@ -10,8 +10,9 @@ const cloudSession = read('src/components/storytime/CloudSession.tsx');
 const shareStory = read('src/components/storytime/ShareStory.tsx');
 const shareControls = read('src/components/storytime/ShareControls.tsx');
 const functions = read('functions/src/storytime.ts');
+const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
+const functionsIndex = read('functions/src/index.ts');
 const provider = read('functions/src/story-provider.ts');
-const revokeShare = read('functions/src/revoke-public-story-share.ts');
 const rules = read('firestore.rules');
 const storageRules = read('storage.rules');
 const runtimeReadiness = read('src/runtime-readiness.mjs');
@@ -79,40 +80,43 @@ test('generation persistence bundle writes all expected private Storytime record
   ]);
 });
 
-test('public sharing exposes only redacted public-safe fields, expires by default, and supports owner revoke', () => {
-  includesAll(functions, [
-    'PUBLIC_SHARE_TTL_DAYS',
-    'daysFromNow(PUBLIC_SHARE_TTL_DAYS)',
-    'expiresAt',
-    'Public sharing requires explicit consent',
-    'readOwnedStorySession',
-    'publicStoryShares',
-    'redact(String(session.data.title))',
-    'safeSummary',
-    'safeBody',
-    'public_safe'
+test('public sharing uses content-neutral expiring derivatives and private owner controls', () => {
+  includesAll(functionsIndex, [
+    'createPublicStoryShare',
+    'revokePublicStoryShare',
+    'public-story-share-lifecycle.js'
   ]);
 
-  includesAll(shareStory, [
+  includesAll(shareLifecycle, [
+    'expiresInDays',
+    'Timestamp.fromMillis',
+    'Public sharing consent is required',
+    'Only safety-approved stories can be shared',
     'publicStoryShares',
-    'where("slug", "==", shareId)',
-    'This Storytime share has been revoked',
-    'This Storytime share has expired',
+    'publicStoryShareControls',
+    'schemaVersion: "public-story-share-v2"',
+    'title: "Shared Story"',
+    'safeSummary',
+    'safeBody',
+    'public_safe',
+    'FieldValue.delete()',
+    'visibility: "private"'
+  ]);
+  assert.doesNotMatch(shareLifecycle, /session\.(title|whyGenerated|sourceText|sourceSignals|symbolicMotifs)/);
+
+  includesAll(shareStory, [
+    'getDoc(doc(db, "publicStoryShares", shareId))',
+    'data.slug !== id || data.revoked !== false',
+    'Date.parse(expiresAt) <= Date.now()',
+    'No active public-safe Storytime share was found.',
     'This public page shows only redacted share text'
   ]);
+  assert.doesNotMatch(shareStory, /collection\(|getDocs\(|where\(/);
 
   includesAll(shareControls, [
     'createPublicStoryShare',
     'revokePublicStoryShare',
     'Explicit public-sharing consent is required'
-  ]);
-
-  includesAll(revokeShare, [
-    'request.auth?.uid',
-    'Public share not found',
-    'revoked: true',
-    'visibility: "private"',
-    'publicShareId: null'
   ]);
 });
 
@@ -130,13 +134,18 @@ test('voiceover and export remain queued job records, not completed artifact cla
   assert.match(proofReadme, /export artifact pipeline proof was available/);
 });
 
-test('rules keep Storytime private by default and deny revoked or unmanaged access', () => {
+test('rules keep Storytime private by default and enforce server-time public-share expiry', () => {
   includesAll(rules, [
     'function ownerOnlyCreate()',
     'function ownerOnlyReadWrite(userId)',
     'match /storySessions/{id}',
+    'function activePublicShare()',
+    "resource.data.schemaVersion == 'public-story-share-v2'",
+    "!resource.data.keys().hasAny(['userId', 'sessionId'])",
+    'request.time < resource.data.expiresAt',
     'match /publicStoryShares/{id}',
-    'resource.data.revoked == false',
+    'allow read: if activePublicShare()',
+    'match /publicStoryShareControls/{id}',
     'match /storytimeUsageCounters/{id}',
     'allow read, write: if false'
   ]);
