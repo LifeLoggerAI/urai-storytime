@@ -1,6 +1,6 @@
 import "./storytime.js";
 
-import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
@@ -42,7 +42,7 @@ function timestamp(value: unknown) {
   return value instanceof Timestamp ? value : null;
 }
 
-function activeSanitizedShare(data: FirebaseFirestore.DocumentData | undefined, nowMs: number) {
+function activeSanitizedShare(data: DocumentData | undefined, nowMs: number) {
   const expiresAt = timestamp(data?.expiresAt);
   return data?.revoked === false
     && expiresAt !== null
@@ -175,6 +175,10 @@ export const revokePublicStoryShare = onCall(async (request) => {
       throw new HttpsError("permission-denied", "You do not own this Storytime share.");
     }
 
+    const sessionRef = typeof sessionId === "string" && sessionId.length > 0
+      ? db.collection("storySessions").doc(sessionId)
+      : null;
+    const sessionSnapshot = sessionRef ? await transaction.get(sessionRef) : null;
     const alreadyRevoked = publicData.revoked === true && controlData.revoked === true;
     if (alreadyRevoked) {
       return { shareId: input.shareId, sessionId, alreadyRevoked: true };
@@ -198,16 +202,12 @@ export const revokePublicStoryShare = onCall(async (request) => {
       migratedFromLegacy: !controlSnapshot.exists
     }, { merge: true });
 
-    if (typeof sessionId === "string" && sessionId.length > 0) {
-      const sessionRef = db.collection("storySessions").doc(sessionId);
-      const sessionSnapshot = await transaction.get(sessionRef);
-      if (sessionSnapshot.exists && sessionSnapshot.data()?.userId === userId) {
-        transaction.update(sessionRef, {
-          publicShareId: FieldValue.delete(),
-          visibility: "private",
-          updatedAt: now.toDate().toISOString()
-        });
-      }
+    if (sessionRef && sessionSnapshot?.exists && sessionSnapshot.data()?.userId === userId) {
+      transaction.update(sessionRef, {
+        publicShareId: FieldValue.delete(),
+        visibility: "private",
+        updatedAt: now.toDate().toISOString()
+      });
     }
 
     return { shareId: input.shareId, sessionId, alreadyRevoked: false };
