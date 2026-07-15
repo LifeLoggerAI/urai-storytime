@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/public-share-rules-emulator.yml'
-      - 'firebase.json'
+      - 'firebase.public-share-rules-emulator.json'
       - 'firestore.rules'
       - 'tests/rules-emulator/**'
       - 'functions/src/public-story-share-lifecycle.ts'
@@ -15,7 +15,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/public-share-rules-emulator.yml'
-      - 'firebase.json'
+      - 'firebase.public-share-rules-emulator.json'
       - 'firestore.rules'
       - 'tests/rules-emulator/**'
       - 'functions/src/public-story-share-lifecycle.ts'
@@ -77,7 +77,7 @@ jobs:
           evidence_dir="$RUNNER_TEMP/storytime-public-share-rules"
           rm -rf -- "$evidence_dir"
           mkdir -p -- "$evidence_dir"
-          sha256sum firestore.rules > "$evidence_dir/firestore-rules-sha256.txt"
+          sha256sum firestore.rules firebase.public-share-rules-emulator.json > "$evidence_dir/rules-and-config-sha256.txt"
           npm ls --prefix tests/rules-emulator --all --json > "$evidence_dir/dependency-tree.json"
           cp tests/rules-emulator/package-lock.json "$evidence_dir/rules-test-package-lock.json"
           {
@@ -86,6 +86,7 @@ jobs:
             echo "checked_out=$(git rev-parse HEAD)"
             echo "run_id=$GITHUB_RUN_ID"
             echo "project=urai-storytime-public-share-rules-test"
+            echo "config=firebase.public-share-rules-emulator.json"
             echo "credentialed=false"
             echo "deployment=false"
             echo "public_sharing_enabled=false"
@@ -99,6 +100,7 @@ jobs:
           set -o pipefail
           evidence_dir="$RUNNER_TEMP/storytime-public-share-rules"
           npx --yes firebase-tools@15.23.0 emulators:exec \
+            --config firebase.public-share-rules-emulator.json \
             --project urai-storytime-public-share-rules-test \
             --only firestore \
             "node --test --test-concurrency=1 tests/rules-emulator/public-share-lifecycle.test.mjs" \
@@ -127,12 +129,13 @@ jobs:
           node - <<'NODE'
           const fs = require('node:fs');
           const receipt = {
-            schemaVersion: 'urai-storytime-public-share-rules-receipt-1',
+            schemaVersion: 'urai-storytime-public-share-rules-receipt-2',
             repository: process.env.GITHUB_REPOSITORY,
             exactHeadSha: process.env.TARGET_SHA,
             workflowRunId: process.env.GITHUB_RUN_ID,
             emulatorStatus: Number(process.env.EMULATOR_STATUS ?? -1),
             projectId: 'urai-storytime-public-share-rules-test',
+            firebaseConfig: 'firebase.public-share-rules-emulator.json',
             matrix: [
               'active anonymous read allowed',
               'revoked read denied',
