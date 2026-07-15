@@ -6,53 +6,80 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: storytime-verify-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
-      - run: corepack enable
-      - name: Install root dependencies
+
+      - name: Install exact dependencies
+        shell: bash
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-      - name: Install Functions dependencies
+          set -euo pipefail
+          npm ci --no-audit 2>&1 | tee /tmp/storytime-verify-root-install.log
+          npm --prefix functions ci --no-audit 2>&1 | tee /tmp/storytime-verify-functions-install.log
+
+      - name: Verify exact candidate
+        shell: bash
         run: |
-          if [ -f functions/package-lock.json ]; then
-            npm --prefix functions ci
-          elif [ -f functions/package.json ]; then
-            npm --prefix functions install
-          else
-            echo "No functions package found; skipping."
-          fi
-      - name: Verify
-        run: node scripts/urai-production-verify.mjs
-      - name: Write verification receipt
+          set -euo pipefail
+          node scripts/urai-production-verify.mjs 2>&1 | tee /tmp/storytime-verify.log
+
+      - name: Write exact-head verification receipt
         if: always()
+        shell: bash
         run: |
           mkdir -p ci-receipts
-          cat > ci-receipts/urai-storytime-verify.txt <<'EOF'
+          cat > ci-receipts/urai-storytime-verify.txt <<EOF
           URAI Storytime CI verification receipt
-          Repository: ${{ github.repository }}
-          Commit: ${{ github.sha }}
-          Ref: ${{ github.ref }}
-          Workflow: ${{ github.workflow }}
-          Run ID: ${{ github.run_id }}
-          Run number: ${{ github.run_number }}
-          Actor: ${{ github.actor }}
+          Repository: ${GITHUB_REPOSITORY}
+          Exact candidate: ${TARGET_SHA}
+          Checked out: $(git rev-parse HEAD)
+          Workflow: ${GITHUB_WORKFLOW}
+          Run ID: ${GITHUB_RUN_ID}
           Verification command: node scripts/urai-production-verify.mjs
-          Production boundary: this receipt proves CI command execution only; Firebase deploy, provider smoke, emulator behavior execution, live persistence, public share smoke, export artifacts, and safety/legal approvals still require separate receipts.
+          Certification: false
+          Deployment: false
+          Production boundary: Firebase deploy, provider smoke, live persistence, public-share lifecycle, export artifacts, monitoring, rollback, and safety/legal approvals require separate receipts.
           EOF
-      - name: Upload verification receipt
+
+      - name: Upload exact-head verification evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: urai-storytime-verify-${{ github.sha }}
-          path: ci-receipts/urai-storytime-verify.txt
-          retention-days: 30
+          name: urai-storytime-verify-${{ env.TARGET_SHA }}
+          path: |
+            ci-receipts/urai-storytime-verify.txt
+            /tmp/storytime-verify-root-install.log
+            /tmp/storytime-verify-functions-install.log
+            /tmp/storytime-verify.log
+          if-no-files-found: warn
+          retention-days: 90
