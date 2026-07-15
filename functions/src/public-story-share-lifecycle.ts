@@ -44,7 +44,8 @@ function timestamp(value: unknown) {
 
 function activeSanitizedShare(data: DocumentData | undefined, nowMs: number) {
   const expiresAt = timestamp(data?.expiresAt);
-  return data?.revoked === false
+  return data?.schemaVersion === "public-story-share-v2"
+    && data?.revoked === false
     && expiresAt !== null
     && expiresAt.toMillis() > nowMs
     && !("userId" in (data ?? {}))
@@ -56,8 +57,7 @@ export const createPublicStoryShare = onCall(async (request) => {
   const input = createShareSchema.parse(request.data);
   const db = getFirestore();
   const sessionRef = db.collection("storySessions").doc(input.sessionId);
-  const newShareRef = db.collection("publicStoryShares").doc();
-  const newControlRef = db.collection("publicStoryShareControls").doc(newShareRef.id);
+  const nonce = db.collection("publicStoryShares").doc().id.slice(-10);
 
   const result = await db.runTransaction(async (transaction) => {
     const sessionSnapshot = await transaction.get(sessionRef);
@@ -99,7 +99,7 @@ export const createPublicStoryShare = onCall(async (request) => {
       ) {
         return {
           shareId: existingShare.id,
-          slug: String(publicData?.slug ?? existingShare.id),
+          slug: existingShare.id,
           expiresAt: timestamp(publicData?.expiresAt)?.toDate().toISOString() ?? null,
           reused: true
         };
@@ -108,7 +108,9 @@ export const createPublicStoryShare = onCall(async (request) => {
 
     const expiresAt = Timestamp.fromMillis(nowMs + (input.expiresInDays ?? 30) * 86_400_000);
     const title = redactPublicText(session.title || "Your Story").slice(0, 140) || "Your Story";
-    const slug = `${slugify(title)}-${newShareRef.id.slice(-8)}`;
+    const slug = `${slugify(title)}-${nonce}`;
+    const newShareRef = db.collection("publicStoryShares").doc(slug);
+    const newControlRef = db.collection("publicStoryShareControls").doc(slug);
     const safeSummary = redactPublicText(session.whyGenerated || "A private story was shared safely.").slice(0, 500);
     const safeBody = "This public-safe story view was created from a private URAI Storytime session. Private signals, identifiers, relationship details, and source records are not included.";
 
@@ -134,13 +136,13 @@ export const createPublicStoryShare = onCall(async (request) => {
       consentSnapshot: { publicSharing: true }
     });
     transaction.update(sessionRef, {
-      publicShareId: newShareRef.id,
+      publicShareId: slug,
       visibility: "public_safe",
       updatedAt: now.toDate().toISOString()
     });
 
     return {
-      shareId: newShareRef.id,
+      shareId: slug,
       slug,
       expiresAt: expiresAt.toDate().toISOString(),
       reused: false
