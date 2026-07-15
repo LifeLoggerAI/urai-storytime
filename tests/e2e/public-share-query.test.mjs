@@ -38,7 +38,7 @@ test('callable lifecycle splits public derivatives from private owner controls',
   assert.doesNotMatch(functionsIndex, /createPublicStoryShare[\s\S]*from "\.\/storytime\.js"/);
   assert.match(lifecycle, /schemaVersion: "public-story-share-v2"/);
   assert.match(lifecycle, /collection\("publicStoryShareControls"\)/);
-  assert.match(lifecycle, /expiresAt: Timestamp\.fromMillis/);
+  assert.match(lifecycle, /const expiresAt = Timestamp\.fromMillis/);
   assert.match(lifecycle, /consentSnapshot\?\.publicSharing !== true/);
   assert.match(lifecycle, /session\.safetyStatus !== "approved"/);
   assert.match(lifecycle, /FieldValue\.delete\(\)/);
