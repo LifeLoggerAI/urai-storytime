@@ -1,9 +1,12 @@
-import "./storytime.js";
-
+import { getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, Timestamp, getFirestore, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+
+if (getApps().length === 0) {
+  initializeApp();
+}
 
 const createShareSchema = z.object({
   sessionId: z.string().min(1),
@@ -193,7 +196,7 @@ export const revokePublicStoryShare = onCall(async (request) => {
     transaction.set(controlRef, {
       schemaVersion: "public-story-share-control-v1",
       userId,
-      sessionId,
+      sessionId: sessionId ?? null,
       revoked: true,
       revokedAt: now,
       updatedAt: now,
