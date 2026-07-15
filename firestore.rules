@@ -15,7 +15,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.admin == true;
+      return signedIn()
+        && request.auth.token.keys().hasAny(['admin'])
+        && request.auth.token.admin == true;
     }
 
     function familyRef(familyId) {
@@ -44,6 +46,27 @@ service cloud.firestore {
 
     function ownerOnlyReadWrite(userId) {
       return isOwner(userId) || isAdmin();
+    }
+
+    function activePublicShare() {
+      return resource.data.keys().hasAll([
+          'schemaVersion',
+          'slug',
+          'title',
+          'safeSummary',
+          'safeBody',
+          'revoked',
+          'expiresAt'
+        ])
+        && !resource.data.keys().hasAny(['userId', 'sessionId'])
+        && resource.data.schemaVersion == 'public-story-share-v2'
+        && resource.data.slug is string
+        && resource.data.title is string
+        && resource.data.safeSummary is string
+        && resource.data.safeBody is string
+        && resource.data.revoked == false
+        && resource.data.expiresAt is timestamp
+        && request.time < resource.data.expiresAt;
     }
 
     match /users/{userId} {
@@ -177,12 +200,13 @@ service cloud.firestore {
     }
 
     match /publicStoryShares/{id} {
-      allow read: if resource.data.revoked == false;
-      allow create: if ownerOnlyCreate()
-        && request.resource.data.revoked == false
-        && request.resource.data.safeBody is string
-        && request.resource.data.safeSummary is string;
-      allow update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if activePublicShare();
+      allow create, update, delete: if false;
+    }
+
+    match /publicStoryShareControls/{id} {
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow create, update, delete: if false;
     }
 
     match /{document=**} {
