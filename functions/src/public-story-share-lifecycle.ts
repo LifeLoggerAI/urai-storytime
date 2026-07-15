@@ -21,21 +21,20 @@ function requireAuth(request: { auth?: { uid: string } | null }) {
   return request.auth.uid;
 }
 
-function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64) || "story";
+function parseCreateInput(value: unknown) {
+  const parsed = createShareSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new HttpsError("invalid-argument", "A valid sessionId and optional 1–90 day expiry are required.");
+  }
+  return parsed.data;
 }
 
-function redactPublicText(value: unknown) {
-  const text = typeof value === "string" ? value : "";
-  return text
-    .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[redacted email]")
-    .replace(/\b(?:\+?\d[\d\s().-]{7,}\d)\b/g, "[redacted phone]")
-    .replace(/\b\d{1,5}\s+[A-Za-z0-9.'-]+(?:\s+[A-Za-z0-9.'-]+){0,4}\s+(?:Street|St|Road|Rd|Avenue|Ave|Boulevard|Blvd|Lane|Ln|Drive|Dr)\b/gi, "[redacted address]")
-    .trim();
+function parseRevokeInput(value: unknown) {
+  const parsed = revokeShareSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new HttpsError("invalid-argument", "A valid shareId is required.");
+  }
+  return parsed.data;
 }
 
 function timestamp(value: unknown) {
@@ -54,10 +53,10 @@ function activeSanitizedShare(data: DocumentData | undefined, nowMs: number) {
 
 export const createPublicStoryShare = onCall(async (request) => {
   const userId = requireAuth(request);
-  const input = createShareSchema.parse(request.data);
+  const input = parseCreateInput(request.data);
   const db = getFirestore();
   const sessionRef = db.collection("storySessions").doc(input.sessionId);
-  const nonce = db.collection("publicStoryShares").doc().id.slice(-10);
+  const nonce = db.collection("publicStoryShares").doc().id.slice(-10).toLowerCase();
 
   const result = await db.runTransaction(async (transaction) => {
     const sessionSnapshot = await transaction.get(sessionRef);
@@ -107,19 +106,16 @@ export const createPublicStoryShare = onCall(async (request) => {
     }
 
     const expiresAt = Timestamp.fromMillis(nowMs + (input.expiresInDays ?? 30) * 86_400_000);
-    const title = redactPublicText(session.title || "Your Story").slice(0, 140) || "Your Story";
-    const slug = `${slugify(title)}-${nonce}`;
+    const slug = `shared-story-${nonce}`;
     const newShareRef = db.collection("publicStoryShares").doc(slug);
     const newControlRef = db.collection("publicStoryShareControls").doc(slug);
-    const safeSummary = redactPublicText(session.whyGenerated || "A private story was shared safely.").slice(0, 500);
-    const safeBody = "This public-safe story view was created from a private URAI Storytime session. Private signals, identifiers, relationship details, and source records are not included.";
 
     transaction.create(newShareRef, {
       schemaVersion: "public-story-share-v2",
       slug,
-      title,
-      safeSummary,
-      safeBody,
+      title: "Shared Story",
+      safeSummary: "A private Storytime session was shared through a redacted public-safe view.",
+      safeBody: "Private signals, names, relationships, source records, and owner identifiers are not included in this public view.",
       revoked: false,
       createdAt: now,
       updatedAt: now,
@@ -155,7 +151,7 @@ export const createPublicStoryShare = onCall(async (request) => {
 
 export const revokePublicStoryShare = onCall(async (request) => {
   const userId = requireAuth(request);
-  const input = revokeShareSchema.parse(request.data);
+  const input = parseRevokeInput(request.data);
   const db = getFirestore();
   const publicRef = db.collection("publicStoryShares").doc(input.shareId);
   const controlRef = db.collection("publicStoryShareControls").doc(input.shareId);
