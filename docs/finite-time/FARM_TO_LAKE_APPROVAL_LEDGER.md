@@ -14,7 +14,7 @@ Private audit authority is retained in Google Drive. This public-safe ledger con
 
 ## Approval records
 
-No row is approved by this document. Approval requires an immutable artifact hash, approver identity, date, and authenticated approval reference retained privately.
+An approved row requires an immutable artifact or authorization record, approver identity, date, and authenticated reference. The founder budget ceiling is recorded separately at `docs/finite-time/approvals/FOUNDER_BUDGET_APPROVAL_2026-07-21.md`.
 
 | Gate | Current status | Required authority |
 |---|---|---|
@@ -35,7 +35,7 @@ No row is approved by this document. Approval requires an immutable artifact has
 | Retries | 0 APPROVED | Adam/budget owner |
 | Per-shot ceiling | USD 0 | Adam/budget owner |
 | Phase ceiling | USD 0 | Adam/budget owner |
-| Absolute project ceiling | USD 0 | Adam/budget owner |
+| Absolute project ceiling | **USD 20 APPROVED** | Adam/budget owner |
 | Final rendering | NOT AUTHORIZED | Adam |
 
 ## Default production treatments until approvals exist
@@ -53,4 +53,4 @@ No row is approved by this document. Approval requires an immutable artifact has
 
 ## Final-render readiness rule
 
-`evaluateFiniteTimeFinalRenderAuthorization()` must return `ready: true` against one checksum-locked authorization record. No environment variable, branch name, issue comment, informal conversation, or budget estimate can bypass that gate.
+`evaluateFiniteTimeFinalRenderAuthorization()` must return `ready: true` against one checksum-locked authorization record. The USD 20 ceiling is necessary budget authority but is not sufficient provider-call authority. No environment variable, branch name, issue comment, informal conversation, or budget estimate can bypass that gate.
