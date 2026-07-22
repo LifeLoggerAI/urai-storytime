@@ -5,6 +5,7 @@ import test from 'node:test';
 const schemas = fs.readFileSync('src/lib/finite-time/schemas.ts', 'utf8');
 const chapter = fs.readFileSync('src/lib/finite-time/farm-to-lake.ts', 'utf8');
 const registry = fs.readFileSync('src/lib/finite-time/registry.ts', 'utf8');
+const authorization = fs.readFileSync('src/lib/finite-time/final-render-approval.ts', 'utf8');
 const functions = fs.readFileSync('functions/src/finite-time-registry.ts', 'utf8');
 const functionsIndex = fs.readFileSync('functions/src/index.ts', 'utf8');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
@@ -57,6 +58,25 @@ test('readiness blocks provider spend and final rendering', () => {
     'references unknown canon entry',
     'deterministic-local-proof'
   ]);
+});
+
+test('final render authorization requires signed checksum-locked approvals and nonzero ceilings', () => {
+  includesAll(authorization, [
+    'finite-time-final-render-authorization-v1',
+    'finalRenderingAuthorized: false',
+    'absoluteProjectCeilingUsd: 0',
+    'perShotCeilingUsd: 0',
+    'providers: []',
+    'source-commit-not-locked',
+    'source-manifest-not-locked',
+    'no-provider-model-authorized',
+    'absolute-project-ceiling-missing',
+    'per-shot-ceiling-missing',
+    'final-rendering-not-authorized',
+    'provider-training-use-not-prohibited',
+    'provider-terms-review-incomplete'
+  ]);
+  assert.doesNotMatch(authorization, /finalRenderingAuthorized:\s*true/);
 });
 
 test('private callables and rules are owner scoped and fail closed', () => {
