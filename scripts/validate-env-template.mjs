@@ -18,8 +18,7 @@ const requiredVariables = [
   'NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING',
   'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
-  'FIREBASE_CLIENT_EMAIL',
-  'FIREBASE_PRIVATE_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
   'URAI_STORYTIME_FIREBASE_PROJECT_ID',
   'URAI_STORYTIME_STAGING_TARGET',
   'URAI_STORYTIME_PRODUCTION_TARGET',
@@ -37,6 +36,8 @@ const requiredVariables = [
   'STORYTIME_OPENAI_MODEL'
 ];
 
+const forbiddenPrivateKeyVariables = ['FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'];
+
 if (!fs.existsSync(envPath)) {
   failures.push('Missing .env.example');
 } else {
@@ -44,6 +45,12 @@ if (!fs.existsSync(envPath)) {
   for (const variableName of requiredVariables) {
     if (!envTemplate.includes(`${variableName}=`)) {
       failures.push(`Missing environment template variable: ${variableName}`);
+    }
+  }
+
+  for (const variableName of forbiddenPrivateKeyVariables) {
+    if (new RegExp(`^${variableName}=`, 'm').test(envTemplate)) {
+      failures.push(`Long-lived Firebase Admin credential variable is forbidden: ${variableName}`);
     }
   }
 
@@ -74,4 +81,4 @@ if (failures.length > 0) {
 }
 
 console.log('Environment template validation passed.');
-console.log('Secrets must be configured outside source control before staging or production deploys.');
+console.log('Firebase Admin uses ADC; secrets and provider identities must be configured outside source control.');
