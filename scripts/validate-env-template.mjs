@@ -19,6 +19,7 @@ const requiredVariables = [
   'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
   'GOOGLE_APPLICATION_CREDENTIALS',
+  'URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY',
   'URAI_STORYTIME_FIREBASE_PROJECT_ID',
   'URAI_STORYTIME_STAGING_TARGET',
   'URAI_STORYTIME_PRODUCTION_TARGET',
@@ -36,7 +37,13 @@ const requiredVariables = [
   'STORYTIME_OPENAI_MODEL'
 ];
 
-const forbiddenPrivateKeyVariables = ['FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'];
+const forbiddenPrivateKeyVariables = [
+  'FIREBASE_CLIENT_EMAIL',
+  'FIREBASE_PRIVATE_KEY',
+  'FIREBASE_SERVICE_ACCOUNT_JSON',
+  'FIREBASE_SERVICE_ACCOUNT_KEY',
+  'GOOGLE_CREDENTIALS'
+];
 
 if (!fs.existsSync(envPath)) {
   failures.push('Missing .env.example');
@@ -62,7 +69,8 @@ if (!fs.existsSync(envPath)) {
     'STORYTIME_PUBLIC_SHARING=false',
     'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false',
     'STORYTIME_PUBLIC_SHARE_TTL_DAYS=30',
-    'STORYTIME_FIREBASE_ISOLATED=false'
+    'STORYTIME_FIREBASE_ISOLATED=false',
+    'URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY=0'
   ]) {
     if (!envTemplate.includes(gatedFlag)) failures.push(`${gatedFlag} must be present in .env.example.`);
   }
@@ -81,4 +89,4 @@ if (failures.length > 0) {
 }
 
 console.log('Environment template validation passed.');
-console.log('Firebase Admin uses ADC; secrets and provider identities must be configured outside source control.');
+console.log('Firebase Admin accepts only external_account WIF or explicitly certified Google metadata identity; production remains NO-GO until provider proof.');
