@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const envTemplate = fs.readFileSync('.env.example', 'utf8');
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const validator = fs.readFileSync('scripts/validate-env-template.mjs', 'utf8');
+const firebaseAdmin = fs.readFileSync('src/lib/firebase/admin.ts', 'utf8');
 
 const requiredVariables = [
   'NEXT_PUBLIC_FIREBASE_API_KEY',
@@ -18,6 +19,7 @@ const requiredVariables = [
   'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
   'GOOGLE_APPLICATION_CREDENTIALS',
+  'URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY',
   'STORYTIME_CLOUD_MODE',
   'STORYTIME_PUBLIC_SHARING',
   'STORYTIME_GENERATION_PROVIDER',
@@ -34,6 +36,9 @@ test('.env.example includes every required Storytime variable', () => {
   }
   assert.doesNotMatch(envTemplate, /^FIREBASE_CLIENT_EMAIL=/m);
   assert.doesNotMatch(envTemplate, /^FIREBASE_PRIVATE_KEY=/m);
+  assert.doesNotMatch(envTemplate, /^FIREBASE_SERVICE_ACCOUNT_JSON=/m);
+  assert.doesNotMatch(envTemplate, /^FIREBASE_SERVICE_ACCOUNT_KEY=/m);
+  assert.doesNotMatch(envTemplate, /^GOOGLE_CREDENTIALS=/m);
 });
 
 test('environment-sensitive feature flags default off in the template', () => {
@@ -44,6 +49,7 @@ test('environment-sensitive feature flags default off in the template', () => {
   assert.match(envTemplate, /^STORYTIME_PUBLIC_SHARING=false$/m);
   assert.match(envTemplate, /^STORYTIME_GENERATION_PROVIDER=disabled$/m);
   assert.match(envTemplate, /^STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false$/m);
+  assert.match(envTemplate, /^URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY=0$/m);
 });
 
 test('env template validator is wired into package scripts and rejects private-key variables', () => {
@@ -52,6 +58,19 @@ test('env template validator is wired into package scripts and rejects private-k
   assert.match(validator, /forbiddenPrivateKeyVariables/);
   assert.match(validator, /FIREBASE_CLIENT_EMAIL/);
   assert.match(validator, /FIREBASE_PRIVATE_KEY/);
+  assert.match(validator, /FIREBASE_SERVICE_ACCOUNT_JSON/);
+  assert.match(validator, /FIREBASE_SERVICE_ACCOUNT_KEY/);
+  assert.match(validator, /GOOGLE_CREDENTIALS/);
   assert.match(validator, /NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false/);
   assert.match(validator, /STORYTIME_GENERATION_PROVIDER=disabled/);
+});
+
+
+test('Firebase Admin enforces short-lived WIF or explicitly certified metadata identity', () => {
+  assert.match(firebaseAdmin, /credential\.type !== "external_account"/);
+  assert.match(firebaseAdmin, /service_account and authorized_user credentials are forbidden/);
+  assert.match(firebaseAdmin, /URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY/);
+  assert.match(firebaseAdmin, /STORYTIME_CLOUD_MODE !== "true"/);
+  assert.match(firebaseAdmin, /applicationDefault\(\)/);
+  assert.doesNotMatch(firebaseAdmin, /\.cert\(/);
 });
