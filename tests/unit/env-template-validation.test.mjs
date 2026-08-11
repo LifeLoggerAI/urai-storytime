@@ -17,8 +17,7 @@ const requiredVariables = [
   'NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING',
   'NEXT_PUBLIC_STORYTIME_PROVIDER_READY',
   'FIREBASE_PROJECT_ID',
-  'FIREBASE_CLIENT_EMAIL',
-  'FIREBASE_PRIVATE_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
   'STORYTIME_CLOUD_MODE',
   'STORYTIME_PUBLIC_SHARING',
   'STORYTIME_GENERATION_PROVIDER',
@@ -33,6 +32,8 @@ test('.env.example includes every required Storytime variable', () => {
   for (const variableName of requiredVariables) {
     assert.match(envTemplate, new RegExp(`^${variableName}=`, 'm'));
   }
+  assert.doesNotMatch(envTemplate, /^FIREBASE_CLIENT_EMAIL=/m);
+  assert.doesNotMatch(envTemplate, /^FIREBASE_PRIVATE_KEY=/m);
 });
 
 test('environment-sensitive feature flags default off in the template', () => {
@@ -45,10 +46,12 @@ test('environment-sensitive feature flags default off in the template', () => {
   assert.match(envTemplate, /^STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false$/m);
 });
 
-test('env template validator is wired into package scripts', () => {
+test('env template validator is wired into package scripts and rejects private-key variables', () => {
   assert.equal(packageJson.scripts['test:env-template'], 'node scripts/validate-env-template.mjs');
   assert.match(validator, /requiredVariables/);
-  assert.match(validator, /STORYTIME_OPENAI_MODEL/);
+  assert.match(validator, /forbiddenPrivateKeyVariables/);
+  assert.match(validator, /FIREBASE_CLIENT_EMAIL/);
+  assert.match(validator, /FIREBASE_PRIVATE_KEY/);
   assert.match(validator, /NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false/);
   assert.match(validator, /STORYTIME_GENERATION_PROVIDER=disabled/);
 });
