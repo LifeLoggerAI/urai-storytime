@@ -11,7 +11,7 @@ const forbiddenCredentialVariables = [
   "GOOGLE_CREDENTIALS",
 ] as const;
 
-export function assertStorytimeFirebaseAdminIdentity(env: NodeJS.ProcessEnv = process.env): "external-account-wif" | "google-metadata" {
+export function assertStorytimeFirebaseAdminIdentity(env: NodeJS.ProcessEnv = process.env): "external-account-wif" | "google-metadata" | "quarantine-disabled" {
   const forbidden = forbiddenCredentialVariables.filter((name) => Boolean(env[name]?.trim()));
   if (forbidden.length) {
     throw new Error(`Storytime Firebase Admin rejects long-lived credential variables: ${forbidden.join(", ")}.`);
@@ -19,10 +19,13 @@ export function assertStorytimeFirebaseAdminIdentity(env: NodeJS.ProcessEnv = pr
 
   const credentialPath = env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
   if (!credentialPath) {
-    if (env.URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY !== "1") {
-      throw new Error("Storytime Firebase Admin is NO-GO without a verified external_account WIF file or an independently certified Google metadata identity.");
+    if (env.URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY === "1") {
+      return "google-metadata";
     }
-    return "google-metadata";
+    if (env.STORYTIME_CLOUD_MODE !== "true") {
+      return "quarantine-disabled";
+    }
+    throw new Error("Storytime Firebase Admin is NO-GO without a verified external_account WIF file or an independently certified Google metadata identity.");
   }
 
   let metadata;
