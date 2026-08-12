@@ -24,14 +24,17 @@ function includesAll(source, markers) {
 test('cloud Storytime creation stays gated behind auth, cloud mode, consent, provider readiness, and safety checks', () => {
   includesAll(home, [
     'isStorytimeCloudModeEnabled',
-    'Cloud generation unavailable',
-    'Create Story requires a signed-in Firebase user',
+    'Story creation is temporarily unavailable',
+    'getFirebaseAuth()',
+    'Sign in to create and save a private story.',
+    'SAFETY_TERMS',
     'consentSnapshot',
     'storyGeneration: true',
     'voiceover: false',
     'publicSharing: false',
     'memoryUse: false'
   ]);
+  assert.doesNotMatch(home, /Open Demo Story Session|MAX_DEMO_SOURCE_CHARS|demo-user/i);
 
   includesAll(functions, [
     'requireAuth(request.auth?.uid)',
@@ -144,12 +147,12 @@ test('rules keep Storytime private by default and deny revoked or unmanaged acce
   assert.match(storageRules, /allow read, write: if false/);
 });
 
-test('demo routes and runtime readiness preserve non-production launch boundary', () => {
+test('session routes require real ids while runtime readiness preserves the non-production launch boundary', () => {
   includesAll(sessionPage, [
-    'sessionId === "demo"',
-    'Deterministic demo session',
-    'does not prove provider generation'
+    'const { sessionId } = await params',
+    '<CloudSession sessionId={sessionId} />'
   ]);
+  assert.doesNotMatch(sessionPage, /sessionId === ["']demo["']|Deterministic demo session|demo-user/i);
   includesAll(runtimeReadiness, [
     'status: RUNTIME_STATUS.red',
     'Production deployment',
