@@ -36,36 +36,37 @@ test('Next and Firebase scripts are present', () => {
   assert.match(packageJson.dependencies.firebase, /^\^11/);
 });
 
-test('Storytime app routes are wired', () => {
-  assert.match(storytimeHome, /URAI Narrative Engine/);
-  assert.match(storytimeHome, /Private by default/);
+test('Storytime app routes are wired with production-facing copy', () => {
+  assert.match(storytimeHome, /URAI Storytime/);
+  assert.match(storytimeHome, /Private first/);
+  assert.match(storytimeHome, /Grounded in your words/);
   assert.match(storytimeSessionRoute, /CloudSession/);
-  assert.match(storytimeSessionRoute, /Demo mode/);
+  assert.doesNotMatch(storytimeSessionRoute, /Demo mode|demo-user/i);
   assert.match(shareRoute, /ShareStory/);
-  assert.match(shareRoute, /Public-safe share demo/);
 });
 
-test('Storytime create form has cloud and demo paths', () => {
+test('Storytime create form has cloud creation and an honest unavailable state', () => {
   assert.match(storytimeHome, /onSubmit=\{handleCreateStory\}/);
   assert.match(storytimeHome, /httpsCallable/);
   assert.match(storytimeHome, /generateStorySession/);
-  assert.match(storytimeHome, /Cloud generation unavailable/);
-  assert.match(storytimeHome, /Open Demo Story Session/);
-  assert.match(storytimeHome, /Create Story/);
-  assert.match(storytimeHome, /MAX_DEMO_SOURCE_CHARS/);
+  assert.match(storytimeHome, /Story creation is temporarily unavailable/);
+  assert.match(storytimeHome, /Create story/);
+  assert.match(storytimeHome, /MAX_SOURCE_CHARS/);
+  assert.doesNotMatch(storytimeHome, /Open Demo Story Session|MAX_DEMO_SOURCE_CHARS|demo-user/i);
 });
 
-test('Storytime account panel supports Firebase email authentication', () => {
+test('Storytime account panel supports Firebase email authentication without exposing setup instructions', () => {
   assert.match(storytimeHome, /AuthPanel/);
   assert.match(authPanel, /createUserWithEmailAndPassword/);
   assert.match(authPanel, /signInWithEmailAndPassword/);
   assert.match(authPanel, /signOut/);
-  assert.match(authPanel, /Firebase client config is required/);
+  assert.match(authPanel, /Account access is temporarily unavailable/);
+  assert.doesNotMatch(authPanel, /Firebase client config is required|NEXT_PUBLIC_|\.env/i);
 });
 
-test('Storytime session route preserves demo while allowing real ids', () => {
+test('Storytime session route accepts real ids and does not fabricate demo sessions', () => {
   assert.doesNotMatch(storytimeSessionRoute, /dynamicParams = false/);
-  assert.match(storytimeSessionRoute, /sessionId === "demo"/);
+  assert.doesNotMatch(storytimeSessionRoute, /sessionId === ["']demo["']|Deterministic demo session|demo-user/i);
   assert.match(storytimeSessionRoute, /<CloudSession sessionId=\{sessionId\}/);
   assert.match(cloudSession, /storySessions/);
   assert.match(cloudSession, /storyChapters/);

@@ -6,10 +6,10 @@ import { getFirebaseAuth, getFirebaseFunctions, isStorytimeCloudModeEnabled } fr
 import { AuthPanel } from "./AuthPanel";
 import { SessionLibrary } from "./SessionLibrary";
 
-const MAX_DEMO_SOURCE_CHARS = 1200;
+const MAX_SOURCE_CHARS = 1200;
 const AGE_RANGES = ["3-5", "6-8", "9-12", "family"] as const;
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
-const SAFETY_TERMS = ["self harm", "harm", "weapon", "explicit", "abuse"];
+const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
 type GenerateStoryResponse = {
   sessionId?: string;
@@ -23,12 +23,12 @@ function firstUnsafeTerm(values: string[]) {
 }
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Story creation failed. Please try again.";
+  return error instanceof Error ? error.message : "Story creation was interrupted. Please try again.";
 }
 
 export function StorytimeHome() {
-  const [title, setTitle] = useState("A Quiet Signal Became a Story");
-  const [theme, setTheme] = useState("quiet signal");
+  const [title, setTitle] = useState("");
+  const [theme, setTheme] = useState("");
   const [ageRange, setAgeRange] = useState<(typeof AGE_RANGES)[number]>("family");
   const [mood, setMood] = useState<(typeof MOODS)[number]>("reflective");
   const [sourceText, setSourceText] = useState("");
@@ -37,42 +37,32 @@ export function StorytimeHome() {
   const cloudReady = isStorytimeCloudModeEnabled();
 
   const validationError = useMemo(() => {
-    if (!title.trim()) return "A story title is required.";
-    if (!theme.trim()) return "A theme is required.";
-    if (!AGE_RANGES.includes(ageRange)) return "Choose a supported age range.";
+    if (!title.trim()) return "Add a title to continue.";
+    if (!theme.trim()) return "Add a theme to continue.";
+    if (!AGE_RANGES.includes(ageRange)) return "Choose an age range.";
     const unsafeTerm = firstUnsafeTerm([title, theme, mood, sourceText]);
-    if (unsafeTerm) return `Remove sensitive term before continuing: ${unsafeTerm}.`;
-    if (sourceText.length > MAX_DEMO_SOURCE_CHARS) return `Keep source text under ${MAX_DEMO_SOURCE_CHARS} characters for this UI.`;
+    if (unsafeTerm) return "This story seed includes sensitive content that Storytime cannot process here.";
+    if (sourceText.length > MAX_SOURCE_CHARS) return `Keep the source text under ${MAX_SOURCE_CHARS} characters.`;
     return null;
   }, [ageRange, mood, sourceText, theme, title]);
-
-  function openDemoSession() {
-    const cleanTitle = title.trim() || "Untitled Story Session";
-    const cleanSource = sourceText.trim().slice(0, MAX_DEMO_SOURCE_CHARS);
-    const params = new URLSearchParams({ title: cleanTitle, theme: theme.trim(), ageRange, mood });
-
-    if (cleanSource) params.set("source", cleanSource);
-
-    window.location.assign(`/storytime/demo?${params.toString()}`);
-  }
 
   async function handleCreateStory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError(null);
+
+    if (!cloudReady) {
+      setSubmitError("Story creation is temporarily unavailable. Your text has not been submitted.");
+      return;
+    }
 
     if (validationError) {
       setSubmitError(validationError);
       return;
     }
 
-    if (!cloudReady) {
-      openDemoSession();
-      return;
-    }
-
     const auth = getFirebaseAuth();
     if (!auth.currentUser) {
-      setSubmitError("Create Story requires a signed-in Firebase user. Demo mode remains available without an account.");
+      setSubmitError("Sign in to create and save a private story.");
       return;
     }
 
@@ -81,7 +71,7 @@ export function StorytimeHome() {
       const createStory = httpsCallable<Record<string, unknown>, GenerateStoryResponse>(getFirebaseFunctions(), "generateStorySession");
       const result = await createStory({
         title: title.trim(),
-        sourceText: sourceText.trim().slice(0, MAX_DEMO_SOURCE_CHARS),
+        sourceText: sourceText.trim().slice(0, MAX_SOURCE_CHARS),
         emotionalTone: mood,
         symbolicMotifs: [theme.trim()],
         sourceSignals: ["storytime form"],
@@ -91,11 +81,11 @@ export function StorytimeHome() {
           storyGeneration: true,
           voiceover: false,
           publicSharing: false,
-          memoryUse: false
-        }
+          memoryUse: false,
+        },
       });
 
-      if (!result.data.sessionId) throw new Error("Story provider returned no session id.");
+      if (!result.data.sessionId) throw new Error("Story creation did not complete.");
       window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
     } catch (error) {
       setSubmitError(errorMessage(error));
@@ -107,50 +97,82 @@ export function StorytimeHome() {
   return (
     <main className="storytime-shell">
       <div className="storytime-wrap">
-        <nav className="storytime-nav">
+        <nav className="storytime-nav" aria-label="Storytime">
           <a className="storytime-brand" href="/storytime">URAI Storytime</a>
           <div className="storytime-links"><a href="/storytime/settings">Settings</a></div>
         </nav>
 
         <section className="storytime-hero">
-          <p className="storytime-eyebrow">URAI Narrative Engine</p>
-          <h1 className="storytime-title">Your life signals, shaped into private story replays.</h1>
-          <p className="storytime-subtitle">Storytime turns opted-in URAI memories, moods, rituals, relationship threads, and timeline moments into gentle chapters, narrator scripts, emotional arcs, and shareable storycards.</p>
+          <p className="storytime-eyebrow">Stories from the life you already lived</p>
+          <h1 className="storytime-title">Turn a memory into something you can return to.</h1>
+          <p className="storytime-subtitle">Storytime can shape the memories and reflections you choose into private chapters with a gentler narrative form. Nothing is shared unless you choose to share it.</p>
         </section>
 
-        <section className="storytime-grid" aria-label="Storytime values">
+        <section className="storytime-grid" aria-label="How Storytime works">
           {[
-            ["Private by default", "Stories stay private unless you explicitly create a public-safe share."],
-            ["Narrator-ready", "Every chapter can become a warm, grounded narrator script."],
-            ["System-aware", "Designed to connect with URAI mood, memory, ritual, timeline, and companion layers."]
+            ["Private first", "Your story remains private unless you explicitly create a shareable version."],
+            ["Grounded in your words", "Storytime starts with the memory, theme, and tone you choose rather than inventing a life for you."],
+            ["Made to revisit", "Created stories can live alongside your other Storytime sessions so meaningful moments are easy to find again."],
           ].map(([heading, body]) => (
             <article key={heading} className="storytime-card"><h2>{heading}</h2><p>{body}</p></article>
           ))}
         </section>
 
-        <section className="storytime-grid compact" aria-label="Storytime cloud account and library">
+        <section className="storytime-grid compact" aria-label="Account and story library">
           <AuthPanel />
           <SessionLibrary />
         </section>
 
-        <form className="storytime-card storytime-form" onSubmit={handleCreateStory}>
-          <p className="storytime-pill">{cloudReady ? "Cloud mode configured" : "Demo mode"}</p>
-          <h2>Create a private story seed</h2>
-          {!cloudReady ? <p className="storytime-warning">Cloud generation unavailable. This form opens a labeled deterministic demo until Firebase client env vars, auth, provider readiness, and NEXT_PUBLIC_STORYTIME_CLOUD_MODE=true are configured.</p> : null}
-          <label className="storytime-field">Story title<input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} /></label>
-          <label className="storytime-field">Theme<input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="gentle adventure, family memory, quiet signal" /></label>
+        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
+          <p className="storytime-pill">Private story</p>
+          <h2>Create a story</h2>
+          <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
+
+          {!cloudReady ? (
+            <p className="storytime-warning" id="storytime-unavailable" role="status">
+              Story creation is temporarily unavailable. You can still review your saved stories and settings.
+            </p>
+          ) : null}
+
+          <label className="storytime-field">
+            Title
+            <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" />
+          </label>
+          <label className="storytime-field">
+            Theme
+            <input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="A family memory, a quiet turning point, a brave day" autoComplete="off" />
+          </label>
           <div className="storytime-grid compact">
-            <label className="storytime-field">Age range<select className="storytime-input" value={ageRange} onChange={(event) => setAgeRange(event.target.value as (typeof AGE_RANGES)[number])}>{AGE_RANGES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-            <label className="storytime-field">Mood<select className="storytime-input" value={mood} onChange={(event) => setMood(event.target.value as (typeof MOODS)[number])}>{MOODS.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="storytime-field">
+              Audience
+              <select className="storytime-input" value={ageRange} onChange={(event) => setAgeRange(event.target.value as (typeof AGE_RANGES)[number])}>
+                <option value="family">Family</option>
+                <option value="3-5">Ages 3–5</option>
+                <option value="6-8">Ages 6–8</option>
+                <option value="9-12">Ages 9–12</option>
+              </select>
+            </label>
+            <label className="storytime-field">
+              Tone
+              <select className="storytime-input" value={mood} onChange={(event) => setMood(event.target.value as (typeof MOODS)[number])}>
+                {MOODS.map((value) => <option key={value} value={value}>{value.charAt(0).toUpperCase() + value.slice(1)}</option>)}
+              </select>
+            </label>
           </div>
-          <label className="storytime-field">Optional source text<textarea className="storytime-input" rows={6} value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder="Paste a private moment, weekly reflection, or story seed. Avoid names, addresses, phone numbers, school names, or other sensitive personal details." /></label>
-          {submitError ? <p className="storytime-error">{submitError}</p> : null}
-          {validationError ? <p className="storytime-helper">{validationError}</p> : null}
+          <label className="storytime-field">
+            Memory or source text <span className="storytime-helper">Optional</span>
+            <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
+          </label>
+
+          {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
+          {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
+
           <div className="storytime-actions">
-            <button className="storytime-button" type="submit" disabled={Boolean(validationError) || isSubmitting}>{cloudReady ? (isSubmitting ? "Creating..." : "Create Story") : "Open Demo Story Session"}</button>
-            {cloudReady ? <button className="storytime-button secondary" type="button" onClick={openDemoSession}>Use demo instead</button> : null}
+            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting}>
+              {isSubmitting ? "Creating story…" : "Create story"}
+            </button>
           </div>
-          <p className="storytime-helper">Demo mode is local and deterministic. Cloud mode requires Firebase Auth plus a real provider configured in Functions; provider failures are shown without saving partial personal data.</p>
+          <p className="storytime-helper">Storytime only submits the information in this form after you choose Create story.</p>
         </form>
       </div>
     </main>
