@@ -18,7 +18,7 @@ export const FIREBASE_CLIENT_ENV_KEYS = [
   "NEXT_PUBLIC_FIREBASE_APP_ID"
 ] as const;
 
-export const FIREBASE_ADMIN_ENV_KEYS = ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"] as const;
+export const FIREBASE_ADMIN_ENV_KEYS = ["FIREBASE_PROJECT_ID"] as const;
 
 export function truthyEnv(value: string | undefined): boolean {
   return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());

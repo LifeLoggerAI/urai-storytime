@@ -24,8 +24,8 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
 
 FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
+GOOGLE_APPLICATION_CREDENTIALS=/protected/path/wif-external-account.json
+URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY=0
 
 STORYTIME_CLOUD_MODE=false
 STORYTIME_PUBLIC_SHARING=false
@@ -54,6 +54,10 @@ firebase login
 firebase use <project-id>
 firebase emulators:start
 ```
+
+## Production identity gate
+
+Production is **NO-GO**. Do not run a production deploy until either a protected, mode-0600, regular `external_account` WIF file or a Google-managed metadata identity has been independently certified. Required evidence includes least-privilege IAM, authorized and unauthorized identity proofs, historical service-account key revocation, protected settings, and exact-runtime read-back. Service-account JSON, authorized-user ADC, client email, and private keys are forbidden.
 
 ## Deploy order
 

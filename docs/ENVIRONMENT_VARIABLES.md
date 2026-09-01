@@ -20,11 +20,13 @@ This document lists names and purpose only. Never store values in Git.
 
 ## Firebase server/deployment
 
+Production remains **NO-GO** until WIF/IAM or Google-managed metadata identity is independently proven. Long-lived service-account JSON, authorized-user ADC, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, and raw key material are forbidden.
+
 | Name | Purpose | Production rule |
 |---|---|---|
-| `FIREBASE_PROJECT_ID` | Admin SDK project | Secret/environment configuration |
-| `FIREBASE_CLIENT_EMAIL` | Admin service identity | Secret manager |
-| `FIREBASE_PRIVATE_KEY` | Admin credential | Secret manager; preserve newlines safely |
+| `FIREBASE_PROJECT_ID` | Admin SDK project | Exact environment configuration |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Protected `external_account` WIF ADC file | Non-Google runtime only; regular, non-symlinked, mode 0600 |
+| `URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY` | Google-managed metadata identity evidence gate | Keep `0` until independently certified; never set merely to bypass startup |
 | `URAI_STORYTIME_FIREBASE_PROJECT_ID` | Canonical Storytime project | distinct from Core/Analytics |
 | `URAI_STORYTIME_STAGING_TARGET` | Staging deployment target | recorded in release receipt |
 | `URAI_STORYTIME_PRODUCTION_TARGET` | Production target | recorded in release receipt |

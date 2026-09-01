@@ -10,6 +10,8 @@ This repository has moved beyond the older standalone static demo. The current i
 
 Production launch is still blocked until isolated Storytime Firebase credentials, auth configuration, provider secrets, staging/production deploys, DNS/SSL, live smoke tests, child-safety/legal review, and release evidence are verified and recorded.
 
+Firebase Admin production is **NO-GO** until a protected external-account WIF file or Google-managed metadata identity is independently verified with least-privilege IAM, negative unauthorized-identity proof, and historical-key revocation. Service-account JSON, authorized-user ADC, client email, and private keys are forbidden.
+
 ## Stack
 
 - Next.js 15
@@ -95,8 +97,8 @@ NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING=false
 NEXT_PUBLIC_STORYTIME_PROVIDER_READY=false
 
 FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
+GOOGLE_APPLICATION_CREDENTIALS=/protected/path/wif-external-account.json
+URAI_STORYTIME_FIREBASE_ADMIN_METADATA_READY=0
 
 URAI_STORYTIME_FIREBASE_PROJECT_ID=
 URAI_STORYTIME_STAGING_TARGET=
