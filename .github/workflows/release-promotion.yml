@@ -11,42 +11,74 @@ on:
           - staging
           - production
       base_url:
-        description: Deployed base URL to verify.
+        description: Deployed HTTPS base URL to verify.
         required: true
         type: string
       rollback_sha:
-        description: Expected rollback SHA for rollback verification.
+        description: Expected 40-character rollback SHA for rollback verification.
         required: true
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: storytime-release-promotion-${{ github.sha }}-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ github.sha }}
+
 jobs:
   release-promotion:
-    name: Verify release promotion gates
-    runs-on: ubuntu-latest
+    name: Verify exact-head release promotion gates
+    runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - name: Checkout exact dispatched candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact clean candidate and bounded inputs
+        shell: bash
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          [[ "$BASE_URL" =~ ^https://[^[:space:]]+$ ]]
+          [[ "$ROLLBACK_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 24
+          node-version: '24'
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run baseline verification
+      - name: Install exact dependency graphs
+        shell: bash
         run: |
+          set -euo pipefail
+          npm ci --no-audit
+          npm --prefix functions ci --no-audit
+
+      - name: Run baseline source verification
+        shell: bash
+        run: |
+          set -euo pipefail
           npm run lint
           npm run typecheck
-          npm run test
+          npm test
           npm run test:smoke
           npm run test:e2e
           npm run test:deployment
@@ -55,15 +87,16 @@ jobs:
           npm run test:emulator-runtime
           npm run test:production-readiness
           npm run build
+          npm --prefix functions run build
 
-      - name: Verify provider wiring
+      - name: Verify provider wiring contract
         env:
           URAI_ANALYTICS_PROVIDER: ${{ secrets.URAI_ANALYTICS_PROVIDER }}
           URAI_MONITORING_PROVIDER: ${{ secrets.URAI_MONITORING_PROVIDER }}
           URAI_ALERTING_PROVIDER: ${{ secrets.URAI_ALERTING_PROVIDER }}
         run: npm run test:provider-wiring
 
-      - name: Verify production evidence
+      - name: Verify production evidence contract
         env:
           URAI_FIREBASE_PROJECT_ID: ${{ secrets.URAI_FIREBASE_PROJECT_ID }}
           URAI_FIREBASE_STAGING_TARGET: ${{ secrets.URAI_FIREBASE_STAGING_TARGET }}
@@ -80,14 +113,43 @@ jobs:
           URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
         run: npm run test:production-evidence
 
-      - name: Verify production smoke evidence
+      - name: Verify production smoke evidence contract
         env:
           URAI_PRODUCTION_URL: ${{ inputs.base_url }}
           URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
           URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
         run: npm run test:production-smoke
 
-      - name: Record rollback expectation
+      - name: Retain exact-head release verification receipt
+        if: always()
         shell: bash
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          BASE_URL: ${{ inputs.base_url }}
+          ROLLBACK_SHA: ${{ inputs.rollback_sha }}
         run: |
-          printf 'Rollback SHA evidence required: %s\\n' "${{ inputs.rollback_sha }}"
+          set -euo pipefail
+          mkdir -p ci-receipts
+          cat > ci-receipts/storytime-release-promotion.txt <<EOF
+          Repository: ${GITHUB_REPOSITORY}
+          Workflow: ${GITHUB_WORKFLOW}
+          Run ID: ${GITHUB_RUN_ID}
+          Exact candidate: ${TARGET_SHA}
+          Checked out: $(git rev-parse HEAD)
+          Environment: ${TARGET_ENVIRONMENT}
+          Base URL: ${BASE_URL}
+          Expected rollback SHA: ${ROLLBACK_SHA}
+          Deployment performed by workflow: false
+          Provider mutation performed by workflow: false
+          Certification: false
+          EOF
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+      - name: Upload exact-head release verification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: urai-storytime-release-promotion-${{ env.TARGET_SHA }}-${{ inputs.environment }}
+          path: ci-receipts/storytime-release-promotion.txt
+          if-no-files-found: error
+          retention-days: 365

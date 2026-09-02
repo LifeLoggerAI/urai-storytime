@@ -43,20 +43,6 @@
       ]
     },
     {
-      "collectionGroup": "publicStoryShares",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "slug",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "revoked",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "weeklyStoryScrolls",
       "queryScope": "COLLECTION",
       "fields": [
