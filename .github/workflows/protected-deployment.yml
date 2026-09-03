@@ -11,7 +11,7 @@ on:
           - staging
           - production
       base_url:
-        description: Exact HTTPS URL expected after deployment.
+        description: Must exactly match the protected environment canonical URL.
         required: true
         type: string
       confirm:
@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
   group: storytime-protected-deployment-${{ inputs.environment }}
@@ -30,16 +29,20 @@ concurrency:
 env:
   TARGET_SHA: ${{ github.sha }}
   TARGET_ENVIRONMENT: ${{ inputs.environment }}
-  BASE_URL: ${{ inputs.base_url }}
-  PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
 
 jobs:
-  deploy:
-    name: Deploy exact protected revision
+  verify:
+    name: Verify and package exact protected revision
     if: github.ref == 'refs/heads/main' && inputs.confirm == 'DEPLOY_STORYTIME'
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
     timeout-minutes: 45
+    env:
+      PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+      BASE_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+      REQUESTED_BASE_URL: ${{ inputs.base_url }}
     steps:
       - name: Checkout exact dispatched revision
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -48,7 +51,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Prove immutable source and bounded target
+      - name: Prove immutable source and environment-owned target
         shell: bash
         run: |
           set -euo pipefail
@@ -56,7 +59,126 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=all)"
           [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
           [[ "$BASE_URL" =~ ^https://[^[:space:]]+$ ]]
+          test "$REQUESTED_BASE_URL" = "$BASE_URL"
           test -n "$PROJECT_ID"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Install, verify, and build without cloud identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit
+          npm --prefix functions ci --no-audit
+          npm run build
+          npm --prefix functions run build
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Validate protected release configuration
+        shell: bash
+        env:
+          URAI_STORYTIME_FIREBASE_PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+          URAI_STORYTIME_STAGING_TARGET: ${{ vars.URAI_STORYTIME_STAGING_TARGET }}
+          URAI_STORYTIME_PRODUCTION_TARGET: ${{ vars.URAI_STORYTIME_PRODUCTION_TARGET }}
+          STORYTIME_FIREBASE_ISOLATED: ${{ vars.STORYTIME_FIREBASE_ISOLATED }}
+          FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED: ${{ vars.FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED }}
+          STORYTIME_GENERATION_PROVIDER: ${{ vars.STORYTIME_GENERATION_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          STORYTIME_OPENAI_MODEL: ${{ vars.STORYTIME_OPENAI_MODEL }}
+          NEXT_PUBLIC_STORYTIME_CLOUD_MODE: ${{ vars.NEXT_PUBLIC_STORYTIME_CLOUD_MODE }}
+          NEXT_PUBLIC_STORYTIME_PROVIDER_READY: ${{ vars.NEXT_PUBLIC_STORYTIME_PROVIDER_READY }}
+          NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING: ${{ vars.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING }}
+          URAI_PRODUCTION_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+          URAI_LEGAL_APPROVED: ${{ secrets.URAI_LEGAL_APPROVED }}
+          URAI_PRIVACY_APPROVED: ${{ secrets.URAI_PRIVACY_APPROVED }}
+          URAI_CHILD_SAFETY_APPROVED: ${{ secrets.URAI_CHILD_SAFETY_APPROVED }}
+          URAI_FIREBASE_PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+          URAI_FIREBASE_STAGING_TARGET: ${{ vars.URAI_STORYTIME_STAGING_TARGET }}
+          URAI_FIREBASE_PRODUCTION_TARGET: ${{ vars.URAI_STORYTIME_PRODUCTION_TARGET }}
+          URAI_FIREBASE_AUTH_VERIFIED: ${{ secrets.URAI_FIREBASE_AUTH_VERIFIED }}
+          URAI_FIRESTORE_VERIFIED: ${{ secrets.URAI_FIRESTORE_VERIFIED }}
+          URAI_STORAGE_RULES_VERIFIED: ${{ secrets.URAI_STORAGE_RULES_VERIFIED }}
+          URAI_DEPLOY_VERIFIED: ${{ secrets.URAI_DEPLOY_VERIFIED }}
+          URAI_SECRETS_VERIFIED: ${{ secrets.URAI_SECRETS_VERIFIED }}
+          URAI_BILLING_PROVIDER: ${{ secrets.URAI_BILLING_PROVIDER }}
+          URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
+          URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
+        run: npm run validate:release-promotion
+
+      - name: Assemble verified deploy payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/storytime-deploy-payload"
+          mkdir -p "$payload"
+          tar --exclude=.git --exclude=release-receipt -cf - . | tar -xf - -C "$payload"
+          PAYLOAD="$payload" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = `${process.env.PAYLOAD}/firebase.json`;
+          const config = JSON.parse(readFileSync(path, 'utf8'));
+          for (const entry of Array.isArray(config.functions) ? config.functions : []) {
+            delete entry.predeploy;
+          }
+          writeFileSync(`${process.env.PAYLOAD}/firebase.deploy.json`, JSON.stringify(config, null, 2) + '\n');
+          NODE
+          npm install --prefix "$payload/firebase-cli" --ignore-scripts --no-audit --no-save firebase-tools@14.12.0
+          tar -czf "$RUNNER_TEMP/storytime-deploy-payload.tgz" -C "$RUNNER_TEMP" storytime-deploy-payload
+          sha256sum "$RUNNER_TEMP/storytime-deploy-payload.tgz" > "$RUNNER_TEMP/storytime-deploy-payload.tgz.sha256"
+
+      - name: Upload verified deploy payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storytime-deploy-payload-${{ env.TARGET_SHA }}
+          path: |
+            ${{ runner.temp }}/storytime-deploy-payload.tgz
+            ${{ runner.temp }}/storytime-deploy-payload.tgz.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy exact protected revision
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    timeout-minutes: 30
+    env:
+      PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+      BASE_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+      REQUESTED_BASE_URL: ${{ inputs.base_url }}
+    steps:
+      - name: Checkout exact dispatched revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download verified deploy payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: storytime-deploy-payload-${{ env.TARGET_SHA }}
+          path: ${{ runner.temp }}/verified-payload
+
+      - name: Verify payload and exact target before identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$REQUESTED_BASE_URL" = "$BASE_URL"
+          (cd "$RUNNER_TEMP/verified-payload" && sha256sum --check storytime-deploy-payload.tgz.sha256)
+          tar -xzf "$RUNNER_TEMP/verified-payload/storytime-deploy-payload.tgz" -C "$RUNNER_TEMP"
 
       - name: Authenticate with short-lived Google WIF
         id: google_auth
@@ -68,32 +190,16 @@ jobs:
           create_credentials_file: true
           export_environment_variables: true
 
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            functions/package-lock.json
-
-      - name: Verify and build exact dependency graphs
+      - name: Deploy verified payload
+        working-directory: ${{ runner.temp }}/storytime-deploy-payload
         shell: bash
         run: |
           set -euo pipefail
-          npm ci --no-audit
-          npm --prefix functions ci --no-audit
-          npm run validate:release-promotion
-          npm run build
-          npm --prefix functions run build
-          test -z "$(git status --porcelain --untracked-files=all)"
-
-      - name: Deploy exact revision
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes firebase-tools@14.12.0 deploy             --project "$PROJECT_ID"             --only firestore:rules,firestore:indexes,storage,functions,hosting             --non-interactive
-          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          ./firebase-cli/node_modules/.bin/firebase deploy \
+            --config firebase.deploy.json \
+            --project "$PROJECT_ID" \
+            --only firestore:rules,firestore:indexes,storage,functions,hosting \
+            --non-interactive
 
       - name: Verify live protected target
         shell: bash
@@ -127,7 +233,6 @@ jobs:
           NODE
 
       - name: Upload immutable deployment receipt
-        id: upload_receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: storytime-deployment-${{ env.TARGET_ENVIRONMENT }}-${{ env.TARGET_SHA }}
