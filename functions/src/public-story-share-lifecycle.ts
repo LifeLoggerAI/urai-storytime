@@ -78,6 +78,7 @@ export const createPublicStoryShare = onCall(async (request) => {
 
     const now = Timestamp.now();
     const nowMs = now.toMillis();
+    const requestedExpiresAt = Timestamp.fromMillis(nowMs + (input.expiresInDays ?? 30) * 86_400_000);
     const existingShareId = typeof session.publicShareId === "string" ? session.publicShareId : null;
 
     if (existingShareId) {
@@ -97,6 +98,8 @@ export const createPublicStoryShare = onCall(async (request) => {
         && controlData?.revoked === false
         && activeSanitizedShare(publicData, nowMs)
       ) {
+        transaction.update(existingShareRef, { expiresAt: requestedExpiresAt, updatedAt: now });
+        transaction.update(existingControlRef, { expiresAt: requestedExpiresAt, updatedAt: now });
         transaction.update(sessionRef, {
           "consentSnapshot.publicSharing": true,
           publicSharingConsentAt: now,
@@ -105,13 +108,13 @@ export const createPublicStoryShare = onCall(async (request) => {
         return {
           shareId: existingShare.id,
           slug: existingShare.id,
-          expiresAt: timestamp(publicData?.expiresAt)?.toDate().toISOString() ?? null,
+          expiresAt: requestedExpiresAt.toDate().toISOString(),
           reused: true
         };
       }
     }
 
-    const expiresAt = Timestamp.fromMillis(nowMs + (input.expiresInDays ?? 30) * 86_400_000);
+    const expiresAt = requestedExpiresAt;
     const slug = `shared-story-${nonce}`;
     const newShareRef = db.collection("publicStoryShares").doc(slug);
     const newControlRef = db.collection("publicStoryShareControls").doc(slug);
