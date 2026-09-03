@@ -20,6 +20,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -78,6 +79,7 @@ jobs:
           BASE_URL: ${{ inputs.base_url }}
           ROLLBACK_SHA: ${{ inputs.rollback_sha }}
           ROLLBACK_EVIDENCE_PATH: release-evidence/deployments/${{ inputs.environment }}/${{ inputs.rollback_sha }}.json
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
@@ -104,6 +106,36 @@ jobs:
           if (evidence.smokeVerified !== true) throw new Error('Rollback revision is not smoke verified.');
           if (evidence.rollbackTested !== true) throw new Error('Rollback revision is not rollback tested.');
           if (!isHttps(evidence.rollbackTestRunUrl)) throw new Error('Rollback evidence requires a rollback test run URL.');
+          if (typeof evidence.deploymentArtifactName !== 'string' || evidence.deploymentArtifactName.length < 8) throw new Error('Rollback evidence requires an immutable deployment artifact name.');
+          if (typeof evidence.rollbackTestArtifactName !== 'string' || evidence.rollbackTestArtifactName.length < 8) throw new Error('Rollback evidence requires an immutable rollback-test artifact name.');
+
+          const repository = process.env.GITHUB_REPOSITORY;
+          const apiUrl = process.env.GITHUB_API_URL;
+          const token = process.env.GITHUB_TOKEN;
+          const runIdFromUrl = (value, field) => {
+            const prefix = `https://github.com/${repository}/actions/runs/`;
+            if (!value.startsWith(prefix) || !/^\d+$/.test(value.slice(prefix.length))) throw new Error(`${field} must identify an Actions run in ${repository}.`);
+            return value.slice(prefix.length);
+          };
+          const github = async (path) => {
+            const response = await fetch(`${apiUrl}${path}`, { headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' } });
+            if (!response.ok) throw new Error(`GitHub evidence lookup failed (${response.status}).`);
+            return response.json();
+          };
+          const verifyRunAndArtifact = async (runUrl, artifactName, kind, requireRollbackHead) => {
+            const runId = runIdFromUrl(runUrl, `${kind} run URL`);
+            const run = await github(`/repos/${repository}/actions/runs/${runId}`);
+            if (run.conclusion !== 'success' || run.status !== 'completed') throw new Error(`${kind} run is not successful and terminal.`);
+            if (requireRollbackHead && String(run.head_sha).toLowerCase() !== expected.deployedSha) throw new Error(`${kind} run is not bound to the rollback SHA.`);
+            const artifacts = await github(`/repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`);
+            const retained = artifacts.artifacts?.find((artifact) => artifact.name === artifactName && artifact.expired === false);
+            if (!retained) throw new Error(`${kind} retained artifact is missing or expired.`);
+            const binding = `${expected.environment}-${expected.deployedSha}`;
+            if (!artifactName.toLowerCase().includes(binding)) throw new Error(`${kind} artifact name is not bound to environment and rollback SHA.`);
+          };
+
+          await verifyRunAndArtifact(evidence.deploymentRunUrl, evidence.deploymentArtifactName, 'Deployment', true);
+          await verifyRunAndArtifact(evidence.rollbackTestRunUrl, evidence.rollbackTestArtifactName, 'Rollback test', false);
 
           console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
           NODE
