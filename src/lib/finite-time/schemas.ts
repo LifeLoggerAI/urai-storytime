@@ -162,7 +162,6 @@ export const FiniteTimeShotGraphSchema = z.object({
   version: z.number().int().positive(),
   ownerId: z.string().min(1).max(128),
   title: z.string().min(1).max(160),
-  canonRevision: z.string().min(1).max(80),
   privacyClass: z.literal("owner-only"),
   renderMode: z.literal("deterministic-local-proof"),
   finalRenderingAuthorized: z.literal(false),
