@@ -1,21 +1,21 @@
-name: URAI Storytime Protected Rollback Test
+name: URAI Storytime Rollback Source Verification
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: Evidence environment; this workflow performs no provider mutation.
+        description: Evidence environment; this workflow performs source verification only.
         required: true
         type: choice
         options:
           - staging
           - production
       base_url:
-        description: HTTPS URL associated with the rollback evidence packet.
+        description: HTTPS URL associated with the source-verification packet.
         required: true
         type: string
       confirm:
-        description: Type VERIFY_STORYTIME_ROLLBACK to authorize exact-revision verification.
+        description: Type VERIFY_STORYTIME_ROLLBACK_SOURCE to authorize exact-revision source verification.
         required: true
         type: string
 
@@ -33,8 +33,8 @@ env:
 
 jobs:
   rollback-test:
-    name: Verify exact rollback revision without provider mutation
-    if: github.ref == 'refs/heads/main' && inputs.confirm == 'VERIFY_STORYTIME_ROLLBACK'
+    name: Verify rollback source without claiming an operational drill
+    if: github.ref == 'refs/heads/main' && inputs.confirm == 'VERIFY_STORYTIME_ROLLBACK_SOURCE'
     runs-on: ubuntu-24.04
     environment: ${{ inputs.environment }}
     timeout-minutes: 35
@@ -81,7 +81,7 @@ jobs:
           npm --prefix functions run build
           test -z "$(git status --porcelain --untracked-files=all)"
 
-      - name: Write immutable rollback-test manifest
+      - name: Write immutable rollback-source-verification manifest
         shell: bash
         run: |
           set -euo pipefail
@@ -90,12 +90,14 @@ jobs:
           import { writeFileSync } from 'node:fs';
           const receipt = {
             schemaVersion: 'urai-storytime-protected-run-v1',
-            role: 'rollback-test',
-            result: 'success',
+            role: 'rollback-source-verification',
+            result: 'verification-success',
             environment: process.env.TARGET_ENVIRONMENT,
             deployedSha: process.env.ROLLBACK_SHA,
             deploymentUrl: process.env.BASE_URL,
             providerMutationPerformed: false,
+            rollbackTested: false,
+            operationalRollbackPerformed: false,
             repository: process.env.GITHUB_REPOSITORY,
             workflow: process.env.GITHUB_WORKFLOW,
             workflowPath: '.github/workflows/protected-rollback-test.yml',
@@ -106,10 +108,10 @@ jobs:
           writeFileSync('release-receipt/manifest.json', JSON.stringify(receipt, null, 2) + '\n');
           NODE
 
-      - name: Upload immutable rollback-test receipt
+      - name: Upload immutable rollback-source-verification receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: storytime-rollback-test-${{ env.TARGET_ENVIRONMENT }}-${{ env.ROLLBACK_SHA }}
+          name: storytime-rollback-source-verification-${{ env.TARGET_ENVIRONMENT }}-${{ env.ROLLBACK_SHA }}
           path: release-receipt/manifest.json
           if-no-files-found: error
           retention-days: 365
