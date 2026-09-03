@@ -57,6 +57,7 @@ test('readiness blocks provider spend and final rendering', () => {
     'finalRenderingAuthorized: false',
     'animaticReady',
     'references unknown canon entry',
+    'that is not approved for animatic',
     'deterministic-local-proof'
   ]);
 });
