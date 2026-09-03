@@ -38,7 +38,7 @@ export function evaluateFiniteTimeReadiness(
   const canonValid = FiniteTimeCanonRegistrySchema.safeParse(canon).success;
   const shotGraphValid = FiniteTimeShotGraphSchema.safeParse(graph).success;
   const shots = graph.scenes.flatMap((scene) => scene.shots);
-  const canonIds = new Set(canon.entries.map((entry) => entry.id));
+  const canonEntries = new Map(canon.entries.map((entry) => [entry.id, entry]));
   const blockers: string[] = [];
 
   if (!canonValid) blockers.push("Canon registry failed schema validation.");
@@ -50,7 +50,11 @@ export function evaluateFiniteTimeReadiness(
 
   for (const shot of shots) {
     for (const id of shot.canonEntryIds) {
-      if (!canonIds.has(id)) blockers.push(`Shot ${shot.id} references unknown canon entry ${id}.`);
+      const canonEntry = canonEntries.get(id);
+      if (!canonEntry) blockers.push(`Shot ${shot.id} references unknown canon entry ${id}.`);
+      else if (!["approved-for-animatic", "approved-for-final-render"].includes(canonEntry.reviewState)) {
+        blockers.push(`Shot ${shot.id} references canon entry ${id} that is not approved for animatic.`);
+      }
     }
     if (shot.renderMethod !== "deterministic-local-proof") blockers.push(`Shot ${shot.id} is not a local-proof render.`);
     if (shot.reviewState !== "approved-for-animatic") blockers.push(`Shot ${shot.id} is not approved for animatic.`);
