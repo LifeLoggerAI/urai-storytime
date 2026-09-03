@@ -130,7 +130,7 @@ jobs:
           NODE
           npm install --prefix "$payload/firebase-cli" --ignore-scripts --no-audit --no-save firebase-tools@14.12.0
           tar -czf "$RUNNER_TEMP/storytime-deploy-payload.tgz" -C "$RUNNER_TEMP" storytime-deploy-payload
-          sha256sum "$RUNNER_TEMP/storytime-deploy-payload.tgz" > "$RUNNER_TEMP/storytime-deploy-payload.tgz.sha256"
+          (cd "$RUNNER_TEMP" && sha256sum storytime-deploy-payload.tgz > storytime-deploy-payload.tgz.sha256)
 
       - name: Upload verified deploy payload
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
