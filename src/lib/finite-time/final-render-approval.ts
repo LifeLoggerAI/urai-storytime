@@ -101,7 +101,22 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
   if (!/^[a-f0-9]{40}$/.test(authorization.sourceCommit)) blockers.push("source-commit-not-locked");
   if (!/^sha256:[a-f0-9]{64}$/.test(authorization.sourceManifestSha256)) blockers.push("source-manifest-not-locked");
 
-  for (const [name, record] of Object.entries(authorization.approvals)) {
+  const requiredApprovals = [
+    "animatic",
+    "likeness",
+    "rightsAndConsent",
+    "narration",
+    "narratorVoice",
+    "scoreDirection",
+    "privacyRetention"
+  ] as const;
+  const approvals = authorization.approvals as Partial<Record<(typeof requiredApprovals)[number], FiniteTimeApprovalRecord>>;
+  for (const name of requiredApprovals) {
+    const record = approvals?.[name];
+    if (!record) {
+      blockers.push(`${name}-approval-missing`);
+      continue;
+    }
     if (record.status !== "approved") blockers.push(`${name}-not-approved`);
     if (!/^sha256:[a-f0-9]{64}$/.test(record.artifactSha256)) blockers.push(`${name}-artifact-not-locked`);
     if (!record.approver || !record.approvedAt || !record.authenticatedReference) blockers.push(`${name}-approval-incomplete`);
