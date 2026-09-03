@@ -34,7 +34,12 @@ test('release-promotion verification remains exact-head, pinned, and non-deployi
   assert.match(workflow, /urai-storytime-deployment-evidence-v1/);
   assert.match(workflow, /evidence\.smokeVerified !== true/);
   assert.match(workflow, /evidence\.rollbackTested !== true/);
-  assert.match(workflow, /verifyRunAndArtifact\(evidence\.rollbackTestRunUrl, evidence\.rollbackTestArtifactName, 'Rollback test', true\)/);
+  assert.match(workflow, /\.github\/workflows\/protected-deployment\.yml/);
+  assert.match(workflow, /\.github\/workflows\/protected-rollback-test\.yml/);
+  assert.match(workflow, /run\.event !== 'workflow_dispatch'/);
+  assert.match(workflow, /retained\.digest !== artifactDigest/);
+  assert.match(workflow, /deploymentArtifactDigest/);
+  assert.match(workflow, /rollbackTestArtifactDigest/);
   assert.match(workflow, /Rollback evidence SHA-256/);
   assert.match(workflow, /Deployment performed by workflow: false/);
   assert.match(workflow, /Provider mutation performed by workflow: false/);
