@@ -271,6 +271,10 @@ export const upsertFiniteTimeCanonRegistry = onCall(async (request) => {
     }
 
     if (existing) {
+      if (existing.sourceAuthority.revision === registry.sourceAuthority.revision
+        && JSON.stringify(existing) !== JSON.stringify(registry)) {
+        throw new HttpsError("failed-precondition", "Canon revisions are immutable; changed canon content requires a new sourceAuthority revision.");
+      }
       const existingRevisionRef = revisionRef(existing.sourceAuthority.revision);
       const existingRevisionSnapshot = existing.sourceAuthority.revision === registry.sourceAuthority.revision
         ? targetRevisionSnapshot
@@ -280,7 +284,7 @@ export const upsertFiniteTimeCanonRegistry = onCall(async (request) => {
         if (!retained.success || JSON.stringify(retained.data) !== JSON.stringify(existing)) {
           throw new HttpsError("failed-precondition", "Retained canon revision history is inconsistent and requires controlled repair.");
         }
-      } else {
+      } else if (existing.sourceAuthority.revision !== registry.sourceAuthority.revision) {
         transaction.create(existingRevisionRef, existing);
       }
     }
