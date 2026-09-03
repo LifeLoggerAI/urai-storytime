@@ -188,14 +188,12 @@ service cloud.firestore {
     }
 
     match /finiteTimeCanonRegistries/{id} {
-      allow create: if privateFiniteTimeCreate();
       allow read, delete: if privateFiniteTimeExisting();
-      allow update: if privateFiniteTimeUpdate();
+      allow create, update: if false;
     }
     match /finiteTimeShotGraphs/{id} {
-      allow create: if privateFiniteTimeCreate() && request.resource.data.renderMode == 'deterministic-local-proof';
       allow read, delete: if privateFiniteTimeExisting();
-      allow update: if privateFiniteTimeUpdate() && request.resource.data.renderMode == 'deterministic-local-proof';
+      allow create, update: if false;
     }
 
     match /{document=**} { allow read, write: if false; }
