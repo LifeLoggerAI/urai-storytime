@@ -15,17 +15,68 @@ const privateDocument = z.object({
 
 const canonRegistrySchema = privateDocument.extend({
   schemaVersion: z.literal("finite-time-canon-registry-v1"),
+  title: z.string().min(1).max(160),
+  sourceAuthority: z.object({
+    type: z.literal("private-drive"),
+    documentId: z.string().regex(/^drv_ft_[a-z0-9_]{6,96}$/),
+    revision: z.string().min(1).max(80)
+  }).strict(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
   entries: z.array(z.object({
     id: stableId,
     projectId: stableId,
+    version: z.number().int().positive(),
     ownerId: z.string().min(1).max(128),
-    privacyClass: z.literal("owner-only"),
+    kind: z.enum(["event", "person-role", "animal", "location", "vehicle", "prop", "technology", "theme", "sound-memory"]),
+    title: z.string().min(1).max(160),
+    summary: z.string().min(1).max(1200),
+    privacyClass: z.enum(["owner-only", "approved-reviewers", "redacted-handoff", "public-safe"]),
     truthClass: z.enum(["exact", "approximate", "family-memory", "reconstructed", "disputed", "private", "pending"]),
+    rightsState: z.enum(["owner-controlled", "permission-pending", "approved", "anonymize", "exclude", "not-applicable"]),
+    chronology: z.object({
+      era: z.string().min(1).max(80),
+      year: z.number().int().min(1900).max(2100).optional(),
+      ageMin: z.number().int().min(0).max(120).optional(),
+      ageMax: z.number().int().min(0).max(120).optional(),
+      uncertaintyNote: z.string().max(300).optional()
+    }).strict(),
+    participantRoleIds: z.array(stableId).max(24),
     evidenceRefs: z.array(z.object({
       id: z.string().regex(/^drv_ft_[a-z0-9_]{6,96}$/),
-      access: z.enum(["owner-only", "approved-reviewers"])
-    }).passthrough())
-  }).passthrough()).min(1)
+      kind: z.enum(["photo", "map", "record", "firsthand-memory", "family-memory", "type-reference", "audio", "video", "document"]),
+      truthClass: z.enum(["exact", "approximate", "family-memory", "reconstructed", "disputed", "private", "pending", "type-reference"]),
+      access: z.enum(["owner-only", "approved-reviewers"]),
+      contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/).optional()
+    }).strict()).max(32),
+    consent: z.object({
+      autobiographicalUse: z.boolean(),
+      likenessUse: z.enum(["not-required", "pending", "approved", "stylize", "exclude"]),
+      voiceUse: z.enum(["not-required", "pending", "approved", "exclude"]),
+      publicRelease: z.enum(["blocked", "pending", "approved"]),
+      capturedAt: z.string().datetime({ offset: true }),
+      authority: z.enum(["founder", "participant", "rights-counsel", "system-default"])
+    }).strict(),
+    dignity: z.object({
+      sensitiveTopics: z.array(z.enum([
+        "none", "grief", "suicide-loss", "combat", "medical", "disability", "addiction",
+        "incarceration", "homelessness", "aging", "dementia"
+      ])),
+      depiction: z.enum(["ordinary", "restrained", "impressionistic", "off-screen", "exclude"]),
+      guardrails: z.array(z.string().min(1).max(240)).max(12)
+    }).strict(),
+    tags: z.array(stableId).max(24),
+    reviewState: z.enum(["draft", "needs-founder-review", "approved-for-animatic", "approved-for-final-render", "rejected", "archived"]),
+    createdAt: z.string().datetime({ offset: true }),
+    updatedAt: z.string().datetime({ offset: true })
+  }).strict().superRefine((entry, context) => {
+    if (entry.chronology.ageMin !== undefined && entry.chronology.ageMax !== undefined && entry.chronology.ageMin > entry.chronology.ageMax) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["chronology", "ageMin"], message: "ageMin cannot exceed ageMax." });
+    }
+    if (entry.privacyClass === "public-safe" && entry.consent.publicRelease !== "approved") {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["consent", "publicRelease"], message: "Public-safe canon requires approved public release consent." });
+    }
+  })).min(1)
 }).superRefine((registry, context) => {
   const entryIds = new Set<string>();
   registry.entries.forEach((entry, index) => {
