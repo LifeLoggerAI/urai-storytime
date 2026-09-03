@@ -135,7 +135,7 @@ jobs:
           };
 
           await verifyRunAndArtifact(evidence.deploymentRunUrl, evidence.deploymentArtifactName, 'Deployment', true);
-          await verifyRunAndArtifact(evidence.rollbackTestRunUrl, evidence.rollbackTestArtifactName, 'Rollback test', false);
+          await verifyRunAndArtifact(evidence.rollbackTestRunUrl, evidence.rollbackTestArtifactName, 'Rollback test', true);
 
           console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
           NODE
