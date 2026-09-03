@@ -166,6 +166,7 @@ export const FARM_TO_LAKE_SHOT_GRAPH = FiniteTimeShotGraphSchema.parse({
   version: 1,
   ownerId: OWNER_ID,
   title: "FINITE TIME — Farm to Lake deterministic animatic",
+  canonRevision: FARM_TO_LAKE_CANON_REGISTRY.sourceAuthority.revision,
   privacyClass: "owner-only",
   renderMode: "deterministic-local-proof",
   finalRenderingAuthorized: false,
