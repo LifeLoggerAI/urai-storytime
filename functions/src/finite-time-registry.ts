@@ -15,7 +15,7 @@ const privateDocument = z.object({
   ownerId: z.string().min(1).max(128),
   privacyClass: z.literal("owner-only"),
   finalRenderingAuthorized: z.literal(false)
-}).passthrough();
+}).strict();
 
 const canonRegistrySchema = privateDocument.extend({
   schemaVersion: z.literal("finite-time-canon-registry-v1"),
