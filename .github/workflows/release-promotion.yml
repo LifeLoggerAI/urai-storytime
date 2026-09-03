@@ -108,6 +108,8 @@ jobs:
           if (!isHttps(evidence.rollbackTestRunUrl)) throw new Error('Rollback evidence requires a rollback test run URL.');
           if (typeof evidence.deploymentArtifactName !== 'string' || evidence.deploymentArtifactName.length < 8) throw new Error('Rollback evidence requires an immutable deployment artifact name.');
           if (typeof evidence.rollbackTestArtifactName !== 'string' || evidence.rollbackTestArtifactName.length < 8) throw new Error('Rollback evidence requires an immutable rollback-test artifact name.');
+          if (!/^sha256:[a-f0-9]{64}$/.test(evidence.deploymentArtifactDigest ?? '')) throw new Error('Rollback evidence requires the deployment artifact digest.');
+          if (!/^sha256:[a-f0-9]{64}$/.test(evidence.rollbackTestArtifactDigest ?? '')) throw new Error('Rollback evidence requires the rollback-test artifact digest.');
 
           const repository = process.env.GITHUB_REPOSITORY;
           const apiUrl = process.env.GITHUB_API_URL;
@@ -122,20 +124,34 @@ jobs:
             if (!response.ok) throw new Error(`GitHub evidence lookup failed (${response.status}).`);
             return response.json();
           };
-          const verifyRunAndArtifact = async (runUrl, artifactName, kind, requireRollbackHead) => {
+          const verifyRunAndArtifact = async (runUrl, artifactName, artifactDigest, kind, trustedWorkflowPath) => {
             const runId = runIdFromUrl(runUrl, `${kind} run URL`);
             const run = await github(`/repos/${repository}/actions/runs/${runId}`);
             if (run.conclusion !== 'success' || run.status !== 'completed') throw new Error(`${kind} run is not successful and terminal.`);
-            if (requireRollbackHead && String(run.head_sha).toLowerCase() !== expected.deployedSha) throw new Error(`${kind} run is not bound to the rollback SHA.`);
+            if (String(run.head_sha).toLowerCase() !== expected.deployedSha) throw new Error(`${kind} run is not bound to the rollback SHA.`);
+            if (run.event !== 'workflow_dispatch' || run.path !== trustedWorkflowPath) throw new Error(`${kind} run is not from the trusted protected workflow.`);
             const artifacts = await github(`/repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`);
             const retained = artifacts.artifacts?.find((artifact) => artifact.name === artifactName && artifact.expired === false);
             if (!retained) throw new Error(`${kind} retained artifact is missing or expired.`);
+            if (retained.digest !== artifactDigest) throw new Error(`${kind} artifact digest does not match the approved immutable manifest.`);
             const binding = `${expected.environment}-${expected.deployedSha}`;
             if (!artifactName.toLowerCase().includes(binding)) throw new Error(`${kind} artifact name is not bound to environment and rollback SHA.`);
           };
 
-          await verifyRunAndArtifact(evidence.deploymentRunUrl, evidence.deploymentArtifactName, 'Deployment', true);
-          await verifyRunAndArtifact(evidence.rollbackTestRunUrl, evidence.rollbackTestArtifactName, 'Rollback test', true);
+          await verifyRunAndArtifact(
+            evidence.deploymentRunUrl,
+            evidence.deploymentArtifactName,
+            evidence.deploymentArtifactDigest,
+            'Deployment',
+            '.github/workflows/protected-deployment.yml'
+          );
+          await verifyRunAndArtifact(
+            evidence.rollbackTestRunUrl,
+            evidence.rollbackTestArtifactName,
+            evidence.rollbackTestArtifactDigest,
+            'Rollback test',
+            '.github/workflows/protected-rollback-test.yml'
+          );
 
           console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
           NODE
