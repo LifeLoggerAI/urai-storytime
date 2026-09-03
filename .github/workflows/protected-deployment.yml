@@ -1,0 +1,136 @@
+name: URAI Storytime Protected Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected target environment.
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      base_url:
+        description: Exact HTTPS URL expected after deployment.
+        required: true
+        type: string
+      confirm:
+        description: Type DEPLOY_STORYTIME to authorize this exact revision.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: storytime-protected-deployment-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ github.sha }}
+  TARGET_ENVIRONMENT: ${{ inputs.environment }}
+  BASE_URL: ${{ inputs.base_url }}
+  PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Deploy exact protected revision
+    if: github.ref == 'refs/heads/main' && inputs.confirm == 'DEPLOY_STORYTIME'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact dispatched revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove immutable source and bounded target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$BASE_URL" =~ ^https://[^[:space:]]+$ ]]
+          test -n "$PROJECT_ID"
+
+      - name: Authenticate with short-lived Google WIF
+        id: google_auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_STORYTIME_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Verify and build exact dependency graphs
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit
+          npm --prefix functions ci --no-audit
+          npm run validate:release-promotion
+          npm run build
+          npm --prefix functions run build
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Deploy exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes firebase-tools@14.12.0 deploy             --project "$PROJECT_ID"             --only firestore:rules,firestore:indexes,storage,functions,hosting             --non-interactive
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+
+      - name: Verify live protected target
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 30 "$BASE_URL/storytime" >/dev/null
+          curl --fail --silent --show-error --location --max-time 30 "$BASE_URL/storytime/settings" >/dev/null
+
+      - name: Write immutable deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-receipt
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const receipt = {
+            schemaVersion: 'urai-storytime-protected-run-v1',
+            role: 'deployment',
+            result: 'success',
+            environment: process.env.TARGET_ENVIRONMENT,
+            deployedSha: process.env.TARGET_SHA,
+            deploymentUrl: process.env.BASE_URL,
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            workflowPath: '.github/workflows/protected-deployment.yml',
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            runUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          };
+          writeFileSync('release-receipt/manifest.json', JSON.stringify(receipt, null, 2) + '\n');
+          NODE
+
+      - name: Upload immutable deployment receipt
+        id: upload_receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storytime-deployment-${{ env.TARGET_ENVIRONMENT }}-${{ env.TARGET_SHA }}
+          path: release-receipt/manifest.json
+          if-no-files-found: error
+          retention-days: 365
