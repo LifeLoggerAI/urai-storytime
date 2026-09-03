@@ -3,6 +3,8 @@ export type FiniteTimeApprovalStatus = "approved" | "not-approved";
 export interface FiniteTimeApprovalRecord {
   artifactId: string;
   artifactSha256: `sha256:${string}`;
+  sourceCommit: string;
+  sourceManifestSha256: `sha256:${string}`;
   approver: string;
   approvedAt: string;
   authenticatedReference: string;
@@ -19,6 +21,8 @@ export interface FiniteTimeProviderAuthorization {
   maxCostPerCallUsd: number;
   maxPhaseCostUsd: number;
   retentionPolicy: string;
+  retentionPolicyReference: string;
+  retentionPolicySha256: `sha256:${string}`;
   trainingUse: "prohibited" | "allowed";
   commercialUseReviewed: boolean;
   likenessRestrictionsReviewed: boolean;
@@ -78,6 +82,8 @@ function pending(artifactId: string): FiniteTimeApprovalRecord {
   return {
     artifactId,
     artifactSha256: "sha256:",
+    sourceCommit: "",
+    sourceManifestSha256: "sha256:",
     approver: "",
     approvedAt: "",
     authenticatedReference: "",
@@ -110,6 +116,15 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
     "scoreDirection",
     "privacyRetention"
   ] as const;
+  const expectedArtifactIds: Record<(typeof requiredApprovals)[number], string> = {
+    animatic: "animatic",
+    likeness: "likeness",
+    rightsAndConsent: "rights-and-consent",
+    narration: "narration",
+    narratorVoice: "narrator-voice",
+    scoreDirection: "score-direction",
+    privacyRetention: "privacy-retention"
+  };
   const approvals = authorization.approvals as Partial<Record<(typeof requiredApprovals)[number], FiniteTimeApprovalRecord>>;
   for (const name of requiredApprovals) {
     const record = approvals?.[name];
@@ -118,7 +133,12 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
       continue;
     }
     if (record.status !== "approved") blockers.push(`${name}-not-approved`);
+    if (record.artifactId !== expectedArtifactIds[name]) blockers.push(`${name}-artifact-id-mismatch`);
     if (!/^sha256:[a-f0-9]{64}$/.test(record.artifactSha256)) blockers.push(`${name}-artifact-not-locked`);
+    if (record.sourceCommit !== authorization.sourceCommit
+      || record.sourceManifestSha256 !== authorization.sourceManifestSha256) {
+      blockers.push(`${name}-source-revision-mismatch`);
+    }
     if (!record.approver || !record.approvedAt || !record.authenticatedReference) blockers.push(`${name}-approval-incomplete`);
   }
 
@@ -153,6 +173,14 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
       }
     }
     if (provider.trainingUse !== "prohibited") blockers.push("provider-training-use-not-prohibited");
+    if (typeof provider.retentionPolicy !== "string"
+      || provider.retentionPolicy.trim().length < 10
+      || typeof provider.retentionPolicyReference !== "string"
+      || !provider.retentionPolicyReference.trim()
+      || typeof provider.retentionPolicySha256 !== "string"
+      || !/^sha256:[a-f0-9]{64}$/.test(provider.retentionPolicySha256)) {
+      blockers.push("provider-retention-policy-not-approved");
+    }
     if (!provider.commercialUseReviewed || !provider.likenessRestrictionsReviewed) blockers.push("provider-terms-review-incomplete");
     if (provider.acceptanceCriteria.length === 0) blockers.push("provider-acceptance-criteria-missing");
   }

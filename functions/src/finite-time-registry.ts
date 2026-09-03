@@ -1,11 +1,15 @@
 import { getApps, initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 
 if (getApps().length === 0) initializeApp();
 
 const stableId = z.string().min(3).max(96).regex(/^[a-z0-9][a-z0-9-]*$/);
+const isoDate = z.string().datetime({ offset: true });
+const truthClass = z.enum(["exact", "approximate", "family-memory", "reconstructed", "disputed", "private", "pending"]);
+const privacyClass = z.enum(["owner-only", "approved-reviewers", "redacted-handoff", "public-safe"]);
+const rightsState = z.enum(["owner-controlled", "permission-pending", "approved", "anonymize", "exclude", "not-applicable"]);
 const privateDocument = z.object({
   projectId: stableId,
   ownerId: z.string().min(1).max(128),
@@ -21,8 +25,8 @@ const canonRegistrySchema = privateDocument.extend({
     documentId: z.string().regex(/^drv_ft_[a-z0-9_]{6,96}$/),
     revision: z.string().min(1).max(80)
   }).strict(),
-  createdAt: z.string().datetime({ offset: true }),
-  updatedAt: z.string().datetime({ offset: true }),
+  createdAt: isoDate,
+  updatedAt: isoDate,
   entries: z.array(z.object({
     id: stableId,
     projectId: stableId,
@@ -31,9 +35,9 @@ const canonRegistrySchema = privateDocument.extend({
     kind: z.enum(["event", "person-role", "animal", "location", "vehicle", "prop", "technology", "theme", "sound-memory"]),
     title: z.string().min(1).max(160),
     summary: z.string().min(1).max(1200),
-    privacyClass: z.enum(["owner-only", "approved-reviewers", "redacted-handoff", "public-safe"]),
-    truthClass: z.enum(["exact", "approximate", "family-memory", "reconstructed", "disputed", "private", "pending"]),
-    rightsState: z.enum(["owner-controlled", "permission-pending", "approved", "anonymize", "exclude", "not-applicable"]),
+    privacyClass,
+    truthClass,
+    rightsState,
     chronology: z.object({
       era: z.string().min(1).max(80),
       year: z.number().int().min(1900).max(2100).optional(),
@@ -54,7 +58,7 @@ const canonRegistrySchema = privateDocument.extend({
       likenessUse: z.enum(["not-required", "pending", "approved", "stylize", "exclude"]),
       voiceUse: z.enum(["not-required", "pending", "approved", "exclude"]),
       publicRelease: z.enum(["blocked", "pending", "approved"]),
-      capturedAt: z.string().datetime({ offset: true }),
+      capturedAt: isoDate,
       authority: z.enum(["founder", "participant", "rights-counsel", "system-default"])
     }).strict(),
     dignity: z.object({
@@ -67,8 +71,8 @@ const canonRegistrySchema = privateDocument.extend({
     }).strict(),
     tags: z.array(stableId).max(24),
     reviewState: z.enum(["draft", "needs-founder-review", "approved-for-animatic", "approved-for-final-render", "rejected", "archived"]),
-    createdAt: z.string().datetime({ offset: true }),
-    updatedAt: z.string().datetime({ offset: true })
+    createdAt: isoDate,
+    updatedAt: isoDate
   }).strict().superRefine((entry, context) => {
     if (entry.chronology.ageMin !== undefined && entry.chronology.ageMax !== undefined && entry.chronology.ageMin > entry.chronology.ageMax) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["chronology", "ageMin"], message: "ageMin cannot exceed ageMax." });
@@ -93,23 +97,82 @@ const canonRegistrySchema = privateDocument.extend({
 const shotGraphSchema = privateDocument.extend({
   schemaVersion: z.literal("finite-time-shot-graph-v1"),
   chapterId: stableId,
+  version: z.number().int().positive(),
+  title: z.string().min(1).max(160),
   renderMode: z.literal("deterministic-local-proof"),
   targetDurationSeconds: z.number().positive(),
+  sequences: z.array(z.object({
+    id: stableId,
+    order: z.number().int().positive(),
+    title: z.string().min(1).max(160)
+  }).strict()).min(1),
   scenes: z.array(z.object({
     id: stableId,
+    sequenceId: stableId,
+    order: z.number().int().positive(),
+    title: z.string().min(1).max(160),
+    purpose: z.string().min(1).max(800),
+    emotionalArc: z.object({
+      enter: z.string().min(1).max(80),
+      turn: z.string().min(1).max(80),
+      exit: z.string().min(1).max(80)
+    }).strict(),
     shots: z.array(z.object({
       id: stableId,
       sceneId: stableId,
-      durationSeconds: z.number().positive(),
+      order: z.number().int().positive(),
+      durationSeconds: z.number().positive().max(90),
+      title: z.string().min(1).max(160),
+      visual: z.string().min(1).max(1000),
+      camera: z.object({
+        framing: z.enum(["extreme-wide", "wide", "medium", "close", "extreme-close", "pov", "aerial"]),
+        movement: z.enum(["locked", "push", "pull", "pan", "tilt", "track", "orbit", "handheld", "crane"]),
+        lensMm: z.number().int().min(14).max(200)
+      }).strict(),
+      narration: z.string().max(1200),
+      dialogue: z.array(z.object({ speakerRoleId: stableId, line: z.string().min(1).max(500) }).strict()),
+      canonEntryIds: z.array(stableId).min(1).max(24),
+      characterRoleIds: z.array(stableId).max(16),
+      locationId: stableId,
+      propIds: z.array(stableId).max(20),
+      musicCueId: stableId,
+      foley: z.array(z.string().min(1).max(160)).max(20),
+      caption: z.string().max(1200),
+      audioDescription: z.string().min(1).max(800),
+      haptics: z.array(z.object({
+        atSeconds: z.number().min(0),
+        pattern: z.enum(["soft-pulse", "double-pulse", "rising", "impact", "texture", "none"]),
+        intensity: z.number().min(0).max(1)
+      }).strict()),
+      truthClass,
+      rightsState,
+      privacyClass,
       renderMethod: z.literal("deterministic-local-proof"),
-      reviewState: z.literal("approved-for-animatic"),
-      canonEntryIds: z.array(stableId).min(1)
-    }).passthrough()).min(1)
-  }).passthrough()).min(1)
+      reviewState: z.enum(["draft", "approved-for-animatic", "rejected"])
+    }).strict().superRefine((shot, context) => {
+      shot.haptics.forEach((cue, index) => {
+        if (cue.atSeconds > shot.durationSeconds) {
+          context.addIssue({ code: z.ZodIssueCode.custom, path: ["haptics", index, "atSeconds"], message: "Haptic cue cannot occur after the shot ends." });
+        }
+      });
+    })).min(1)
+  }).strict()).min(1),
+  createdAt: isoDate,
+  updatedAt: isoDate
 }).superRefine((graph, context) => {
+  const sequenceIds = new Set<string>();
+  graph.sequences.forEach((sequence, sequenceIndex) => {
+    if (sequenceIds.has(sequence.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["sequences", sequenceIndex, "id"], message: "Duplicate sequence ID." });
+    }
+    sequenceIds.add(sequence.id);
+  });
   const sceneIds = new Set<string>();
   const shotIds = new Set<string>();
   graph.scenes.forEach((scene, sceneIndex) => {
+    if (!sequenceIds.has(scene.sequenceId)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", sceneIndex, "sequenceId"], message: "Scene references an unknown sequence ID." });
+    }
     if (sceneIds.has(scene.id)) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", sceneIndex, "id"], message: "Duplicate scene ID." });
     }
@@ -171,7 +234,7 @@ export const upsertFiniteTimeCanonRegistry = onCall(async (request) => {
     ownerId,
     providerSpendAuthorized: false,
     finalRenderingAuthorized: false,
-    updatedAt: FieldValue.serverTimestamp()
+    updatedAt: registry.updatedAt
   }, { merge: true });
   return { registryId: id, privateByDefault: true, finalRenderingAuthorized: false };
 });
@@ -196,7 +259,7 @@ export const upsertFiniteTimeShotGraph = onCall(async (request) => {
     ownerId,
     providerSpendAuthorized: false,
     finalRenderingAuthorized: false,
-    updatedAt: FieldValue.serverTimestamp()
+    updatedAt: graph.updatedAt
   }, { merge: true });
   return { shotGraphId: id, animaticOnly: true, finalRenderingAuthorized: false };
 });

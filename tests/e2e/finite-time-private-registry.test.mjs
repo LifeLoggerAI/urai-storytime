@@ -78,7 +78,11 @@ test('final render authorization requires signed checksum-locked approvals and n
     'provider-call-cost-exceeds-per-shot-ceiling',
     'provider-phase-cost-exceeds-project-ceiling',
     'provider-call-budget-exceeds-phase-ceiling',
-    'provider-phase-total-exceeds-project-ceiling'
+    'provider-phase-total-exceeds-project-ceiling',
+    'artifact-id-mismatch',
+    'source-revision-mismatch',
+    'provider-retention-policy-not-approved',
+    'retentionPolicySha256'
   ]);
   assert.doesNotMatch(authorization, /finalRenderingAuthorized:\s*true/);
 });
@@ -96,8 +100,15 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'storedCanonGraphBlockers',
     'Shot sceneId must match its parent scene.',
     'references unknown canon entry',
-    'A valid private canon registry must exist before its shot graph can be stored.'
+    'A valid private canon registry must exist before its shot graph can be stored.',
+    'updatedAt: registry.updatedAt',
+    'updatedAt: graph.updatedAt',
+    'version: z.number().int().positive()',
+    'sequenceId: stableId',
+    'audioDescription: z.string().min(1).max(800)',
+    'Haptic cue cannot occur after the shot ends.'
   ]);
+  assert.doesNotMatch(functions, /FieldValue\.serverTimestamp\(\)/);
   includesAll(functionsIndex, [
     'upsertFiniteTimeCanonRegistry',
     'upsertFiniteTimeShotGraph',
