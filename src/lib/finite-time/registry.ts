@@ -44,6 +44,7 @@ export function evaluateFiniteTimeReadiness(
   if (!canonValid) blockers.push("Canon registry failed schema validation.");
   if (!shotGraphValid) blockers.push("Shot graph failed schema validation.");
   if (canon.ownerId !== graph.ownerId || canon.projectId !== graph.projectId) blockers.push("Canon and shot graph authority do not match.");
+  if (canon.sourceAuthority.revision !== graph.canonRevision) blockers.push("Shot graph does not match the exact canon revision.");
   if (canon.privacyClass !== "owner-only" || graph.privacyClass !== "owner-only") blockers.push("Private-by-default boundary is not intact.");
   if (canon.finalRenderingAuthorized || graph.finalRenderingAuthorized) blockers.push("Final rendering must remain unauthorized during animatic production.");
 
