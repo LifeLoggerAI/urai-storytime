@@ -113,7 +113,12 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'Haptic cue cannot occur after the shot ends.'
   ]);
   assert.doesNotMatch(functions, /FieldValue\.serverTimestamp\(\)/);
-  assert.doesNotMatch(functions, /providerSpendAuthorized:\s*false/);
+  const persistedWrites = [
+    functions.match(/transaction\.set\(registryRef, \{[\s\S]*?\}, \{ merge: false \}\);/)?.[0] ?? '',
+    functions.match(/\.doc\(id\)\.set\(\{[\s\S]*?\}, \{ merge: false \}\);/)?.[0] ?? ''
+  ];
+  assert.ok(persistedWrites.every(Boolean), 'both finite-time write payloads must be present');
+  for (const payload of persistedWrites) assert.doesNotMatch(payload, /providerSpendAuthorized/);
   includesAll(functionsIndex, [
     'upsertFiniteTimeCanonRegistry',
     'upsertFiniteTimeShotGraph',
@@ -126,7 +131,7 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'request.resource.data.providerSpendAuthorized == false',
     'match /finiteTimeCanonRegistries/{id}',
     'match /finiteTimeShotGraphs/{id}',
-    "request.resource.data.renderMode == 'deterministic-local-proof'"
+    "allow create, update: if false"
   ]);
   assert.doesNotMatch(rules, /match \/finiteTime(?:CanonRegistries|ShotGraphs)\/\{id\}[\s\S]*allow read: if true/);
 });
