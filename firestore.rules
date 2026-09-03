@@ -191,6 +191,9 @@ service cloud.firestore {
       allow read: if privateFiniteTimeExisting();
       allow create, update, delete: if false;
     }
+    match /finiteTimeCanonRegistryRevisions/{id} {
+      allow read, write: if false;
+    }
     match /finiteTimeShotGraphs/{id} {
       allow read, delete: if privateFiniteTimeExisting();
       allow create, update: if false;
