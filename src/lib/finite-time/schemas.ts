@@ -171,7 +171,11 @@ export const FiniteTimeShotGraphSchema = z.object({
   createdAt: IsoDate,
   updatedAt: IsoDate
 }).strict().superRefine((graph, context) => {
-  const sequenceIds = new Set(graph.sequences.map((item) => item.id));
+  const sequenceIds = new Set<string>();
+  graph.sequences.forEach((sequence, sequenceIndex) => {
+    if (sequenceIds.has(sequence.id)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["sequences", sequenceIndex, "id"], message: `Duplicate sequence ID: ${sequence.id}` });
+    sequenceIds.add(sequence.id);
+  });
   const sceneIds = new Set<string>();
   const shotIds = new Set<string>();
   let duration = 0;
