@@ -99,6 +99,7 @@ const shotGraphSchema = privateDocument.extend({
   chapterId: stableId,
   version: z.number().int().positive(),
   title: z.string().min(1).max(160),
+  canonRevision: z.string().min(1).max(80),
   renderMode: z.literal("deterministic-local-proof"),
   targetDurationSeconds: z.number().positive(),
   sequences: z.array(z.object({
@@ -204,9 +205,15 @@ function storedCanonGraphBlockers(canonValue: unknown, graphValue: unknown) {
   if (canon.data.projectId !== graph.data.projectId || canon.data.ownerId !== graph.data.ownerId) {
     blockers.push("Stored canon and shot graph authority do not match.");
   }
+  if (canon.data.sourceAuthority.revision !== graph.data.canonRevision) {
+    blockers.push("Stored shot graph does not match the exact canon revision.");
+  }
   const canonEntryIds = new Set(canon.data.entries.map((entry) => entry.id));
   for (const scene of graph.data.scenes) {
     for (const shot of scene.shots) {
+      if (shot.reviewState !== "approved-for-animatic") {
+        blockers.push(`Shot ${shot.id} is not approved for animatic.`);
+      }
       for (const canonEntryId of shot.canonEntryIds) {
         if (!canonEntryIds.has(canonEntryId)) {
           blockers.push(`Shot ${shot.id} references unknown canon entry ${canonEntryId}.`);
