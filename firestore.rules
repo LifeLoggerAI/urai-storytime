@@ -188,8 +188,8 @@ service cloud.firestore {
     }
 
     match /finiteTimeCanonRegistries/{id} {
-      allow read, delete: if privateFiniteTimeExisting();
-      allow create, update: if false;
+      allow read: if privateFiniteTimeExisting();
+      allow create, update, delete: if false;
     }
     match /finiteTimeShotGraphs/{id} {
       allow read, delete: if privateFiniteTimeExisting();
