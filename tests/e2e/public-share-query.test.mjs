@@ -39,7 +39,9 @@ test('callable lifecycle splits public derivatives from private owner controls',
   assert.match(lifecycle, /schemaVersion: "public-story-share-v2"/);
   assert.match(lifecycle, /collection\("publicStoryShareControls"\)/);
   assert.match(lifecycle, /const expiresAt = Timestamp\.fromMillis/);
-  assert.match(lifecycle, /consentSnapshot\?\.publicSharing !== true/);
+  assert.match(lifecycle, /consent: z\.literal\(true\)/);
+  assert.match(lifecycle, /"consentSnapshot\.publicSharing": true/);
+  assert.match(lifecycle, /publicSharingConsentAt: now/);
   assert.match(lifecycle, /session\.safetyStatus !== "approved"/);
   assert.match(lifecycle, /title: "Shared Story"/);
   assert.match(lifecycle, /safeSummary: "A private Storytime session was shared through a redacted public-safe view\."/);

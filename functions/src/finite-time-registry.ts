@@ -27,10 +27,15 @@ const canonRegistrySchema = privateDocument.extend({
     }).passthrough())
   }).passthrough()).min(1)
 }).superRefine((registry, context) => {
+  const entryIds = new Set<string>();
   registry.entries.forEach((entry, index) => {
     if (entry.projectId !== registry.projectId || entry.ownerId !== registry.ownerId) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["entries", index], message: "Entry authority mismatch." });
     }
+    if (entryIds.has(entry.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["entries", index, "id"], message: "Duplicate canon entry ID." });
+    }
+    entryIds.add(entry.id);
   });
 });
 
@@ -51,11 +56,52 @@ const shotGraphSchema = privateDocument.extend({
     }).passthrough()).min(1)
   }).passthrough()).min(1)
 }).superRefine((graph, context) => {
+  const sceneIds = new Set<string>();
+  const shotIds = new Set<string>();
+  graph.scenes.forEach((scene, sceneIndex) => {
+    if (sceneIds.has(scene.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", sceneIndex, "id"], message: "Duplicate scene ID." });
+    }
+    sceneIds.add(scene.id);
+    scene.shots.forEach((shot, shotIndex) => {
+      if (shot.sceneId !== scene.id) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", sceneIndex, "shots", shotIndex, "sceneId"], message: "Shot sceneId must match its parent scene." });
+      }
+      if (shotIds.has(shot.id)) {
+        context.addIssue({ code: z.ZodIssueCode.custom, path: ["scenes", sceneIndex, "shots", shotIndex, "id"], message: "Duplicate shot ID." });
+      }
+      shotIds.add(shot.id);
+    });
+  });
   const duration = graph.scenes.flatMap((scene) => scene.shots).reduce((sum, shot) => sum + shot.durationSeconds, 0);
   if (Math.abs(duration - graph.targetDurationSeconds) > 0.001) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["targetDurationSeconds"], message: "Shot duration total mismatch." });
   }
 });
+
+function storedCanonGraphBlockers(canonValue: unknown, graphValue: unknown) {
+  const canon = canonRegistrySchema.safeParse(canonValue);
+  const graph = shotGraphSchema.safeParse(graphValue);
+  const blockers: string[] = [];
+  if (!canon.success) blockers.push("Stored canon registry failed schema validation.");
+  if (!graph.success) blockers.push("Stored shot graph failed schema validation.");
+  if (!canon.success || !graph.success) return blockers;
+
+  if (canon.data.projectId !== graph.data.projectId || canon.data.ownerId !== graph.data.ownerId) {
+    blockers.push("Stored canon and shot graph authority do not match.");
+  }
+  const canonEntryIds = new Set(canon.data.entries.map((entry) => entry.id));
+  for (const scene of graph.data.scenes) {
+    for (const shot of scene.shots) {
+      for (const canonEntryId of shot.canonEntryIds) {
+        if (!canonEntryIds.has(canonEntryId)) {
+          blockers.push(`Shot ${shot.id} references unknown canon entry ${canonEntryId}.`);
+        }
+      }
+    }
+  }
+  return [...new Set(blockers)];
+}
 
 function requireOwner(request: { auth?: { uid: string } | null }, ownerId: string) {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Authentication is required.");
@@ -84,8 +130,17 @@ export const upsertFiniteTimeShotGraph = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid FINITE TIME shot graph.");
   const graph = parsed.data;
   const ownerId = requireOwner(request, graph.ownerId);
+  const db = getFirestore();
+  const canon = await db.collection("finiteTimeCanonRegistries").doc(`${graph.projectId}-${ownerId}`).get();
+  if (!canon.exists) {
+    throw new HttpsError("failed-precondition", "A valid private canon registry must exist before its shot graph can be stored.");
+  }
+  const consistencyBlockers = storedCanonGraphBlockers(canon.data(), graph);
+  if (consistencyBlockers.length > 0) {
+    throw new HttpsError("failed-precondition", `Shot graph is incompatible with the stored canon registry: ${consistencyBlockers.join(" ")}`);
+  }
   const id = `${graph.projectId}-${graph.chapterId}-${ownerId}`;
-  await getFirestore().collection("finiteTimeShotGraphs").doc(id).set({
+  await db.collection("finiteTimeShotGraphs").doc(id).set({
     ...graph,
     ownerId,
     providerSpendAuthorized: false,
@@ -110,9 +165,7 @@ export const getFiniteTimeProductionReadiness = onCall(async (request) => {
   const blockers: string[] = [];
   if (!canon.exists) blockers.push("Private canon registry is missing.");
   if (!graph.exists) blockers.push("Shot graph is missing.");
-  if (canonData?.privacyClass !== "owner-only" || graphData?.privacyClass !== "owner-only") blockers.push("Private boundary is not intact.");
-  if (canonData?.finalRenderingAuthorized !== false || graphData?.finalRenderingAuthorized !== false) blockers.push("Final rendering authorization must remain false.");
-  if (graphData?.renderMode !== "deterministic-local-proof") blockers.push("Shot graph is not deterministic local proof mode.");
+  if (canon.exists && graph.exists) blockers.push(...storedCanonGraphBlockers(canonData, graphData));
   return {
     projectId: input.data.projectId,
     chapterId: input.data.chapterId,

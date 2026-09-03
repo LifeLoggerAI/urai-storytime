@@ -92,6 +92,7 @@ test('public sharing uses content-neutral expiring derivatives and private owner
 
   includesAll(shareLifecycle, [
     'expiresInDays',
+    'consent: z.literal(true)',
     'Timestamp.fromMillis',
     'Public sharing consent is required',
     'Only safety-approved stories can be shared',
@@ -101,6 +102,8 @@ test('public sharing uses content-neutral expiring derivatives and private owner
     'title: "Shared Story"',
     'safeSummary',
     'safeBody',
+    '"consentSnapshot.publicSharing": true',
+    'publicSharingConsentAt: now',
     'public_safe',
     'FieldValue.delete()',
     'visibility: "private"'
@@ -168,4 +171,3 @@ test('session routes require real ids while runtime readiness preserves the non-
     'Production deploy target, smoke evidence, rollback evidence, and secrets are not verified'
   ]);
 });
-

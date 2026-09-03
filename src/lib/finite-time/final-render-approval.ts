@@ -111,13 +111,32 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
 
   let approvedCallCount = 0;
   let approvedRetryCount = 0;
+  let authorizedPhaseTotalUsd = 0;
   for (const provider of authorization.providers) {
     approvedCallCount += provider.maxInitialCalls;
     approvedRetryCount += provider.maxRetries;
     if (!provider.provider || !provider.model || !provider.modelVersion) blockers.push("provider-model-version-incomplete");
-    if (provider.maxInitialCalls <= 0) blockers.push("provider-call-ceiling-missing");
-    if (provider.maxRetries < 0) blockers.push("provider-retry-ceiling-invalid");
-    if (provider.maxCostPerCallUsd <= 0 || provider.maxPhaseCostUsd <= 0) blockers.push("provider-cost-ceiling-missing");
+    if (!Number.isInteger(provider.maxInitialCalls) || provider.maxInitialCalls <= 0) blockers.push("provider-call-ceiling-missing");
+    if (!Number.isInteger(provider.maxRetries) || provider.maxRetries < 0) blockers.push("provider-retry-ceiling-invalid");
+
+    const costInputsAreFinite = Number.isFinite(provider.maxCostPerCallUsd)
+      && Number.isFinite(provider.maxPhaseCostUsd);
+    if (!costInputsAreFinite || provider.maxCostPerCallUsd <= 0 || provider.maxPhaseCostUsd <= 0) {
+      blockers.push("provider-cost-ceiling-missing");
+    } else {
+      authorizedPhaseTotalUsd += provider.maxPhaseCostUsd;
+      if (provider.maxCostPerCallUsd > authorization.perShotCeilingUsd) {
+        blockers.push("provider-call-cost-exceeds-per-shot-ceiling");
+      }
+      if (provider.maxPhaseCostUsd > authorization.absoluteProjectCeilingUsd) {
+        blockers.push("provider-phase-cost-exceeds-project-ceiling");
+      }
+      const worstCaseProviderCostUsd = provider.maxCostPerCallUsd
+        * (provider.maxInitialCalls + provider.maxRetries);
+      if (!Number.isFinite(worstCaseProviderCostUsd) || worstCaseProviderCostUsd > provider.maxPhaseCostUsd) {
+        blockers.push("provider-call-budget-exceeds-phase-ceiling");
+      }
+    }
     if (provider.trainingUse !== "prohibited") blockers.push("provider-training-use-not-prohibited");
     if (!provider.commercialUseReviewed || !provider.likenessRestrictionsReviewed) blockers.push("provider-terms-review-incomplete");
     if (provider.acceptanceCriteria.length === 0) blockers.push("provider-acceptance-criteria-missing");
@@ -125,6 +144,12 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
 
   if (authorization.absoluteProjectCeilingUsd <= 0) blockers.push("absolute-project-ceiling-missing");
   if (authorization.perShotCeilingUsd <= 0) blockers.push("per-shot-ceiling-missing");
+  if (!Number.isFinite(authorization.absoluteProjectCeilingUsd) || !Number.isFinite(authorization.perShotCeilingUsd)) {
+    blockers.push("project-cost-ceiling-invalid");
+  }
+  if (authorizedPhaseTotalUsd > authorization.absoluteProjectCeilingUsd) {
+    blockers.push("provider-phase-total-exceeds-project-ceiling");
+  }
   if (!authorization.authorizedBy || !authorization.authorizedAt || !authorization.authorizationReference) blockers.push("final-authorization-signature-incomplete");
   if (!authorization.finalRenderingAuthorized) blockers.push("final-rendering-not-authorized");
 

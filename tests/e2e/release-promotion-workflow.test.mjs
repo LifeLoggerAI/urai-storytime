@@ -27,6 +27,14 @@ test('release-promotion verification remains exact-head, pinned, and non-deployi
   assert.match(workflow, /npm --prefix functions ci --no-audit/);
   assert.match(workflow, /npm --prefix functions run build/);
   assert.match(workflow, /\[\[ "\$ROLLBACK_SHA" =~ \^\[0-9a-fA-F\]\{40\}\$ \]\]/);
+  assert.match(workflow, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.match(workflow, /git cat-file -e "\$\{ROLLBACK_SHA\}\^\{commit\}"/);
+  assert.match(workflow, /git merge-base --is-ancestor "\$ROLLBACK_SHA" "\$TARGET_SHA"/);
+  assert.match(workflow, /release-evidence\/deployments\/\$\{\{ inputs\.environment \}\}\/\$\{\{ inputs\.rollback_sha \}\}\.json/);
+  assert.match(workflow, /urai-storytime-deployment-evidence-v1/);
+  assert.match(workflow, /evidence\.smokeVerified !== true/);
+  assert.match(workflow, /evidence\.rollbackTested !== true/);
+  assert.match(workflow, /Rollback evidence SHA-256/);
   assert.match(workflow, /Deployment performed by workflow: false/);
   assert.match(workflow, /Provider mutation performed by workflow: false/);
 

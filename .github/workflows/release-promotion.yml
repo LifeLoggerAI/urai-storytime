@@ -47,14 +47,20 @@ jobs:
       - name: Prove exact clean candidate and bounded inputs
         shell: bash
         env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
           BASE_URL: ${{ inputs.base_url }}
           ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+          ROLLBACK_EVIDENCE_PATH: release-evidence/deployments/${{ inputs.environment }}/${{ inputs.rollback_sha }}.json
         run: |
           set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
           test "$(git rev-parse HEAD)" = "$TARGET_SHA"
           test -z "$(git status --porcelain --untracked-files=all)"
           [[ "$BASE_URL" =~ ^https://[^[:space:]]+$ ]]
           [[ "$ROLLBACK_SHA" =~ ^[0-9a-fA-F]{40}$ ]]
+          git cat-file -e "${ROLLBACK_SHA}^{commit}"
+          git merge-base --is-ancestor "$ROLLBACK_SHA" "$TARGET_SHA"
+          test -f "$ROLLBACK_EVIDENCE_PATH"
 
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -64,6 +70,43 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             functions/package-lock.json
+
+      - name: Verify immutable environment rollback evidence
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          BASE_URL: ${{ inputs.base_url }}
+          ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+          ROLLBACK_EVIDENCE_PATH: release-evidence/deployments/${{ inputs.environment }}/${{ inputs.rollback_sha }}.json
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+
+          const evidencePath = process.env.ROLLBACK_EVIDENCE_PATH;
+          const evidenceBytes = readFileSync(evidencePath);
+          const evidence = JSON.parse(evidenceBytes.toString('utf8'));
+          const expected = {
+            environment: process.env.TARGET_ENVIRONMENT,
+            deploymentUrl: process.env.BASE_URL,
+            deployedSha: process.env.ROLLBACK_SHA.toLowerCase(),
+          };
+          const isHttps = (value) => typeof value === 'string' && /^https:\/\/[^\s]+$/.test(value);
+          const isIsoDate = (value) => typeof value === 'string' && Number.isFinite(Date.parse(value));
+
+          if (evidence.schemaVersion !== 'urai-storytime-deployment-evidence-v1') throw new Error('Unsupported rollback evidence schema.');
+          if (evidence.environment !== expected.environment) throw new Error('Rollback evidence environment mismatch.');
+          if (String(evidence.deployedSha ?? '').toLowerCase() !== expected.deployedSha) throw new Error('Rollback evidence SHA mismatch.');
+          if (evidence.deploymentUrl !== expected.deploymentUrl || !isHttps(evidence.deploymentUrl)) throw new Error('Rollback evidence URL mismatch.');
+          if (!isHttps(evidence.deploymentRunUrl)) throw new Error('Rollback evidence requires a deployment run URL.');
+          if (!isIsoDate(evidence.deployedAt)) throw new Error('Rollback evidence requires a deployment timestamp.');
+          if (evidence.smokeVerified !== true) throw new Error('Rollback revision is not smoke verified.');
+          if (evidence.rollbackTested !== true) throw new Error('Rollback revision is not rollback tested.');
+          if (!isHttps(evidence.rollbackTestRunUrl)) throw new Error('Rollback evidence requires a rollback test run URL.');
+
+          console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
+          NODE
 
       - name: Install exact dependency graphs
         shell: bash
@@ -127,9 +170,14 @@ jobs:
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
           BASE_URL: ${{ inputs.base_url }}
           ROLLBACK_SHA: ${{ inputs.rollback_sha }}
+          ROLLBACK_EVIDENCE_PATH: release-evidence/deployments/${{ inputs.environment }}/${{ inputs.rollback_sha }}.json
         run: |
           set -euo pipefail
           mkdir -p ci-receipts
+          rollback_evidence_sha256="missing"
+          if test -f "$ROLLBACK_EVIDENCE_PATH"; then
+            rollback_evidence_sha256="$(sha256sum "$ROLLBACK_EVIDENCE_PATH" | cut -d' ' -f1)"
+          fi
           cat > ci-receipts/storytime-release-promotion.txt <<EOF
           Repository: ${GITHUB_REPOSITORY}
           Workflow: ${GITHUB_WORKFLOW}
@@ -139,6 +187,8 @@ jobs:
           Environment: ${TARGET_ENVIRONMENT}
           Base URL: ${BASE_URL}
           Expected rollback SHA: ${ROLLBACK_SHA}
+          Rollback evidence: ${ROLLBACK_EVIDENCE_PATH}
+          Rollback evidence SHA-256: ${rollback_evidence_sha256}
           Deployment performed by workflow: false
           Provider mutation performed by workflow: false
           Certification: false

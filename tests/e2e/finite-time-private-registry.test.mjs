@@ -74,7 +74,11 @@ test('final render authorization requires signed checksum-locked approvals and n
     'per-shot-ceiling-missing',
     'final-rendering-not-authorized',
     'provider-training-use-not-prohibited',
-    'provider-terms-review-incomplete'
+    'provider-terms-review-incomplete',
+    'provider-call-cost-exceeds-per-shot-ceiling',
+    'provider-phase-cost-exceeds-project-ceiling',
+    'provider-call-budget-exceeds-phase-ceiling',
+    'provider-phase-total-exceeds-project-ceiling'
   ]);
   assert.doesNotMatch(authorization, /finalRenderingAuthorized:\s*true/);
 });
@@ -88,7 +92,11 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'providerSpendAuthorized: false',
     'finalRenderingAuthorized: false',
     'finiteTimeCanonRegistries',
-    'finiteTimeShotGraphs'
+    'finiteTimeShotGraphs',
+    'storedCanonGraphBlockers',
+    'Shot sceneId must match its parent scene.',
+    'references unknown canon entry',
+    'A valid private canon registry must exist before its shot graph can be stored.'
   ]);
   includesAll(functionsIndex, [
     'upsertFiniteTimeCanonRegistry',

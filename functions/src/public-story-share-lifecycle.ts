@@ -10,6 +10,7 @@ if (getApps().length === 0) {
 
 const createShareSchema = z.object({
   sessionId: z.string().min(1),
+  consent: z.literal(true),
   expiresInDays: z.number().int().min(1).max(90).optional()
 });
 
@@ -27,7 +28,7 @@ function requireAuth(request: { auth?: { uid: string } | null }) {
 function parseCreateInput(value: unknown) {
   const parsed = createShareSchema.safeParse(value);
   if (!parsed.success) {
-    throw new HttpsError("invalid-argument", "A valid sessionId and optional 1–90 day expiry are required.");
+    throw new HttpsError("invalid-argument", "Public sharing consent is required; provide a valid sessionId and optional 1–90 day expiry.");
   }
   return parsed.data;
 }
@@ -71,9 +72,6 @@ export const createPublicStoryShare = onCall(async (request) => {
     if (session.userId !== userId) {
       throw new HttpsError("permission-denied", "You do not own this story session.");
     }
-    if (session.consentSnapshot?.publicSharing !== true) {
-      throw new HttpsError("failed-precondition", "Public sharing consent is required.");
-    }
     if (session.safetyStatus !== "approved") {
       throw new HttpsError("failed-precondition", "Only safety-approved stories can be shared.");
     }
@@ -99,6 +97,11 @@ export const createPublicStoryShare = onCall(async (request) => {
         && controlData?.revoked === false
         && activeSanitizedShare(publicData, nowMs)
       ) {
+        transaction.update(sessionRef, {
+          "consentSnapshot.publicSharing": true,
+          publicSharingConsentAt: now,
+          updatedAt: now.toDate().toISOString()
+        });
         return {
           shareId: existingShare.id,
           slug: existingShare.id,
@@ -135,6 +138,8 @@ export const createPublicStoryShare = onCall(async (request) => {
       consentSnapshot: { publicSharing: true }
     });
     transaction.update(sessionRef, {
+      "consentSnapshot.publicSharing": true,
+      publicSharingConsentAt: now,
       publicShareId: slug,
       visibility: "public_safe",
       updatedAt: now.toDate().toISOString()
