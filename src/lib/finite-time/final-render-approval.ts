@@ -110,6 +110,14 @@ export function finiteTimeRetentionPolicySha256(provider: FiniteTimeProviderAuth
   return `sha256:${createHash("sha256").update(payload, "utf8").digest("hex")}`;
 }
 
+export function finiteTimeRetentionManifestSha256(providers: FiniteTimeProviderAuthorization[]): `sha256:${string}` {
+  const policies = providers.map((provider) => ({
+    provider: provider.provider,
+    policySha256: finiteTimeRetentionPolicySha256(provider)
+  })).sort((left, right) => left.provider.localeCompare(right.provider));
+  return `sha256:${createHash("sha256").update(JSON.stringify(policies), "utf8").digest("hex")}`;
+}
+
 export function evaluateFiniteTimeFinalRenderAuthorization(
   authorization: FiniteTimeFinalRenderAuthorization
 ): FiniteTimeAuthorizationEvaluation {
@@ -194,8 +202,6 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
       blockers.push("provider-retention-policy-not-approved");
     } else if (provider.retentionPolicySha256 !== finiteTimeRetentionPolicySha256(provider)) {
       blockers.push("provider-retention-policy-hash-mismatch");
-    } else if (approvals?.privacyRetention?.artifactSha256 !== provider.retentionPolicySha256) {
-      blockers.push("provider-retention-policy-not-bound-to-privacy-approval");
     }
     if (provider.fallbackProvider) {
       if (provider.fallbackProvider === provider.provider || !authorizedProviderNames.has(provider.fallbackProvider)) {
@@ -204,6 +210,11 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
     }
     if (!provider.commercialUseReviewed || !provider.likenessRestrictionsReviewed) blockers.push("provider-terms-review-incomplete");
     if (provider.acceptanceCriteria.length === 0) blockers.push("provider-acceptance-criteria-missing");
+  }
+
+  if (authorization.providers.length > 0
+    && approvals?.privacyRetention?.artifactSha256 !== finiteTimeRetentionManifestSha256(authorization.providers)) {
+    blockers.push("provider-retention-manifest-not-bound-to-privacy-approval");
   }
 
   if (authorization.absoluteProjectCeilingUsd <= 0) blockers.push("absolute-project-ceiling-missing");
