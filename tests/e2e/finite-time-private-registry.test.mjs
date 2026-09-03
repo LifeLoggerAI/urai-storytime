@@ -83,7 +83,7 @@ test('final render authorization requires signed checksum-locked approvals and n
     'artifact-id-mismatch',
     'source-revision-mismatch',
     'provider-retention-policy-not-approved',
-    'provider-retention-policy-not-bound-to-privacy-approval',
+    'provider-retention-manifest-not-bound-to-privacy-approval',
     'fallback-provider-not-authorized',
     'retentionPolicySha256'
   ]);
