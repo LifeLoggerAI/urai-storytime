@@ -149,8 +149,8 @@ jobs:
             evidence.rollbackTestRunUrl,
             evidence.rollbackTestArtifactName,
             evidence.rollbackTestArtifactDigest,
-            'Rollback test',
-            '.github/workflows/protected-rollback-test.yml'
+            'Protected rollback drill',
+            '.github/workflows/protected-rollback-drill.yml'
           );
 
           console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
