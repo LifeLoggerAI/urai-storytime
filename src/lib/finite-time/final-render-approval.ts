@@ -99,6 +99,17 @@ export interface FiniteTimeAuthorizationEvaluation {
   absoluteProjectCeilingUsd: number;
 }
 
+export function finiteTimeRetentionPolicySha256(provider: FiniteTimeProviderAuthorization): `sha256:${string}` {
+  const payload = JSON.stringify({
+    provider: provider.provider,
+    model: provider.model,
+    modelVersion: provider.modelVersion,
+    retentionPolicy: provider.retentionPolicy,
+    retentionPolicyReference: provider.retentionPolicyReference
+  });
+  return `sha256:${createHash("sha256").update(payload, "utf8").digest("hex")}`;
+}
+
 export function evaluateFiniteTimeFinalRenderAuthorization(
   authorization: FiniteTimeFinalRenderAuthorization
 ): FiniteTimeAuthorizationEvaluation {
@@ -180,6 +191,8 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
       || typeof provider.retentionPolicySha256 !== "string"
       || !/^sha256:[a-f0-9]{64}$/.test(provider.retentionPolicySha256)) {
       blockers.push("provider-retention-policy-not-approved");
+    } else if (provider.retentionPolicySha256 !== finiteTimeRetentionPolicySha256(provider)) {
+      blockers.push("provider-retention-policy-hash-mismatch");
     }
     if (!provider.commercialUseReviewed || !provider.likenessRestrictionsReviewed) blockers.push("provider-terms-review-incomplete");
     if (provider.acceptanceCriteria.length === 0) blockers.push("provider-acceptance-criteria-missing");
@@ -204,3 +217,4 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
     absoluteProjectCeilingUsd: authorization.absoluteProjectCeilingUsd
   };
 }
+import { createHash } from "node:crypto";
