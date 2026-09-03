@@ -158,6 +158,7 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
   let approvedCallCount = 0;
   let approvedRetryCount = 0;
   let authorizedPhaseTotalUsd = 0;
+  const authorizedProviderNames = new Set(authorization.providers.map((provider) => provider.provider));
   for (const provider of authorization.providers) {
     approvedCallCount += provider.maxInitialCalls;
     approvedRetryCount += provider.maxRetries;
@@ -193,6 +194,13 @@ export function evaluateFiniteTimeFinalRenderAuthorization(
       blockers.push("provider-retention-policy-not-approved");
     } else if (provider.retentionPolicySha256 !== finiteTimeRetentionPolicySha256(provider)) {
       blockers.push("provider-retention-policy-hash-mismatch");
+    } else if (approvals?.privacyRetention?.artifactSha256 !== provider.retentionPolicySha256) {
+      blockers.push("provider-retention-policy-not-bound-to-privacy-approval");
+    }
+    if (provider.fallbackProvider) {
+      if (provider.fallbackProvider === provider.provider || !authorizedProviderNames.has(provider.fallbackProvider)) {
+        blockers.push("fallback-provider-not-authorized");
+      }
     }
     if (!provider.commercialUseReviewed || !provider.likenessRestrictionsReviewed) blockers.push("provider-terms-review-incomplete");
     if (provider.acceptanceCriteria.length === 0) blockers.push("provider-acceptance-criteria-missing");
