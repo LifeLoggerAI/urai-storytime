@@ -246,22 +246,46 @@ export const upsertFiniteTimeCanonRegistry = onCall(async (request) => {
   const id = `${registry.projectId}-${ownerId}`;
   const db = getFirestore();
   const registryRef = db.collection("finiteTimeCanonRegistries").doc(id);
+  const revisionRef = (revision: string) => db.collection("finiteTimeCanonRegistryRevisions")
+    .doc(`${id}--${Buffer.from(revision, "utf8").toString("base64url")}`);
   await db.runTransaction(async (transaction) => {
     const existingSnapshot = await transaction.get(registryRef);
+    let existing: z.infer<typeof canonRegistrySchema> | null = null;
     if (existingSnapshot.exists) {
       const existingRaw = existingSnapshot.data() ?? {};
       const { providerSpendAuthorized: _legacyProviderSpendAuthorized, ...existingCandidate } = existingRaw;
-      const existing = canonRegistrySchema.safeParse(existingCandidate);
-      if (!existing.success) {
+      const parsedExisting = canonRegistrySchema.safeParse(existingCandidate);
+      if (!parsedExisting.success) {
         throw new HttpsError("failed-precondition", "Existing FINITE TIME canon registry is invalid and requires controlled migration.");
       }
-      if (
-        existing.data.sourceAuthority.revision === registry.sourceAuthority.revision
-        && JSON.stringify(existing.data) !== JSON.stringify(registry)
-      ) {
-        throw new HttpsError("failed-precondition", "Canon revisions are immutable; changed canon content requires a new sourceAuthority revision.");
+      existing = parsedExisting.data;
+    }
+
+    const targetRevisionRef = revisionRef(registry.sourceAuthority.revision);
+    const targetRevisionSnapshot = await transaction.get(targetRevisionRef);
+    if (targetRevisionSnapshot.exists) {
+      const retained = canonRegistrySchema.safeParse(targetRevisionSnapshot.data());
+      if (!retained.success || JSON.stringify(retained.data) !== JSON.stringify(registry)) {
+        throw new HttpsError("failed-precondition", "Canon revisions are immutable and a historical revision cannot be reused with different content.");
       }
     }
+
+    if (existing) {
+      const existingRevisionRef = revisionRef(existing.sourceAuthority.revision);
+      const existingRevisionSnapshot = existing.sourceAuthority.revision === registry.sourceAuthority.revision
+        ? targetRevisionSnapshot
+        : await transaction.get(existingRevisionRef);
+      if (existingRevisionSnapshot.exists) {
+        const retained = canonRegistrySchema.safeParse(existingRevisionSnapshot.data());
+        if (!retained.success || JSON.stringify(retained.data) !== JSON.stringify(existing)) {
+          throw new HttpsError("failed-precondition", "Retained canon revision history is inconsistent and requires controlled repair.");
+        }
+      } else {
+        transaction.create(existingRevisionRef, existing);
+      }
+    }
+
+    if (!targetRevisionSnapshot.exists) transaction.create(targetRevisionRef, registry);
     transaction.set(registryRef, {
       ...registry,
       ownerId,
