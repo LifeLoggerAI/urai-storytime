@@ -194,7 +194,12 @@ const shotGraphSchema = privateDocument.extend({
   }
 });
 
-function storedCanonGraphBlockers(canonValue: unknown, graphValue: unknown) {
+function storedCanonGraphBlockers(
+  canonValue: unknown,
+  graphValue: unknown,
+  options: { requireReadiness?: boolean } = {}
+) {
+  const requireReadiness = options.requireReadiness !== false;
   const canon = canonRegistrySchema.safeParse(canonValue);
   const graph = shotGraphSchema.safeParse(graphValue);
   const blockers: string[] = [];
@@ -208,15 +213,18 @@ function storedCanonGraphBlockers(canonValue: unknown, graphValue: unknown) {
   if (canon.data.sourceAuthority.revision !== graph.data.canonRevision) {
     blockers.push("Stored shot graph does not match the exact canon revision.");
   }
-  const canonEntryIds = new Set(canon.data.entries.map((entry) => entry.id));
+  const canonEntries = new Map(canon.data.entries.map((entry) => [entry.id, entry]));
   for (const scene of graph.data.scenes) {
     for (const shot of scene.shots) {
-      if (shot.reviewState !== "approved-for-animatic") {
+      if (requireReadiness && shot.reviewState !== "approved-for-animatic") {
         blockers.push(`Shot ${shot.id} is not approved for animatic.`);
       }
       for (const canonEntryId of shot.canonEntryIds) {
-        if (!canonEntryIds.has(canonEntryId)) {
+        const canonEntry = canonEntries.get(canonEntryId);
+        if (!canonEntry) {
           blockers.push(`Shot ${shot.id} references unknown canon entry ${canonEntryId}.`);
+        } else if (requireReadiness && !["approved-for-animatic", "approved-for-final-render"].includes(canonEntry.reviewState)) {
+          blockers.push(`Shot ${shot.id} references canon entry ${canonEntryId} that is not approved for animatic.`);
         }
       }
     }
@@ -236,13 +244,31 @@ export const upsertFiniteTimeCanonRegistry = onCall(async (request) => {
   const registry = parsed.data;
   const ownerId = requireOwner(request, registry.ownerId);
   const id = `${registry.projectId}-${ownerId}`;
-  await getFirestore().collection("finiteTimeCanonRegistries").doc(id).set({
-    ...registry,
-    ownerId,
-    providerSpendAuthorized: false,
-    finalRenderingAuthorized: false,
-    updatedAt: registry.updatedAt
-  }, { merge: true });
+  const db = getFirestore();
+  const registryRef = db.collection("finiteTimeCanonRegistries").doc(id);
+  await db.runTransaction(async (transaction) => {
+    const existingSnapshot = await transaction.get(registryRef);
+    if (existingSnapshot.exists) {
+      const existingRaw = existingSnapshot.data() ?? {};
+      const { providerSpendAuthorized: _legacyProviderSpendAuthorized, ...existingCandidate } = existingRaw;
+      const existing = canonRegistrySchema.safeParse(existingCandidate);
+      if (!existing.success) {
+        throw new HttpsError("failed-precondition", "Existing FINITE TIME canon registry is invalid and requires controlled migration.");
+      }
+      if (
+        existing.data.sourceAuthority.revision === registry.sourceAuthority.revision
+        && JSON.stringify(existing.data) !== JSON.stringify(registry)
+      ) {
+        throw new HttpsError("failed-precondition", "Canon revisions are immutable; changed canon content requires a new sourceAuthority revision.");
+      }
+    }
+    transaction.set(registryRef, {
+      ...registry,
+      ownerId,
+      finalRenderingAuthorized: false,
+      updatedAt: registry.updatedAt
+    }, { merge: false });
+  });
   return { registryId: id, privateByDefault: true, finalRenderingAuthorized: false };
 });
 
@@ -256,7 +282,7 @@ export const upsertFiniteTimeShotGraph = onCall(async (request) => {
   if (!canon.exists) {
     throw new HttpsError("failed-precondition", "A valid private canon registry must exist before its shot graph can be stored.");
   }
-  const consistencyBlockers = storedCanonGraphBlockers(canon.data(), graph);
+  const consistencyBlockers = storedCanonGraphBlockers(canon.data(), graph, { requireReadiness: false });
   if (consistencyBlockers.length > 0) {
     throw new HttpsError("failed-precondition", `Shot graph is incompatible with the stored canon registry: ${consistencyBlockers.join(" ")}`);
   }
@@ -264,10 +290,9 @@ export const upsertFiniteTimeShotGraph = onCall(async (request) => {
   await db.collection("finiteTimeShotGraphs").doc(id).set({
     ...graph,
     ownerId,
-    providerSpendAuthorized: false,
     finalRenderingAuthorized: false,
     updatedAt: graph.updatedAt
-  }, { merge: true });
+  }, { merge: false });
   return { shotGraphId: id, animaticOnly: true, finalRenderingAuthorized: false };
 });
 
