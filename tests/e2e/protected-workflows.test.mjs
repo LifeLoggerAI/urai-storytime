@@ -44,8 +44,8 @@ test('protected deployment isolates untrusted verification from deploy identity'
     assert.match(workflow, new RegExp(`\\b${variable}:\\s+\\$\\{\\{`));
   }
 
-  assert.match(workflow, /test "\\$NEXT_PUBLIC_FIREBASE_PROJECT_ID" = "\\$PROJECT_ID"/);
-  assert.match(workflow, /for name in[\\s\\S]*NEXT_PUBLIC_FIREBASE_API_KEY[\\s\\S]*NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING[\\s\\S]*test -n "\\$\\{!name\\}"/);
+  assert.match(workflow, /test "\$NEXT_PUBLIC_FIREBASE_PROJECT_ID" = "\$PROJECT_ID"/);
+  assert.match(workflow, /for name in[\s\S]*NEXT_PUBLIC_FIREBASE_API_KEY[\s\S]*NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING[\s\S]*test -n "\$\{!name\}"/);
   assert.match(workflow, /sha256sum --check storytime-deploy-payload\.tgz\.sha256/);
   assert.match(workflow, /firebase\.deploy\.json/);
   assert.match(workflow, /delete entry\.predeploy/);
