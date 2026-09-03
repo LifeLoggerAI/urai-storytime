@@ -34,6 +34,7 @@ test('Farm-to-Lake graph is complete, timed and redacted for handoff', () => {
   assert.deepEqual(shotIds, Array.from({ length: 30 }, (_, index) => String(index + 1).padStart(3, '0')));
   includesAll(chapter, [
     'targetDurationSeconds: 180',
+    'canonRevision: FARM_TO_LAKE_CANON_REGISTRY.sourceAuthority.revision',
     'renderMode: "deterministic-local-proof"',
     'finalRenderingAuthorized: false',
     'createRedactedFarmToLakeHandoff',
@@ -82,6 +83,8 @@ test('final render authorization requires signed checksum-locked approvals and n
     'artifact-id-mismatch',
     'source-revision-mismatch',
     'provider-retention-policy-not-approved',
+    'provider-retention-policy-not-bound-to-privacy-approval',
+    'fallback-provider-not-authorized',
     'retentionPolicySha256'
   ]);
   assert.doesNotMatch(authorization, /finalRenderingAuthorized:\s*true/);
@@ -93,11 +96,12 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'upsertFiniteTimeShotGraph',
     'getFiniteTimeProductionReadiness',
     'request.auth.uid !== ownerId',
-    'providerSpendAuthorized: false',
     'finalRenderingAuthorized: false',
     'finiteTimeCanonRegistries',
     'finiteTimeShotGraphs',
     'storedCanonGraphBlockers',
+    'Canon revisions are immutable',
+    'requireReadiness: false',
     'Shot sceneId must match its parent scene.',
     'references unknown canon entry',
     'A valid private canon registry must exist before its shot graph can be stored.',
@@ -109,6 +113,7 @@ test('private callables and rules are owner scoped and fail closed', () => {
     'Haptic cue cannot occur after the shot ends.'
   ]);
   assert.doesNotMatch(functions, /FieldValue\.serverTimestamp\(\)/);
+  assert.doesNotMatch(functions, /providerSpendAuthorized:\s*false/);
   includesAll(functionsIndex, [
     'upsertFiniteTimeCanonRegistry',
     'upsertFiniteTimeShotGraph',
