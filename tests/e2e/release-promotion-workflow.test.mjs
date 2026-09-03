@@ -35,7 +35,8 @@ test('release-promotion verification remains exact-head, pinned, and non-deployi
   assert.match(workflow, /evidence\.smokeVerified !== true/);
   assert.match(workflow, /evidence\.rollbackTested !== true/);
   assert.match(workflow, /\.github\/workflows\/protected-deployment\.yml/);
-  assert.match(workflow, /\.github\/workflows\/protected-rollback-test\.yml/);
+  assert.match(workflow, /\.github\/workflows\/protected-rollback-drill\.yml/);
+  assert.doesNotMatch(workflow, /trustedWorkflowPath[\s\S]*protected-rollback-test\.yml/);
   assert.match(workflow, /run\.event !== 'workflow_dispatch'/);
   assert.match(workflow, /retained\.digest !== artifactDigest/);
   assert.match(workflow, /deploymentArtifactDigest/);
