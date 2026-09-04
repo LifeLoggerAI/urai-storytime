@@ -1,4 +1,5 @@
 name: URAI Storytime Protected Rollback Drill
+run-name: Storytime rollback ${{ inputs.environment }} ${{ inputs.rollback_sha }}
 
 on:
   workflow_dispatch:
