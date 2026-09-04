@@ -49,7 +49,13 @@ export function evaluateFiniteTimeReadiness(
   if (canon.finalRenderingAuthorized || graph.finalRenderingAuthorized) blockers.push("Final rendering must remain unauthorized during animatic production.");
 
   for (const shot of shots) {
-    for (const id of shot.canonEntryIds) {
+    const referencedCanonIds = new Set([
+      ...shot.canonEntryIds,
+      ...shot.characterRoleIds,
+      shot.locationId,
+      ...shot.dialogue.map((line) => line.speakerRoleId)
+    ]);
+    for (const id of referencedCanonIds) {
       const canonEntry = canonEntries.get(id);
       if (!canonEntry) blockers.push(`Shot ${shot.id} references unknown canon entry ${id}.`);
       else if (!["approved-for-animatic", "approved-for-final-render"].includes(canonEntry.reviewState)) {
