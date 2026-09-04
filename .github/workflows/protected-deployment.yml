@@ -94,12 +94,22 @@ jobs:
             package-lock.json
             functions/package-lock.json
 
-      - name: Install, verify, and build without cloud identity
+      - name: Install, test, verify, and build without cloud identity
         shell: bash
         run: |
           set -euo pipefail
           npm ci --no-audit
           npm --prefix functions ci --no-audit
+          npm run lint
+          npm run typecheck
+          npm test
+          npm run test:smoke
+          npm run test:e2e
+          npm run test:deployment
+          npm run test:security-rules
+          npm run test:emulator-scaffold
+          npm run test:emulator-runtime
+          npm run test:production-readiness
           npm run build
           npm --prefix functions run build
           test -z "$(git status --porcelain --untracked-files=all)"
