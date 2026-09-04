@@ -219,7 +219,13 @@ function storedCanonGraphBlockers(
       if (requireReadiness && shot.reviewState !== "approved-for-animatic") {
         blockers.push(`Shot ${shot.id} is not approved for animatic.`);
       }
-      for (const canonEntryId of shot.canonEntryIds) {
+      const referencedCanonIds = new Set([
+        ...shot.canonEntryIds,
+        ...shot.characterRoleIds,
+        shot.locationId,
+        ...shot.dialogue.map((line) => line.speakerRoleId)
+      ]);
+      for (const canonEntryId of referencedCanonIds) {
         const canonEntry = canonEntries.get(canonEntryId);
         if (!canonEntry) {
           blockers.push(`Shot ${shot.id} references unknown canon entry ${canonEntryId}.`);
