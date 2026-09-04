@@ -124,12 +124,20 @@ jobs:
             if (!response.ok) throw new Error(`GitHub evidence lookup failed (${response.status}).`);
             return response.json();
           };
-          const verifyRunAndArtifact = async (runUrl, artifactName, artifactDigest, kind, trustedWorkflowPath) => {
+          const verifyRunAndArtifact = async (
+            runUrl,
+            artifactName,
+            artifactDigest,
+            kind,
+            trustedWorkflowPath,
+            { requireHeadSha = true, expectedRunTitle = null } = {}
+          ) => {
             const runId = runIdFromUrl(runUrl, `${kind} run URL`);
             const run = await github(`/repos/${repository}/actions/runs/${runId}`);
             if (run.conclusion !== 'success' || run.status !== 'completed') throw new Error(`${kind} run is not successful and terminal.`);
-            if (String(run.head_sha).toLowerCase() !== expected.deployedSha) throw new Error(`${kind} run is not bound to the rollback SHA.`);
+            if (requireHeadSha && String(run.head_sha).toLowerCase() !== expected.deployedSha) throw new Error(`${kind} run is not bound to the rollback SHA.`);
             if (run.event !== 'workflow_dispatch' || run.path !== trustedWorkflowPath) throw new Error(`${kind} run is not from the trusted protected workflow.`);
+            if (expectedRunTitle && run.display_title !== expectedRunTitle) throw new Error(`${kind} dispatch metadata is not bound to the requested rollback target.`);
             const artifacts = await github(`/repos/${repository}/actions/runs/${runId}/artifacts?per_page=100`);
             const retained = artifacts.artifacts?.find((artifact) => artifact.name === artifactName && artifact.expired === false);
             if (!retained) throw new Error(`${kind} retained artifact is missing or expired.`);
@@ -150,7 +158,11 @@ jobs:
             evidence.rollbackTestArtifactName,
             evidence.rollbackTestArtifactDigest,
             'Protected rollback drill',
-            '.github/workflows/protected-rollback-drill.yml'
+            '.github/workflows/protected-rollback-drill.yml',
+            {
+              requireHeadSha: false,
+              expectedRunTitle: `Storytime rollback ${expected.environment} ${expected.deployedSha}`,
+            }
           );
 
           console.log(`Verified rollback evidence sha256:${createHash('sha256').update(evidenceBytes).digest('hex')}`);
