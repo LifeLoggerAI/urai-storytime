@@ -275,4 +275,4 @@ jobs:
           name: storytime-rollback-drill-${{ env.TARGET_ENVIRONMENT }}-${{ env.TARGET_SHA }}
           path: release-receipt/manifest.json
           if-no-files-found: error
-          retention-days: 365
+          retention-days: 90
