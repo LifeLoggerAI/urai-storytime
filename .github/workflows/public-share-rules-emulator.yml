@@ -1,0 +1,182 @@
+name: Storytime Public Share Rules Emulator
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-share-rules-emulator.yml'
+      - 'firebase.public-share-rules-emulator.json'
+      - 'firestore.rules'
+      - 'tests/rules-emulator/**'
+      - 'functions/src/public-story-share-lifecycle.ts'
+      - 'functions/src/index.ts'
+      - 'src/components/storytime/ShareStory.tsx'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/public-share-rules-emulator.yml'
+      - 'firebase.public-share-rules-emulator.json'
+      - 'firestore.rules'
+      - 'tests/rules-emulator/**'
+      - 'functions/src/public-story-share-lifecycle.ts'
+      - 'functions/src/index.ts'
+      - 'src/components/storytime/ShareStory.tsx'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storytime-public-share-rules-${{ github.event.pull_request.number || github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  TARGET_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  public-share-rules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Prove exact clean candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.23.1'
+
+      - name: Setup Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install isolated rules harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix tests/rules-emulator --ignore-scripts --no-audit --no-fund
+
+      - name: Capture exact rules identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/storytime-public-share-rules"
+          rm -rf -- "$evidence_dir"
+          mkdir -p -- "$evidence_dir"
+          sha256sum firestore.rules firebase.public-share-rules-emulator.json > "$evidence_dir/rules-and-config-sha256.txt"
+          npm ls --prefix tests/rules-emulator --all --json > "$evidence_dir/dependency-tree.json"
+          cp tests/rules-emulator/package-lock.json "$evidence_dir/rules-test-package-lock.json"
+          {
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "exact_head=$TARGET_SHA"
+            echo "checked_out=$(git rev-parse HEAD)"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "project=urai-storytime-public-share-rules-test"
+            echo "config=firebase.public-share-rules-emulator.json"
+            echo "credentialed=false"
+            echo "deployment=false"
+            echo "public_sharing_enabled=false"
+          } > "$evidence_dir/authority.env"
+
+      - name: Execute public-share lifecycle matrix
+        id: emulator
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          evidence_dir="$RUNNER_TEMP/storytime-public-share-rules"
+          npx --yes firebase-tools@15.23.0 emulators:exec \
+            --config firebase.public-share-rules-emulator.json \
+            --project urai-storytime-public-share-rules-test \
+            --only firestore \
+            "node --test --test-concurrency=1 tests/rules-emulator/public-share-lifecycle.test.mjs" \
+            2>&1 | tee "$evidence_dir/emulator.log"
+          status=${PIPESTATUS[0]}
+          printf '%s\n' "$status" > "$evidence_dir/exit-code.txt"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Reject undefined-field rule diagnostics
+        if: always()
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/storytime-public-share-rules/emulator.log"
+          if grep -E "Property (schemaVersion|slug|title|safeSummary|safeBody|revoked|expiresAt|userId|sessionId) is undefined" "$log"; then
+            echo '::error::Public-share rules emitted undefined-field diagnostics.'
+            exit 1
+          fi
+
+      - name: Write exact-head lifecycle receipt
+        if: always()
+        env:
+          EMULATOR_STATUS: ${{ steps.emulator.outputs.status }}
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const receipt = {
+            schemaVersion: 'urai-storytime-public-share-rules-receipt-2',
+            repository: process.env.GITHUB_REPOSITORY,
+            exactHeadSha: process.env.TARGET_SHA,
+            workflowRunId: process.env.GITHUB_RUN_ID,
+            emulatorStatus: Number(process.env.EMULATOR_STATUS ?? -1),
+            projectId: 'urai-storytime-public-share-rules-test',
+            firebaseConfig: 'firebase.public-share-rules-emulator.json',
+            matrix: [
+              'active anonymous read allowed',
+              'revoked read denied',
+              'expired read denied',
+              'malformed and legacy identifier leak denied',
+              'all public client writes denied',
+              'owner control read scoped',
+              'all owner control client writes denied'
+            ],
+            credentialed: false,
+            deployment: false,
+            publicSharingEnabled: false,
+            protectedRuntimeCertified: false,
+          };
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/storytime-public-share-rules/receipt.json`, `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+
+      - name: Upload exact-head emulator evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: storytime-public-share-rules-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/storytime-public-share-rules
+          if-no-files-found: error
+          retention-days: 365
+
+      - name: Restore exact source after emulator generation
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard "$TARGET_SHA"
+          git clean -ffd
+
+      - name: Prove final exact clean source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Enforce emulator result
+        run: test "${{ steps.emulator.outputs.status }}" = '0'
