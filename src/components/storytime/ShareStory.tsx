@@ -1,25 +1,66 @@
 "use client";
 
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseDb, isStorytimePublicSharingEnabled } from "@/lib/firebase/client";
-import type { PublicStoryShare } from "@/lib/storytime/types";
+
+type PublicSafeStoryShare = {
+  id: string;
+  schemaVersion: "public-story-share-v2";
+  slug: string;
+  title: string;
+  safeSummary: string;
+  safeBody: string;
+  expiresAt: string;
+  revoked: false;
+};
 
 type State =
   | { status: "blocked"; message: string }
   | { status: "loading"; message: string }
   | { status: "notFound"; message: string }
-  | { status: "revoked"; message: string }
-  | { status: "expired"; message: string }
   | { status: "error"; message: string }
-  | { status: "ready"; share: PublicStoryShare };
+  | { status: "ready"; share: PublicSafeStoryShare };
 
 function message(error: unknown) {
   return error instanceof Error ? error.message : "Public share could not be loaded.";
 }
 
-function expired(share: PublicStoryShare) {
-  return Boolean(share.expiresAt && Date.parse(share.expiresAt) < Date.now());
+function firestoreCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "";
+}
+
+function timestampIso(value: unknown) {
+  if (
+    typeof value === "object"
+    && value !== null
+    && "toDate" in value
+    && typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  return null;
+}
+
+function parsePublicShare(id: string, data: Record<string, unknown>): PublicSafeStoryShare | null {
+  if (data.schemaVersion !== "public-story-share-v2") return null;
+  if (data.slug !== id || data.revoked !== false) return null;
+  if ("userId" in data || "sessionId" in data) return null;
+  if (typeof data.title !== "string" || typeof data.safeSummary !== "string" || typeof data.safeBody !== "string") return null;
+  const expiresAt = timestampIso(data.expiresAt);
+  if (!expiresAt || Date.parse(expiresAt) <= Date.now()) return null;
+  return {
+    id,
+    schemaVersion: "public-story-share-v2",
+    slug: id,
+    title: data.title,
+    safeSummary: data.safeSummary,
+    safeBody: data.safeBody,
+    expiresAt,
+    revoked: false
+  };
 }
 
 export function ShareStory({ shareId }: { shareId: string }) {
@@ -36,25 +77,26 @@ export function ShareStory({ shareId }: { shareId: string }) {
     async function run() {
       try {
         const db = getFirebaseDb();
-        const publicShares = collection(db, "publicStoryShares");
-        // Firestore rules only permit anonymous reads of non-revoked shares.
-        // Keep the query constrained to the same authorization predicate so
-        // Firestore can prove the query cannot return a revoked document.
-        const bySlug = await getDocs(
-          query(publicShares, where("slug", "==", shareId), where("revoked", "==", false), limit(1))
-        );
-        const snapshot = bySlug.docs[0];
+        const snapshot = await getDoc(doc(db, "publicStoryShares", shareId));
         if (!active) return;
-        if (!snapshot) {
+        if (!snapshot.exists()) {
           setState({ status: "notFound", message: "No active public-safe Storytime share was found." });
           return;
         }
-        const share = { id: snapshot.id, ...snapshot.data() } as PublicStoryShare;
-        if (share.revoked) setState({ status: "revoked", message: "This Storytime share has been revoked." });
-        else if (expired(share)) setState({ status: "expired", message: "This Storytime share has expired." });
-        else setState({ status: "ready", share });
+        const share = parsePublicShare(snapshot.id, snapshot.data());
+        if (!share) {
+          setState({ status: "notFound", message: "No active public-safe Storytime share was found." });
+          return;
+        }
+        setState({ status: "ready", share });
       } catch (error) {
-        if (active) setState({ status: "error", message: message(error) });
+        if (!active) return;
+        const code = firestoreCode(error);
+        if (code.endsWith("permission-denied") || code.endsWith("not-found")) {
+          setState({ status: "notFound", message: "No active public-safe Storytime share was found." });
+        } else {
+          setState({ status: "error", message: message(error) });
+        }
       }
     }
     run();

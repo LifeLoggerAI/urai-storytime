@@ -1,0 +1,278 @@
+name: URAI Storytime Protected Rollback Drill
+run-name: Storytime rollback ${{ inputs.environment }} ${{ inputs.rollback_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: Exact previously deployed main revision to restore.
+        required: true
+        type: string
+      environment:
+        description: Protected target environment.
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      base_url:
+        description: Must exactly match the protected environment canonical URL.
+        required: true
+        type: string
+      confirm:
+        description: Type DRILL_STORYTIME_ROLLBACK to authorize this operational rollback.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storytime-protected-rollback-drill-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  TARGET_SHA: ${{ inputs.rollback_sha }}
+  DISPATCH_SHA: ${{ github.sha }}
+  TARGET_ENVIRONMENT: ${{ inputs.environment }}
+
+jobs:
+  verify:
+    name: Verify and package exact protected revision
+    if: github.ref == 'refs/heads/main' && inputs.confirm == 'DRILL_STORYTIME_ROLLBACK'
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    timeout-minutes: 45
+    env:
+      PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+      BASE_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+      REQUESTED_BASE_URL: ${{ inputs.base_url }}
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      NEXT_PUBLIC_STORYTIME_CLOUD_MODE: ${{ vars.NEXT_PUBLIC_STORYTIME_CLOUD_MODE }}
+      NEXT_PUBLIC_STORYTIME_PROVIDER_READY: ${{ vars.NEXT_PUBLIC_STORYTIME_PROVIDER_READY }}
+      NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING: ${{ vars.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING }}
+    steps:
+      - name: Checkout exact approved rollback revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove immutable source and environment-owned target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          git cat-file -e "${DISPATCH_SHA}^{commit}"
+          git merge-base --is-ancestor "$TARGET_SHA" "$DISPATCH_SHA" || {
+            echo "::error::rollback_sha must be an ancestor of the dispatched protected main revision"
+            exit 1
+          }
+          [[ "$BASE_URL" =~ ^https://[^[:space:]]+$ ]]
+          test "$REQUESTED_BASE_URL" = "$BASE_URL"
+          test -n "$PROJECT_ID"
+          test "$NEXT_PUBLIC_FIREBASE_PROJECT_ID" = "$PROJECT_ID"
+          for name in \
+            NEXT_PUBLIC_FIREBASE_API_KEY \
+            NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN \
+            NEXT_PUBLIC_FIREBASE_PROJECT_ID \
+            NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET \
+            NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID \
+            NEXT_PUBLIC_FIREBASE_APP_ID \
+            NEXT_PUBLIC_STORYTIME_CLOUD_MODE \
+            NEXT_PUBLIC_STORYTIME_PROVIDER_READY \
+            NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING
+          do
+            test -n "${!name}"
+          done
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            functions/package-lock.json
+
+      - name: Install, verify, and build without cloud identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit
+          npm --prefix functions ci --no-audit
+          npm run build
+          npm --prefix functions run build
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Validate protected release configuration
+        shell: bash
+        env:
+          URAI_STORYTIME_FIREBASE_PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+          URAI_STORYTIME_STAGING_TARGET: ${{ vars.URAI_STORYTIME_STAGING_TARGET }}
+          URAI_STORYTIME_PRODUCTION_TARGET: ${{ vars.URAI_STORYTIME_PRODUCTION_TARGET }}
+          STORYTIME_FIREBASE_ISOLATED: ${{ vars.STORYTIME_FIREBASE_ISOLATED }}
+          FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED: ${{ vars.FIREBASE_AUTH_EMAIL_PROVIDER_ENABLED }}
+          STORYTIME_GENERATION_PROVIDER: ${{ vars.STORYTIME_GENERATION_PROVIDER }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          STORYTIME_OPENAI_MODEL: ${{ vars.STORYTIME_OPENAI_MODEL }}
+          NEXT_PUBLIC_STORYTIME_CLOUD_MODE: ${{ vars.NEXT_PUBLIC_STORYTIME_CLOUD_MODE }}
+          NEXT_PUBLIC_STORYTIME_PROVIDER_READY: ${{ vars.NEXT_PUBLIC_STORYTIME_PROVIDER_READY }}
+          NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING: ${{ vars.NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING }}
+          URAI_PRODUCTION_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+          URAI_LEGAL_APPROVED: ${{ secrets.URAI_LEGAL_APPROVED }}
+          URAI_PRIVACY_APPROVED: ${{ secrets.URAI_PRIVACY_APPROVED }}
+          URAI_CHILD_SAFETY_APPROVED: ${{ secrets.URAI_CHILD_SAFETY_APPROVED }}
+          URAI_FIREBASE_PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+          URAI_FIREBASE_STAGING_TARGET: ${{ vars.URAI_STORYTIME_STAGING_TARGET }}
+          URAI_FIREBASE_PRODUCTION_TARGET: ${{ vars.URAI_STORYTIME_PRODUCTION_TARGET }}
+          URAI_FIREBASE_AUTH_VERIFIED: ${{ secrets.URAI_FIREBASE_AUTH_VERIFIED }}
+          URAI_FIRESTORE_VERIFIED: ${{ secrets.URAI_FIRESTORE_VERIFIED }}
+          URAI_STORAGE_RULES_VERIFIED: ${{ secrets.URAI_STORAGE_RULES_VERIFIED }}
+          URAI_DEPLOY_VERIFIED: ${{ secrets.URAI_DEPLOY_VERIFIED }}
+          URAI_SECRETS_VERIFIED: ${{ secrets.URAI_SECRETS_VERIFIED }}
+          URAI_BILLING_PROVIDER: ${{ secrets.URAI_BILLING_PROVIDER }}
+          URAI_SMOKE_TEST_VERIFIED: ${{ secrets.URAI_SMOKE_TEST_VERIFIED }}
+          URAI_SMOKE_TEST_EVIDENCE_URL: ${{ secrets.URAI_SMOKE_TEST_EVIDENCE_URL }}
+        run: npm run validate:release-promotion
+
+      - name: Assemble verified deploy payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/storytime-deploy-payload"
+          mkdir -p "$payload"
+          tar --exclude=.git --exclude=release-receipt -cf - . | tar -xf - -C "$payload"
+          PAYLOAD="$payload" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const path = `${process.env.PAYLOAD}/firebase.json`;
+          const config = JSON.parse(readFileSync(path, 'utf8'));
+          for (const entry of Array.isArray(config.functions) ? config.functions : []) {
+            delete entry.predeploy;
+          }
+          writeFileSync(`${process.env.PAYLOAD}/firebase.deploy.json`, JSON.stringify(config, null, 2) + '\n');
+          NODE
+          npm install --prefix "$payload/firebase-cli" --ignore-scripts --no-audit --no-save firebase-tools@14.12.0
+          tar -czf "$RUNNER_TEMP/storytime-deploy-payload.tgz" -C "$RUNNER_TEMP" storytime-deploy-payload
+          (cd "$RUNNER_TEMP" && sha256sum storytime-deploy-payload.tgz > storytime-deploy-payload.tgz.sha256)
+
+      - name: Upload verified deploy payload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storytime-deploy-payload-${{ env.TARGET_SHA }}
+          path: |
+            ${{ runner.temp }}/storytime-deploy-payload.tgz
+            ${{ runner.temp }}/storytime-deploy-payload.tgz.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  deploy:
+    name: Deploy exact protected revision
+    needs: verify
+    runs-on: ubuntu-24.04
+    environment: ${{ inputs.environment }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    timeout-minutes: 30
+    env:
+      PROJECT_ID: ${{ vars.URAI_STORYTIME_FIREBASE_PROJECT_ID }}
+      BASE_URL: ${{ vars.URAI_STORYTIME_BASE_URL }}
+      REQUESTED_BASE_URL: ${{ inputs.base_url }}
+    steps:
+      - name: Checkout exact dispatched revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download verified deploy payload
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: storytime-deploy-payload-${{ env.TARGET_SHA }}
+          path: ${{ runner.temp }}/verified-payload
+
+      - name: Verify payload and exact target before identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          test "$REQUESTED_BASE_URL" = "$BASE_URL"
+          (cd "$RUNNER_TEMP/verified-payload" && sha256sum --check storytime-deploy-payload.tgz.sha256)
+          tar -xzf "$RUNNER_TEMP/verified-payload/storytime-deploy-payload.tgz" -C "$RUNNER_TEMP"
+
+      - name: Authenticate with short-lived Google WIF
+        id: google_auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_STORYTIME_DEPLOY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Deploy verified payload
+        working-directory: ${{ runner.temp }}/storytime-deploy-payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./firebase-cli/node_modules/.bin/firebase deploy \
+            --config firebase.deploy.json \
+            --project "$PROJECT_ID" \
+            --only firestore:rules,firestore:indexes,storage,functions,hosting \
+            --non-interactive
+
+      - name: Verify live protected target
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 30 "$BASE_URL/storytime" >/dev/null
+          curl --fail --silent --show-error --location --max-time 30 "$BASE_URL/storytime/settings" >/dev/null
+
+      - name: Write immutable deployment manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-receipt
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          const receipt = {
+            schemaVersion: 'urai-storytime-protected-run-v1',
+            role: 'operational-rollback-drill',
+            result: 'success',
+            environment: process.env.TARGET_ENVIRONMENT,
+            deployedSha: process.env.TARGET_SHA,
+            deploymentUrl: process.env.BASE_URL,
+            rollbackTested: true,
+            operationalRollbackPerformed: true,
+            providerMutationPerformed: true,
+            repository: process.env.GITHUB_REPOSITORY,
+            workflow: process.env.GITHUB_WORKFLOW,
+            workflowPath: '.github/workflows/protected-rollback-drill.yml',
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+            runUrl: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          };
+          writeFileSync('release-receipt/manifest.json', JSON.stringify(receipt, null, 2) + '\n');
+          NODE
+
+      - name: Upload immutable rollback-drill receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storytime-rollback-drill-${{ env.TARGET_ENVIRONMENT }}-${{ env.TARGET_SHA }}
+          path: release-receipt/manifest.json
+          if-no-files-found: error
+          retention-days: 365
