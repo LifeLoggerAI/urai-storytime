@@ -35,6 +35,28 @@ service cloud.firestore {
     }
     function ownerOnlyCreate() { return signedIn() && request.resource.data.userId == request.auth.uid; }
     function ownerOnlyReadWrite(userId) { return isOwner(userId) || isAdmin(); }
+    function storySessionModerationFields() {
+      return [
+        'safetyStatus',
+        'safetyReview',
+        'safetyReviewedAt',
+        'safetyReviewedBy',
+        'moderationStatus',
+        'moderationDecision',
+        'moderationReviewedAt',
+        'moderationReviewedBy'
+      ];
+    }
+    function ownerStorySessionCreate() {
+      return ownerOnlyCreate()
+        && !request.resource.data.keys().hasAny(storySessionModerationFields());
+    }
+    function ownerStorySessionUpdate() {
+      return ownerOnlyReadWrite(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(storySessionModerationFields());
+    }
     function privateFiniteTimeCreate() {
       return signedIn()
         && request.resource.data.ownerId == request.auth.uid
@@ -116,8 +138,9 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /storySessions/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow create: if ownerStorySessionCreate();
+      allow read, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow update: if ownerStorySessionUpdate();
     }
     match /storyChapters/{id} {
       allow create: if ownerOnlyCreate();

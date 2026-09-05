@@ -91,6 +91,9 @@ test('public sharing uses content-neutral expiring derivatives and private owner
   ]);
 
   includesAll(shareLifecycle, [
+    'process.env.STORYTIME_PUBLIC_SHARING !== "true"',
+    'Public Storytime sharing is disabled.',
+    'requirePublicSharingEnabled();',
     'expiresInDays',
     'consent: z.literal(true)',
     'Timestamp.fromMillis',
@@ -109,6 +112,10 @@ test('public sharing uses content-neutral expiring derivatives and private owner
     'visibility: "private"'
   ]);
   assert.doesNotMatch(shareLifecycle, /session\.(title|whyGenerated|sourceText|sourceSignals|symbolicMotifs)/);
+  assert.ok(
+    shareLifecycle.indexOf('requirePublicSharingEnabled();') < shareLifecycle.indexOf('const db = getFirestore();'),
+    'the server-side feature gate must reject direct calls before Firestore access',
+  );
 
   includesAll(shareStory, [
     'getDoc(doc(db, "publicStoryShares", shareId))',
@@ -144,6 +151,12 @@ test('rules keep Storytime private by default and enforce server-time public-sha
   includesAll(rules, [
     'function ownerOnlyCreate()',
     'function ownerOnlyReadWrite(userId)',
+    'function storySessionModerationFields()',
+    'function ownerStorySessionCreate()',
+    'function ownerStorySessionUpdate()',
+    "'safetyStatus'",
+    "'moderationDecision'",
+    '.affectedKeys()',
     'match /storySessions/{id}',
     'function activePublicShare()',
     "resource.data.schemaVersion == 'public-story-share-v2'",

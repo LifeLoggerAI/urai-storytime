@@ -110,3 +110,37 @@ test('private owner controls are owner-readable and never client-writable', asyn
     revoked: false,
   }));
 });
+
+test('session owners cannot create or escalate server-owned safety and moderation fields', async () => {
+  const alice = testEnv.authenticatedContext('alice').firestore();
+  const sessionRef = doc(alice, 'storySessions/session-a');
+
+  await assertFails(setDoc(sessionRef, {
+    userId: 'alice',
+    title: 'Unsafe client assertion',
+    safetyStatus: 'approved',
+  }));
+
+  await assertSucceeds(setDoc(sessionRef, {
+    userId: 'alice',
+    title: 'Private draft',
+  }));
+  await assertSucceeds(updateDoc(sessionRef, { title: 'Private draft updated' }));
+  await assertFails(updateDoc(sessionRef, { safetyStatus: 'approved' }));
+  await assertFails(updateDoc(sessionRef, { moderationDecision: 'approved' }));
+});
+
+test('even admin-token clients cannot rewrite server-owned moderation authority', async () => {
+  await seed('storySessions/session-a', {
+    userId: 'alice',
+    title: 'Private draft',
+    safetyStatus: 'needs_review',
+    moderationDecision: 'review_required',
+  });
+  const adminClient = testEnv.authenticatedContext('moderator', { admin: true }).firestore();
+
+  await assertFails(updateDoc(doc(adminClient, 'storySessions/session-a'), {
+    safetyStatus: 'approved',
+    moderationDecision: 'approved',
+  }));
+});

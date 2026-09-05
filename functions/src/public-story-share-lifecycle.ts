@@ -25,6 +25,12 @@ function requireAuth(request: { auth?: { uid: string } | null }) {
   return request.auth.uid;
 }
 
+function requirePublicSharingEnabled() {
+  if (process.env.STORYTIME_PUBLIC_SHARING !== "true") {
+    throw new HttpsError("failed-precondition", "Public Storytime sharing is disabled.");
+  }
+}
+
 function parseCreateInput(value: unknown) {
   const parsed = createShareSchema.safeParse(value);
   if (!parsed.success) {
@@ -57,6 +63,7 @@ function activeSanitizedShare(data: DocumentData | undefined, nowMs: number) {
 
 export const createPublicStoryShare = onCall(async (request) => {
   const userId = requireAuth(request);
+  requirePublicSharingEnabled();
   const input = parseCreateInput(request.data);
   const db = getFirestore();
   const sessionRef = db.collection("storySessions").doc(input.sessionId);
