@@ -47,6 +47,7 @@ const requiredSourceFiles = [
   'functions/src/index.ts',
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
+  'functions/src/readiness.ts',
   'functions/src/revoke-public-story-share.ts',
   'tests/e2e/smoke.test.mjs'
 ];
@@ -73,6 +74,32 @@ if (exists('functions/src/story-provider.ts')) {
   const provider = read('functions/src/story-provider.ts');
   if (!provider.includes('STORYTIME_GENERATION_PROVIDER') || !provider.includes('OPENAI_API_KEY') || !provider.includes('STORYTIME_OPENAI_MODEL')) {
     failures.push('Story provider readiness gates must require provider, API key, and model config.');
+  }
+}
+
+if (exists('functions/src/readiness.ts')) {
+  const readinessSource = read('functions/src/readiness.ts');
+  for (const marker of [
+    "process.env.STORYTIME_FIREBASE_ISOLATED === 'true'",
+    "process.env.STORYTIME_CLOUD_MODE === 'true'",
+    'provider.ready === true',
+    "process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER !== 'true'",
+    'publicShareTtlBounded',
+    "claimBoundary: 'technical_runtime_only'",
+    'result.ready ? 200 : 503',
+    "Cache-Control', 'no-store'"
+  ]) {
+    if (!readinessSource.includes(marker)) failures.push(`Missing technical readiness marker: ${marker}`);
+  }
+  if (/OPENAI_API_KEY\s*[:=]\s*process\.env\.OPENAI_API_KEY/.test(readinessSource)) {
+    failures.push('Storytime readiness must not emit provider secret values.');
+  }
+}
+
+if (exists('functions/src/index.ts')) {
+  const functionsIndex = read('functions/src/index.ts');
+  if (!functionsIndex.includes('health, readiness') || !functionsIndex.includes('./readiness.js')) {
+    failures.push('Storytime Functions entrypoint must export health and readiness.');
   }
 }
 
