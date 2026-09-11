@@ -14,3 +14,4 @@ export {
   upsertFiniteTimeShotGraph,
   getFiniteTimeProductionReadiness
 } from "./finite-time-registry.js";
+export { health, readiness } from "./readiness.js";
