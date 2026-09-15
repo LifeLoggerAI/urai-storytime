@@ -44,6 +44,7 @@
     {
       "source": "functions",
       "codebase": "storytime",
+      "runtime": "nodejs22",
       "predeploy": [
         "npm --prefix functions run build"
       ]

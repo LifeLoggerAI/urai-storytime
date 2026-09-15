@@ -34,7 +34,8 @@ button, input, textarea, select { font: inherit; }
 .storytime-subtitle { max-width: 720px; color: var(--muted); font-size: clamp(17px, 2vw, 21px); line-height: 1.6; }
 .storytime-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
 .storytime-grid.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
-.storytime-card { padding: 22px; }
+.storytime-grid > * { min-width: 0; }
+.storytime-card { padding: 22px; overflow-wrap: anywhere; }
 .storytime-card h2, .storytime-card h3 { margin-top: 0; letter-spacing: -0.035em; }
 .storytime-card p { color: var(--muted); line-height: 1.6; }
 .storytime-form { display: grid; gap: 16px; margin-top: 18px; }
@@ -59,6 +60,6 @@ button, input, textarea, select { font: inherit; }
 .storytime-list a { color: var(--text); font-weight: 700; }
 
 @media (max-width: 760px) {
-  .storytime-grid, .storytime-grid.compact { grid-template-columns: 1fr; }
+  .storytime-grid, .storytime-grid.compact { grid-template-columns: minmax(0, 1fr); }
   .storytime-nav { align-items: flex-start; flex-direction: column; }
 }
