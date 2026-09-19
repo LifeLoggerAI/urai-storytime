@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { defineSecret } from "firebase-functions/params";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
@@ -8,6 +9,7 @@ import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProvide
 initializeApp();
 
 const db = getFirestore();
+const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const now = () => new Date().toISOString();
 const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
@@ -47,8 +49,8 @@ function allowLocalBuilder() {
   return process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true" && process.env.NODE_ENV !== "production";
 }
 
-function requireConfiguredStoryProvider(userId?: string) {
-  const readiness = getStoryProviderReadiness();
+function requireConfiguredStoryProvider(apiKey: string, userId?: string) {
+  const readiness = getStoryProviderReadiness(apiKey);
   if (readiness.ready || allowLocalBuilder()) return readiness;
   auditLog({ event: "provider_unavailable", userId, provider: readiness.provider, errorCode: "missing_provider_config" });
   throw new HttpsError(
@@ -134,7 +136,7 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
   return { ref: sessionSnap.ref, data: sessionSnap.data()! };
 }
 
-export const generateStorySession = onCall(async (request) => {
+export const generateStorySession = onCall({ secrets: [OPENAI_API_KEY] }, async (request) => {
   requireAuth(request.auth?.uid);
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
@@ -153,15 +155,22 @@ export const generateStorySession = onCall(async (request) => {
   }
 
   await enforceGenerationQuota(userId);
-  const readiness = requireConfiguredStoryProvider(userId);
+  const apiKey = OPENAI_API_KEY.value();
+  const readiness = requireConfiguredStoryProvider(apiKey, userId);
   let generated: StoryProviderOutput;
   try {
     generated = readiness.ready
-      ? await generateStoryWithProvider({ title: input.title, sourceText: source, emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs })
+      ? await generateStoryWithProvider({ title: input.title, sourceText: source, emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs }, apiKey)
       : fallbackProviderOutput(input, source);
   } catch (error) {
     auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
-    throw new HttpsError("internal", error instanceof Error ? error.message : "Story provider failed.");
+    throw new HttpsError("internal", "Story provider request failed safely.");
+  }
+
+  const outputModeration = moderate(Object.values(generated).join(" "));
+  if (outputModeration.hits.length) {
+    auditLog({ event: "generation_blocked_output_safety", userId, safetyStatus: outputModeration.safetyStatus, errorCode: "unsafe_provider_output" });
+    throw new HttpsError("failed-precondition", "Generated story requires safety review before it can be saved.");
   }
 
   const createdAt = now();
