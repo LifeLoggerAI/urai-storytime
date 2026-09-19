@@ -20,20 +20,37 @@ export interface StoryProviderOutput {
   resolutionTone: string;
 }
 
-const REQUIRED_OPENAI_ENV = ["OPENAI_API_KEY", "STORYTIME_OPENAI_MODEL"];
-
-function missingOpenAIEnv() {
-  return REQUIRED_OPENAI_ENV.filter((key) => !process.env[key]?.trim());
-}
-
-export function getStoryProviderReadiness() {
+export function getStoryProviderReadiness(apiKey = "") {
   const provider = process.env.STORYTIME_GENERATION_PROVIDER || "disabled";
-  const missing = provider === "openai" ? missingOpenAIEnv() : ["STORYTIME_GENERATION_PROVIDER=openai"];
+  const missing = [];
+  if (provider !== "openai") missing.push("STORYTIME_GENERATION_PROVIDER=openai");
+  if (!apiKey.trim()) missing.push("OPENAI_API_KEY secret");
+  if (!process.env.STORYTIME_OPENAI_MODEL?.trim()) missing.push("STORYTIME_OPENAI_MODEL");
   return {
     provider,
     ready: provider === "openai" && missing.length === 0,
     missing
   };
+}
+
+async function moderateWithProvider(apiKey: string, text: string, phase: "input" | "output") {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  const response = await fetch("https://api.openai.com/v1/moderations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({ model: "omni-moderation-latest", input: text }),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) throw new Error(`Story provider ${phase} moderation unavailable (HTTP ${response.status}).`);
+  const payload = await response.json() as { results?: Array<{ flagged?: boolean }> };
+  if (payload.results?.[0]?.flagged === true) {
+    throw new Error(`Story provider ${phase} blocked by safety policy.`);
+  }
 }
 
 function assertStringRecord(value: unknown): asserts value is Record<string, unknown> {
@@ -47,8 +64,8 @@ function readString(record: Record<string, unknown>, key: keyof StoryProviderOut
   return (typeof value === "string" && value.trim() ? value.trim() : fallback).slice(0, maxLength);
 }
 
-export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderOutput> {
-  const readiness = getStoryProviderReadiness();
+export async function generateStoryWithProvider(input: StoryProviderInput, apiKey: string): Promise<StoryProviderOutput> {
+  const readiness = getStoryProviderReadiness(apiKey);
   if (!readiness.ready) {
     throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
   }
@@ -63,11 +80,15 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     `Source: ${input.sourceText || "No source text provided."}`
   ].join("\n");
 
+  await moderateWithProvider(apiKey, prompt, "input");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+      Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({
       model: process.env.STORYTIME_OPENAI_MODEL,
@@ -76,13 +97,14 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
         { role: "user", content: prompt }
       ],
       temperature: 0.4,
-      response_format: { type: "json_object" }
-    })
-  });
+      response_format: { type: "json_object" },
+      store: false
+    }),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Story provider request failed: ${response.status} ${errorText.slice(0, 300)}`);
+    throw new Error(`Story provider request failed (HTTP ${response.status}).`);
   }
 
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -92,7 +114,7 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
   const parsed = JSON.parse(content) as unknown;
   assertStringRecord(parsed);
 
-  return {
+  const output = {
     chapterTitle: readString(parsed, "chapterTitle", "Chapter One: The Signal Becomes a Story", 140),
     chapterSummary: readString(parsed, "chapterSummary", "A private moment was shaped into a gentle narrative replay.", 800),
     momentTitle: readString(parsed, "momentTitle", "A moment worth remembering", 140),
@@ -106,4 +128,7 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     peakTone: readString(parsed, "peakTone", "noticed", 80),
     resolutionTone: readString(parsed, "resolutionTone", "settled", 80)
   };
+
+  await moderateWithProvider(apiKey, Object.values(output).join("\n"), "output");
+  return output;
 }
