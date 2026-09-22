@@ -1,7 +1,7 @@
 import type { UserStoryPreferences } from "@/lib/storytime/types";
 
 const settingRows = [
-  ["Memory use", "allowMemoryUse", "Off by default", "Requires explicit opt-in before URAI memories can shape a story."],
+  ["Memory use", "allowMemoryUse", "Off by default", "Requires explicit opt-in before UrAi memories can shape a story."],
   ["Relationship threads", "allowRelationshipThreads", "Off by default", "Requires explicit opt-in before relationship context can be used."],
   ["Voiceover jobs", "allowVoiceoverJobs", "Off by default", "Queued voiceover generation stays disabled until provider and consent checks are live."],
   ["Public sharing", "allowPublicSharing", "Requires explicit consent", "Public-safe shares require consent, redaction, and safety review."]
