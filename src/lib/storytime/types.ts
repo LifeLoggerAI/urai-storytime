@@ -21,6 +21,8 @@ export interface StorySession extends StorytimeBase {
   chapterIds: string[];
   narratorScriptIds: string[];
   emotionalArcSummaryId?: string;
+  currentVersionId?: string;
+  currentVersionNumber?: number;
   publicShareId?: string;
   whyGenerated: string;
   safetyStatus: SafetyStatus;
