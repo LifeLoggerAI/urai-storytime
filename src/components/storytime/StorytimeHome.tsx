@@ -23,8 +23,8 @@ function firstUnsafeTerm(values: string[]) {
   return SAFETY_TERMS.find((term) => text.includes(term));
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Story creation was interrupted. Please try again.";
+function errorMessage() {
+  return "Story creation was interrupted. No private story was saved. Please try again.";
 }
 
 function createRequestId() {
@@ -112,8 +112,8 @@ export function StorytimeHome() {
 
       if (!result.data.sessionId) throw new Error("Story creation did not complete.");
       window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
-    } catch (error) {
-      setSubmitError(errorMessage(error));
+    } catch {
+      setSubmitError(errorMessage());
     } finally {
       setIsSubmitting(false);
     }
@@ -192,7 +192,7 @@ export function StorytimeHome() {
           <label className="storytime-field">
             Memory or source text <span className="storytime-helper">Optional</span>
             <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." aria-describedby="storytime-source-count" />
-            <span className="storytime-helper" id="storytime-source-count" aria-live="polite">{sourceText.length} / {MAX_SOURCE_CHARS} characters</span>
+            <span className="storytime-helper" id="storytime-source-count">{sourceText.length} / {MAX_SOURCE_CHARS} characters</span>
           </label>
 
           <label className="storytime-field">
