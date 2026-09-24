@@ -17,3 +17,5 @@ export {
 export { health, readiness } from "./readiness.js";
 
 export { requestPrivacyOperation } from "./privacy-requests.js";
+
+export { saveStoryDraft, deleteStoryDraft } from "./story-drafts.js";
