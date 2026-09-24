@@ -148,6 +148,8 @@ if (exists('functions/src/story-drafts.ts')) {
   for (const marker of [
     'story-draft-storage-v1',
     'privateDraftStorage: z.literal(true)',
+    'role: z.literal("adult_or_guardian")',
+    'affirmed: z.literal(true)',
     'currentRevision !== input.expectedRevision',
     'generationConsentStored: false',
     'providerProcessingAuthorized: false',
