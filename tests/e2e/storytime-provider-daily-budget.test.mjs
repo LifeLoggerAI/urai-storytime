@@ -57,3 +57,12 @@ test('provider budget ledgers are server-only', () => {
   assert.match(rules, /match \/storytimeProviderBudgetCounters\/\{id\} \{ allow read, write: if false; \}/);
   assert.match(rules, /match \/storytimeProviderBudgetReservations\/\{id\} \{ allow read, write: if false; \}/);
 });
+
+test('uncertain provider failures retain a server-only dead letter without raw story content or retry authorization', () => {
+  assert.match(storytime, /storytime-provider-dead-letter-v1/);
+  assert.match(storytime, /status: "requires_provider_receipt_reconciliation"/);
+  assert.match(storytime, /containsRawStoryContent: false/);
+  assert.match(storytime, /retryAuthorized: false/);
+  assert.match(storytime, /retainProviderDeadLetter/);
+  assert.match(rules, /match \/storytimeProviderDeadLetters\/\{id\} \{ allow read, write: if false; \}/);
+});
