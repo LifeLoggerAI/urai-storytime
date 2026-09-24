@@ -258,6 +258,30 @@ async function holdProviderBudgetReservation(
   }, { merge: true });
 }
 
+async function retainProviderDeadLetter(args: {
+  userId: string;
+  requestId: string;
+  reservation: ProviderBudgetReservation;
+  failureCode: string;
+}) {
+  const timestamp = now();
+  await db.collection("storytimeProviderDeadLetters").doc(args.reservation.reservationId).set({
+    schemaVersion: "storytime-provider-dead-letter-v1",
+    userId: args.userId,
+    requestId: args.requestId,
+    reservationId: args.reservation.reservationId,
+    dayId: args.reservation.dayId,
+    status: "requires_provider_receipt_reconciliation",
+    failureCode: args.failureCode,
+    heldCostUsd: args.reservation.estimatedMaxCostUsd,
+    containsRawStoryContent: false,
+    retryAuthorized: false,
+    cancellationRequested: false,
+    createdAt: timestamp,
+    updatedAt: timestamp
+  }, { merge: true });
+}
+
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
   const requestRef = db.collection("storyGenerationRequests").doc(generationRequestId(userId, input.requestId));
   const result = await db.runTransaction(async (transaction) => {
@@ -484,10 +508,14 @@ export const generateStorySession = onCall(async (request) => {
     }
   } catch (error) {
     if (budgetReservation) {
-      await holdProviderBudgetReservation(
-        budgetReservation,
-        error instanceof Error ? error.name : "provider_failure"
-      );
+      const failureCode = error instanceof Error ? error.name : "provider_failure";
+      await holdProviderBudgetReservation(budgetReservation, failureCode);
+      await retainProviderDeadLetter({
+        userId,
+        requestId: input.requestId,
+        reservation: budgetReservation,
+        failureCode
+      });
     }
     await generationRequest.requestRef.set({
       status: "failed",
@@ -509,6 +537,12 @@ export const generateStorySession = onCall(async (request) => {
       }, { merge: true });
     } catch (error) {
       await holdProviderBudgetReservation(budgetReservation, "budget_settlement_failed");
+      await retainProviderDeadLetter({
+        userId,
+        requestId: input.requestId,
+        reservation: budgetReservation,
+        failureCode: "budget_settlement_failed"
+      });
       await generationRequest.requestRef.set({
         status: "failed",
         errorCode: "budget_settlement_failed",
