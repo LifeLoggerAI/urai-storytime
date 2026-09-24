@@ -154,7 +154,7 @@ export function StorytimeHome() {
   }, [cloudReady]);
 
   useEffect(() => {
-    if (!cloudReady || !draftStorageConsent || draftSaving) return undefined;
+    if (!cloudReady || !draftStorageConsent || !adultGuardianAffirmed || draftSaving) return undefined;
     if (currentDraftFingerprint === lastSavedDraftFingerprint) return undefined;
     if (!title.trim() && !theme.trim() && !sourceText.trim()) return undefined;
 
@@ -182,6 +182,10 @@ export function StorytimeHome() {
           emotionalTone: mood,
           audienceAgeBand,
           locale: "en-US",
+          operator: {
+            role: "adult_or_guardian",
+            affirmed: adultGuardianAffirmed
+          },
           storageConsent: {
             privateDraftStorage: true,
             consentVersion: DRAFT_STORAGE_CONSENT_VERSION
@@ -203,6 +207,7 @@ export function StorytimeHome() {
 
     return () => window.clearTimeout(timer);
   }, [
+    adultGuardianAffirmed,
     audienceAgeBand,
     cloudReady,
     currentDraftFingerprint,
@@ -427,7 +432,9 @@ export function StorytimeHome() {
                   onChange={(event) => {
                     setDraftStorageConsent(event.target.checked);
                     setDraftStatus(event.target.checked
-                      ? "Private draft autosave enabled. This does not authorize generation or provider processing."
+                      ? adultGuardianAffirmed
+                        ? "Private draft autosave enabled. This does not authorize generation or provider processing."
+                        : "Draft storage selected. Autosave begins only after you affirm that you are the adult or guardian operating Storytime."
                       : "Private draft autosave stopped. Any existing saved draft remains until you delete it.");
                   }}
                   disabled={!cloudReady}
