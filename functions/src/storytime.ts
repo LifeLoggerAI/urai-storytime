@@ -191,6 +191,7 @@ export const generateStorySession = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
   }
 
+  const readiness = requireConfiguredStoryProvider(userId);
   const generationRequest = await claimGenerationRequest(userId, input);
   if (generationRequest.reusedSessionId) {
     auditLog({ event: "generation_reused", userId, sessionId: generationRequest.reusedSessionId });
@@ -212,7 +213,6 @@ export const generateStorySession = onCall(async (request) => {
     }, { merge: true });
     throw error;
   }
-  const readiness = requireConfiguredStoryProvider(userId);
   let generated: StoryProviderOutput;
   try {
     generated = readiness.ready
@@ -332,7 +332,7 @@ export const generateStorySession = onCall(async (request) => {
     scriptType: "memory_replay",
     voiceTone: "warm",
     text: generated.narratorText,
-    safetyStatus: mod.safetyStatus,
+    safetyStatus: outputModeration.safetyStatus,
     createdAt,
     updatedAt: createdAt
   };
