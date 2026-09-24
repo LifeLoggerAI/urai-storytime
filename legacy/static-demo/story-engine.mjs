@@ -1,3 +1,7 @@
+// Historical static Storytime demo engine.
+// Non-canonical: production/runtime authority is the Next.js app under src/app.
+// Retained only for historical behavior regression coverage.
+
 const blocked = [
   'violence',
   'blood',

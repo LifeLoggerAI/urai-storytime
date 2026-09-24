@@ -5,14 +5,13 @@ Evidence baseline: `main@af3b97166b23c55618ae3cdd91a96bb035fd40f2`
 
 ## Current classification
 
-URAI Storytime is a Next.js/Firebase internal-alpha product with a deterministic demo fallback. The active application is under `src/app`, `src/components/storytime`, and `src/lib`. Files such as `src/app.js`, `src/index.html`, and `src/story-engine.mjs` belong to the older static/hash-router implementation and are not the canonical runtime.
+URAI Storytime has one canonical application runtime: the Next.js/Firebase product under `src/app`, `src/components/storytime`, and `src/lib/storytime`, with Firebase callable Functions under `functions/src`. The historical deterministic static engine has been removed from the canonical `src/` root and is retained only under `legacy/static-demo/` for regression/history purposes.
 
 ## Current runtime architecture
 
 ```mermaid
 flowchart TB
   Browser[Next.js Storytime UI]
-  Browser --> Demo[Deterministic demo builder]
   Browser --> Auth[Firebase Auth]
   Browser --> FS[(Firestore)]
   Browser --> Fn[Firebase callable Functions]
@@ -25,7 +24,7 @@ flowchart TB
 
   FS --> Sessions[Story sessions/chapters/moments/scenes/scripts/arcs]
   FS --> Shares[Public-safe shares]
-  FS --> Jobs[Voiceover/export queue records]
+  FS --> Privacy[Privacy requests, plans, receipts]
 
   Adapter[Asset-Factory TypeScript adapter] -. not dispatched by worker .-> AssetFactory[asset-factory API]
 ```
@@ -35,31 +34,26 @@ flowchart TB
 - `/` redirects to `/storytime`.
 - `/storytime` contains Firebase account UI, cloud library, and story-seed form.
 - `/storytime/settings` is a read-only description of effective defaults.
-- `/storytime/demo` renders a deterministic, non-persisted story.
 - `/storytime/[sessionId]` reads an authenticated cloud session.
-- `/share/story/demo` shows the public-share boundary.
 - `/share/story/[shareId]` reads a redacted public-safe share when enabled.
 
 There are no active Next API routes. Backend operations are Firebase callable Functions.
 
 ## Callable boundary
 
-### Implemented but not live-verified
+### Implemented in source, not live-certified
 
-- `generateStorySession`
-- `createPublicStoryShare`
-- `revokePublicStoryShare`
-- `prepareVoiceoverJob` (queue records only)
+- `generateStorySession` — governed cloud story generation.
+- `createPublicStoryShare` / `revokePublicStoryShare` — content-neutral public derivative lifecycle.
+- `generateNarratorScript` — deterministic repository-owned record, completed synchronously.
+- `generateEmotionalArcSummary` — deterministic repository-owned record, completed synchronously.
+- `generateWeeklyStoryScroll` — deterministic repository-owned record, completed synchronously.
+- `refreshStoryTimeline` — ownership-checked timeline persistence.
+- `rebuildUserStoryArchive` — bounded archive snapshot rebuild.
+- Storytime privacy request/export/deletion-plan callables — bounded by privacy and environment gates.
+- `prepareVoiceoverJob` — intentionally fail-closed; no media queue is created until a governed worker exists.
 
-### Placeholder hooks
-
-- `generateNarratorScript`
-- `generateEmotionalArcSummary`
-- `generateWeeklyStoryScroll`
-- `refreshStoryTimeline`
-- `rebuildUserStoryArchive`
-
-A callable name existing is not evidence that its business process exists.
+Callable source existence still does not prove deployed/runtime readiness.
 
 ## Current data ownership
 
@@ -69,7 +63,7 @@ Storytime owns:
 - sessions, chapters, moments, scenes, narrator scripts, and emotional arcs;
 - user Storytime preferences;
 - public-safe derivatives and share lifecycle;
-- Storytime export/voiceover job metadata;
+- Storytime privacy/export evidence and hard-off media integration metadata;
 - consent, safety, provider, cost, and provenance receipts for Storytime operations.
 
 Storytime must not own raw canonical Life Map, relationship, location, health, or calendar records. Future integrations receive a minimum-necessary, purpose-bound snapshot through versioned APIs.
@@ -85,9 +79,11 @@ Active or source-wired collections include:
 - `narratorScripts`
 - `emotionalArcSummaries`
 - `publicStoryShares`
-- `voiceoverJobs`
-- `storyExports`
 - `timelineReplayEvents`
+- `storyArchiveSnapshots`
+- `privacyRequests`
+- `privacyDeletionPlans`
+- `privacyCompletionReceipts`
 - `storytimeUsageCounters`
 
 Family-oriented scaffolding also references `users`, `families`, `childProfiles`, `stories`, `storyRuns`, `moderation`, `auditLogs`, and `privacyRequests`, but the active UI/Functions do not yet provide a complete family workspace lifecycle.
@@ -194,15 +190,11 @@ A public share is a separate derivative record with:
 - all logs exclude raw private content and secrets;
 - monitoring, cost alerts, backups, restore drills, and tested rollback.
 
-## Legacy migration
+## Legacy status
 
-Before deleting the old static implementation:
+The old deterministic static Storytime engine is archived under `legacy/static-demo/`. Production build/deploy paths do not import it. Its retained unit test targets the archived path only.
 
-1. inventory unique demo behavior and tests;
-2. migrate any still-required local-only story/library/narration behavior into explicit Next adapters;
-3. move retained historical code to `legacy/static-demo/` with a non-canonical README, or delete it;
-4. remove obsolete build/preview scripts and stale documentation references;
-5. prove active routes/tests/build are unchanged.
+The canonical source rule is: **production Storytime code belongs to the Next.js/Firebase application and Functions surfaces, never the legacy directory.**
 
 ## Architecture decision gates
 

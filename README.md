@@ -6,7 +6,7 @@ URAI Storytime is the URAI narrative engine for turning opted-in life signals, p
 
 **Status: Done but needs external environment, CI, emulator, provider, deploy, and safety/legal receipts. Not production/live-published verified.**
 
-This repository has moved beyond the older standalone static demo. The current implementation uses Next.js, React, Firebase client/admin/functions, Firestore rules/index scaffolding, CI validation, runtime readiness gates, Storytime deployment/QA documentation, production-boundary regression tests, and explicit launch-proof records.
+This repository has one canonical Next.js/Firebase runtime. The historical deterministic static engine is archived under `legacy/static-demo/` and is excluded from production application/deployment authority. The current implementation uses Next.js, React, Firebase client/admin/functions, Firestore rules/index scaffolding, CI validation, runtime readiness gates, Storytime deployment/QA documentation, production-boundary regression tests, and explicit launch-proof records.
 
 Production launch is still blocked until isolated Storytime Firebase credentials, auth configuration, provider secrets, staging/production deploys, DNS/SSL, live smoke tests, child-safety/legal review, and release evidence are verified and recorded.
 
@@ -31,7 +31,7 @@ Firebase Admin production is **NO-GO** until a protected external-account WIF fi
 - `/storytime/settings` – Storytime settings surface
 - `/storytime/[sessionId]` – story session playback route
 - `/share/story/[shareId]` – public-safe/redacted share route
-- `/` – legacy demo entry where still retained
+- `/` – redirects to the canonical `/storytime` application
 
 ## Current backend hooks
 
