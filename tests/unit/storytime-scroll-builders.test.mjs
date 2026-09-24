@@ -4,10 +4,11 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('functions/src/storytime-scroll-builders.ts', 'utf8');
 
-test('weekly scroll builder creates queued scroll records', () => {
+test('weekly scroll builder creates locally compiled scroll records', () => {
   assert.match(source, /export function buildWeeklyStoryScrollRecord/);
   assert.match(source, /title: "Weekly Story Scroll"/);
-  assert.match(source, /providerStatus: "queued"/);
+  assert.match(source, /providerStatus: "local_compiled"/);
+  assert.match(source, /Compiled weekly scroll/);
   assert.match(source, /sessionIds: args\.sessionIds/);
   assert.match(source, /weekStart: args\.weekStart/);
   assert.match(source, /weekEnd: args\.weekEnd/);
