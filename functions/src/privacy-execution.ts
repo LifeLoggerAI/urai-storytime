@@ -72,6 +72,7 @@ const accountUserCollections = [
   "storytimeUsageCounters",
   "storyGenerationRequests",
   "storyArchiveSnapshots",
+  "storySafetyReports",
   "publicStoryShareControls"
 ] as const;
 
@@ -94,6 +95,7 @@ const sessionScalarCollections = [
   "relationshipStoryThreads",
   "storyAnalyticsEvents",
   "storyGenerationRequests",
+  "storySafetyReports",
   "publicStoryShareControls"
 ] as const;
 
