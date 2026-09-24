@@ -188,13 +188,13 @@ if (exists('firestore.rules')) {
     'revoked == false',
     'match /storytimeUsageCounters/{id}',
     'match /privacyDeletionPlans/{planId}',
-    'match /privacyCompletionReceipts/{receiptId}',
+    'match /privacyOperationReceipts/{receiptId}',
     'allow read, write: if false'
   ]) {
     if (!rules.includes(marker)) failures.push(`Missing Firestore rule marker: ${marker}`);
   }
-  if (rules.includes('privacyOperationReceipts')) {
-    failures.push('Obsolete privacyOperationReceipts rule must not remain; privacyCompletionReceipts is canonical.');
+  if (rules.includes('privacyCompletionReceipts')) {
+    failures.push('Obsolete privacyCompletionReceipts rule must not remain; privacyOperationReceipts is canonical.');
   }
 }
 
