@@ -137,6 +137,8 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if false;
     }
+    match /privacyDeletionPlans/{id} { allow read, write: if false; }
+    match /privacyCompletionReceipts/{id} { allow read, write: if false; }
     match /privacyDeletionPlans/{planId} {
       allow read, write: if false;
     }
