@@ -21,6 +21,10 @@ const SaveDraftSchema = z.object({
   emotionalTone: z.enum(["gentle", "reflective", "playful", "brave", "calm"]),
   audienceAgeBand: z.enum(["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"]),
   locale: z.literal("en-US"),
+  operator: z.object({
+    role: z.literal("adult_or_guardian"),
+    affirmed: z.literal(true)
+  }),
   storageConsent: z.object({
     privateDraftStorage: z.literal(true),
     consentVersion: z.literal(DRAFT_STORAGE_CONSENT_VERSION)
@@ -80,6 +84,7 @@ export const saveStoryDraft = onCall(async (request) => {
       emotionalTone: input.emotionalTone,
       audienceAgeBand: input.audienceAgeBand,
       locale: input.locale,
+      operatorRoleAtSave: input.operator.role,
       storageConsent: input.storageConsent,
       generationConsentStored: false,
       providerProcessingAuthorized: false,
