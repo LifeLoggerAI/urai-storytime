@@ -1,5 +1,7 @@
 export {
   generateStorySession,
+  cancelStoryGeneration,
+  listStorytimeProviderReconciliationQueue,
   prepareVoiceoverJob
 } from "./storytime.js";
 
