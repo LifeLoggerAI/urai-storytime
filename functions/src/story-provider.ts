@@ -24,19 +24,19 @@ export interface StoryProviderOutput {
 
 export interface StoryProviderReceipt {
   schemaVersion: "storytime-provider-receipt-v1";
-  provider: "openai";
+  provider: "openai" | "local_builder";
   model: string;
-  providerRequestId: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  configuredInputUsdPerMillionTokens: number;
-  configuredOutputUsdPerMillionTokens: number;
+  providerRequestId: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  configuredInputUsdPerMillionTokens: number | null;
+  configuredOutputUsdPerMillionTokens: number | null;
   estimatedMaxCostUsd: number;
   actualCostUsd: number;
-  maxAllowedCostUsd: number;
+  maxAllowedCostUsd: number | null;
   attemptCount: 1;
-  costStatus: "priced_from_configured_rates";
+  costStatus: "priced_from_configured_rates" | "no_provider_spend";
 }
 
 export interface StoryProviderResult {
@@ -209,9 +209,9 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
   const totalTokens = payload.usage?.total_tokens;
   if (
     !providerRequestId
-    || !Number.isInteger(promptTokens) || Number(promptTokens) < 0
-    || !Number.isInteger(completionTokens) || Number(completionTokens) < 0
-    || !Number.isInteger(totalTokens) || Number(totalTokens) < 0
+    || typeof promptTokens !== "number" || !Number.isInteger(promptTokens) || promptTokens < 0
+    || typeof completionTokens !== "number" || !Number.isInteger(completionTokens) || completionTokens < 0
+    || typeof totalTokens !== "number" || !Number.isInteger(totalTokens) || totalTokens < 0
   ) {
     throw new Error("Story provider usage receipt is incomplete.");
   }
