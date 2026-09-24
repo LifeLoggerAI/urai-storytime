@@ -5,6 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
+import { buildInitialStoryVersionRecord } from "./story-version.js";
 
 initializeApp();
 
@@ -14,6 +15,7 @@ const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString
 const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
 const MAX_GENERATIONS_PER_DAY = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_DAY || 24);
 const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
+const STORY_REQUEST_REVIEW_VERSION = "story-request-review-v1";
 
 const GenerateStorySchema = z.object({
   requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/),
@@ -27,6 +29,10 @@ const GenerateStorySchema = z.object({
   operator: z.object({
     role: z.literal("adult_or_guardian"),
     affirmed: z.literal(true)
+  }),
+  requestReview: z.object({
+    reviewed: z.literal(true),
+    reviewVersion: z.literal(STORY_REQUEST_REVIEW_VERSION)
   }),
   consentSnapshot: z.object({
     storyGeneration: z.literal(true),
@@ -92,6 +98,22 @@ function generationRequestId(userId: string, requestId: string) {
   return `${userId}_${requestId}`;
 }
 
+function reviewedRequestSha256(input: z.infer<typeof GenerateStorySchema>) {
+  const reviewedRequest = {
+    title: input.title,
+    sourceText: input.sourceText ?? "",
+    emotionalTone: input.emotionalTone,
+    symbolicMotifs: input.symbolicMotifs,
+    sourceSignals: input.sourceSignals,
+    locale: input.locale,
+    audienceAgeBand: input.audienceAgeBand,
+    operator: input.operator,
+    requestReview: input.requestReview,
+    consentSnapshot: input.consentSnapshot
+  };
+  return createHash("sha256").update(JSON.stringify(reviewedRequest), "utf8").digest("hex");
+}
+
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
   const requestRef = db.collection("storyGenerationRequests").doc(generationRequestId(userId, input.requestId));
   const result = await db.runTransaction(async (transaction) => {
@@ -117,6 +139,8 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       audienceAgeBand: input.audienceAgeBand,
       operatorRole: input.operator.role,
       consentVersion: input.consentSnapshot.consentVersion,
+      reviewVersion: input.requestReview.reviewVersion,
+      reviewedRequestSha256: reviewedRequestSha256(input),
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -226,6 +250,7 @@ export const generateStorySession = onCall(async (request) => {
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
+  const processedRequestSha256 = reviewedRequestSha256(input);
   const source = input.sourceText || "A quiet signal became a private URAI story.";
   const inputSafetyText = `${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`;
   const mod = moderate(inputSafetyText);
@@ -311,6 +336,7 @@ export const generateStorySession = onCall(async (request) => {
   const sceneId = id("memoryScene");
   const scriptId = id("narratorScript");
   const arcId = id("emotionalArc");
+  const versionId = id("storyVersion");
 
   const session = {
     id: sessionId,
@@ -325,11 +351,17 @@ export const generateStorySession = onCall(async (request) => {
     chapterIds: [chapterId],
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
+    currentVersionId: versionId,
+    versionNumber: 1,
     provider: readiness.ready ? readiness.provider : "local_builder",
     requestId: input.requestId,
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     operator: input.operator,
+    requestReview: {
+      ...input.requestReview,
+      processedRequestSha256
+    },
     provenance: {
       schemaVersion: "storytime-provenance-v1",
       sourceType: "direct_storytime_input",
@@ -422,6 +454,40 @@ export const generateStorySession = onCall(async (request) => {
     updatedAt: createdAt
   };
 
+  const version = buildInitialStoryVersionRecord({
+    id: versionId,
+    userId,
+    sessionId,
+    createdAt,
+    title: input.title,
+    provider: session.provider,
+    locale: input.locale,
+    audienceAgeBand: input.audienceAgeBand,
+    consentVersion: input.consentSnapshot.consentVersion,
+    reviewVersion: input.requestReview.reviewVersion,
+    reviewedRequestSha256: processedRequestSha256,
+    provenance: session.provenance,
+    chapter: {
+      id: chapterId,
+      title: chapter.title,
+      summary: chapter.summary
+    },
+    moment: {
+      id: momentId,
+      title: moment.title,
+      body: moment.body
+    },
+    narrator: {
+      id: scriptId,
+      text: narratorScript.text
+    },
+    emotionalArc: {
+      id: arcId,
+      arcLabel: arc.arcLabel,
+      summary: arc.summary
+    }
+  });
+
   const batch = db.batch();
   batch.set(db.collection("storySessions").doc(sessionId), session);
   batch.set(db.collection("storyChapters").doc(chapterId), chapter);
@@ -429,6 +495,7 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("memoryScenes").doc(sceneId), scene);
   batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+  batch.set(db.collection("storyVersions").doc(versionId), version);
   batch.set(generationRequest.requestRef, {
     status: "succeeded",
     sessionId,

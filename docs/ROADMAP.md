@@ -138,7 +138,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.1 Guided story builder and draft workflow
 
 - **User value:** people can create a story without understanding internal terms.
-- **Current evidence:** one form for title/theme/age/mood/source.
+- **Current evidence:** the current form captures title/theme/audience/tone/source, adult/guardian authority, generation/provider consent, and now requires a versioned review of the exact request fingerprint before generation; changing any reviewed field invalidates the review. Multi-step guidance, private draft autosave/resume, people/pets/places, length/genre and draft recovery remain open.
 - **Scope:** multi-step wizard for audience, people/pets/places, genre, tone, length, language, source permissions, review; autosaved draft; validation and recovery.
 - **Areas:** Storytime components, domain schemas, Firestore drafts.
 - **Dependencies:** P0 policy/data model.
@@ -153,7 +153,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.2 Story reader, editor, regeneration, and version history
 
 - **User value:** users can read, correct, and selectively improve stories without regenerating everything.
-- **Current evidence:** static chapter cards and narrator text.
+- **Current evidence:** generated sessions now atomically commit an immutable `story-version-v1` snapshot with SHA-256 content identity, version number, parent pointer, consent/provenance, and read-only owner-visible version history. Editing, section regeneration, compare/restore, optimistic concurrency and later-version creation remain open.
 - **Scope:** scene/chapter reader, edit, regenerate section, compare versions, restore, progress, loading/error/retry, content report.
 - **Areas:** `StoryPlayer`, story version model, Functions.
 - **Dependencies:** P0 generation jobs.
