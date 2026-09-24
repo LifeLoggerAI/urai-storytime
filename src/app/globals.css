@@ -176,10 +176,15 @@ button, input, textarea, select { font: inherit; }
   cursor: pointer;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
 .storytime-button:focus-visible,
 .storytime-links a:focus-visible,
 .storytime-list a:focus-visible {
-  outline: 3px solid rgba(154, 104, 66, 0.35);
+  outline: 3px solid rgba(154, 104, 66, 0.45);
   outline-offset: 3px;
 }
 

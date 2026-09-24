@@ -84,7 +84,7 @@ export function ShareControls({ session }: { session: StorySession }) {
         </>
       )}
       {shareSlug ? <p><a href={`/share/story/${encodeURIComponent(shareSlug)}`}>Open public-safe share</a></p> : null}
-      {message ? <p className="storytime-helper">{message}</p> : null}
+      {message ? <p className="storytime-helper" role="status" aria-live="polite">{message}</p> : null}
     </section>
   );
 }
