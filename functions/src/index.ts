@@ -1,7 +1,4 @@
-export {
-  generateStorySession,
-  prepareVoiceoverJob
-} from "./storytime.js";
+export { generateStorySession } from "./storytime.js";
 
 export { createPublicStoryShare, revokePublicStoryShare } from "./public-story-share-lifecycle.js";
 export { generateNarratorScript } from "./generate-narrator-script.js";
