@@ -54,6 +54,8 @@ These functions enforce auth boundaries, consent checks, private-by-default stor
 Implemented or source-wired in code:
 
 - Next.js Storytime routes
+- Guided Details → Review & consent story creation
+- Consent-bound private draft save/resume lifecycle
 - Firebase callable lifecycle hooks
 - Firestore rules/index scaffolding
 - Storytime domain models and safety helpers

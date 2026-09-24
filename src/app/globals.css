@@ -327,3 +327,29 @@ button, input, textarea, select { font: inherit; }
     border: 1px solid CanvasText;
   }
 }
+
+
+.storytime-review {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card-strong);
+}
+
+.storytime-review > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.32fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.storytime-review > div:last-child { border-bottom: 0; }
+.storytime-review dt { font-weight: 700; color: var(--text); }
+.storytime-review dd { margin: 0; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .storytime-review > div { grid-template-columns: 1fr; gap: 4px; }
+}

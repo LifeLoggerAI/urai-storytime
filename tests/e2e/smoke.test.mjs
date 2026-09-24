@@ -55,7 +55,10 @@ test('Storytime create form has cloud creation and an honest unavailable state',
   assert.match(storytimeHome, /httpsCallable/);
   assert.match(storytimeHome, /generateStorySession/);
   assert.match(storytimeHome, /Story creation is temporarily unavailable/);
-  assert.match(storytimeHome, /Create story/);
+  assert.match(storytimeHome, /Review story request/);
+  assert.match(storytimeHome, /Create private story/);
+  assert.match(storytimeHome, /getStoryDraft/);
+  assert.match(storytimeHome, /saveStoryDraft/);
   assert.match(storytimeHome, /MAX_SOURCE_CHARS/);
   assert.doesNotMatch(storytimeHome, /Open Demo Story Session|MAX_DEMO_SOURCE_CHARS|demo-user/i);
 });
