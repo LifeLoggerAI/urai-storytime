@@ -119,7 +119,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.7 Data rights and deletion
 
 - **User value:** users can see, export, revoke, and delete their private information.
-- **Current evidence:** current hardening adds a verified, explicitly confirmed, idempotent server-owned `privacyRequests` lifecycle plus user-facing account export/deletion request controls. Request creation is real; export assembly, deletion cascades, provider/media deletion, completion receipts, backup-retention handling, and account-auth deletion remain incomplete.
+- **Current evidence:** the privacy child lane now packages Storytime-owned exports to private Storage with integrity manifests, exposes owner-only short-lived download only for complete Storytime-owned scope, creates deletion dry-run plans/hashes, checks legal hold/family/provider/isolation blockers, requires admin-only exact-plan destructive execution, deletes bounded Storytime-owned Firestore/Storage/Auth targets, and performs post-delete verification with retained receipts. Whole-URAI/family/provider deletion remains outside Storytime authority, and final completion remains blocked until backup-retention certification and runtime proof.
 - **Problem:** privacy promises are incomplete and data can become effectively undeletable.
 - **Scope:** inventory data; retention classes; account export; story/session delete; account deletion orchestration; media/provider deletion; share revocation; tombstones/audit strategy; backup retention disclosure.
 - **Repository areas:** Functions, rules, settings UI, `urai-privacy` contract, operations docs.
