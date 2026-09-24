@@ -198,7 +198,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.5 Narration, captions, and accessible playback
 
 - **User value:** stories can be listened to and used by people with visual, reading, motor, or attention needs.
-- **Current evidence:** narrator text only; queue scaffold.
+- **Current evidence:** narrator scripts, emotional arcs, weekly scrolls, timeline refresh, and archive snapshots are synchronous local persistence operations and report completed only after writes succeed. Provider-backed voiceover/media execution is deliberately absent from the callable surface; a versioned zero-spend hard-off media contract exists for future activation.
 - **Scope:** browser speech fallback, provider TTS behind consent/cost gate, audio player, captions/transcript, playback speed, scene timing, keyboard controls, reduced motion.
 - **Areas:** player/narrator components, media job system, Storage.
 - **Dependencies:** P0 job/data controls.
@@ -260,7 +260,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P2.2 Export platform and physical-book-ready artifacts
 
 - **User value:** users can keep, print, and privately share their stories.
-- **Current evidence:** queued export records and an Asset-Factory adapter exist. Current hardening adds a versioned provenance-bound integration envelope, a separate default-off `STORYTIME_ASSET_FACTORY_EXECUTION` gate, and bounded network timeout; no worker dispatch, paid generation, signed downloads, or final artifact lifecycle is claimed.
+- **Current evidence:** the old unconsumed voiceover/export queue callable has been removed from the deployed Functions surface. The Asset Factory adapter and versioned provenance-bound integration envelope remain hard-off behind `STORYTIME_ASSET_FACTORY_EXECUTION=false` and `STORYTIME_MEDIA_EXECUTION=false`; no worker dispatch, paid generation, signed media download, or final artifact lifecycle is claimed.
 - **Scope:** PDF, EPUB, audio, image package, print-ready PDF; signed expiring downloads; job progress/cancel/retry; provenance manifest.
 - **Areas:** Asset Factory contract, jobs, Storage, export UI.
 - **Dependencies:** P0 data rights/jobs and media ownership policy.
