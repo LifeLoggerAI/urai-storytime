@@ -1,15 +1,19 @@
 "use client";
 
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { FormEvent, useMemo, useState } from "react";
-import { getFirebaseAuth, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { getFirebaseAuth, getFirebaseDb, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
 import { AuthPanel } from "./AuthPanel";
+import { DraftLibrary } from "./DraftLibrary";
 import { SessionLibrary } from "./SessionLibrary";
 
 const MAX_SOURCE_CHARS = 1200;
 const AUDIENCE_AGE_BANDS = ["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"] as const;
 const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
 const STORY_REQUEST_REVIEW_VERSION = "story-request-review-v1";
+const DRAFT_STORAGE_CONSENT_VERSION = "story-draft-storage-v1";
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
 const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
@@ -17,6 +21,13 @@ type GenerateStoryResponse = {
   sessionId?: string;
   status?: string;
   safetyStatus?: string;
+};
+
+type SaveDraftResponse = {
+  draftId?: string;
+  revision?: number;
+  updatedAt?: string;
+  retentionReviewAt?: string;
 };
 
 function firstUnsafeTerm(values: string[]) {
@@ -35,6 +46,34 @@ function createRequestId() {
   return `story-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+function createDraftId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `draft-${crypto.randomUUID()}`;
+  }
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function validDraftId(value: string) {
+  return /^[A-Za-z0-9._-]{8,128}$/.test(value);
+}
+
+function draftFingerprint(input: {
+  title: string;
+  theme: string;
+  audienceAgeBand: string;
+  mood: string;
+  sourceText: string;
+}) {
+  return JSON.stringify({
+    title: input.title.trim(),
+    theme: input.theme.trim(),
+    audienceAgeBand: input.audienceAgeBand,
+    mood: input.mood,
+    sourceText: input.sourceText.trim(),
+    locale: "en-US"
+  });
+}
+
 export function StorytimeHome() {
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("");
@@ -45,6 +84,12 @@ export function StorytimeHome() {
   const [generationConsent, setGenerationConsent] = useState(false);
   const [providerProcessingConsent, setProviderProcessingConsent] = useState(false);
   const [reviewedFingerprint, setReviewedFingerprint] = useState<string | null>(null);
+  const [draftStorageConsent, setDraftStorageConsent] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
+  const [lastSavedDraftFingerprint, setLastSavedDraftFingerprint] = useState<string | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
