@@ -178,8 +178,11 @@ button, input, textarea, select { font: inherit; }
 
 .storytime-button:focus-visible,
 .storytime-links a:focus-visible,
-.storytime-list a:focus-visible {
-  outline: 3px solid rgba(154, 104, 66, 0.35);
+.storytime-list a:focus-visible,
+.storytime-card a:focus-visible,
+.storytime-brand:focus-visible,
+.storytime-field input[type="checkbox"]:focus-visible {
+  outline: 3px solid rgba(154, 104, 66, 0.5);
   outline-offset: 3px;
 }
 
@@ -325,5 +328,14 @@ button, input, textarea, select { font: inherit; }
   .storytime-card,
   .storytime-input {
     border: 1px solid CanvasText;
+  }
+
+  .storytime-button:focus-visible,
+  .storytime-links a:focus-visible,
+  .storytime-list a:focus-visible,
+  .storytime-card a:focus-visible,
+  .storytime-brand:focus-visible,
+  .storytime-field input[type="checkbox"]:focus-visible {
+    outline: 3px solid Highlight;
   }
 }

@@ -23,8 +23,8 @@ function firstUnsafeTerm(values: string[]) {
   return SAFETY_TERMS.find((term) => text.includes(term));
 }
 
-function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Story creation was interrupted. Please try again.";
+function errorMessage() {
+  return "Story creation was interrupted. No private story was saved. Please try again.";
 }
 
 function createRequestId() {
@@ -112,8 +112,8 @@ export function StorytimeHome() {
 
       if (!result.data.sessionId) throw new Error("Story creation did not complete.");
       window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
-    } catch (error) {
-      setSubmitError(errorMessage(error));
+    } catch {
+      setSubmitError(errorMessage());
     } finally {
       setIsSubmitting(false);
     }
@@ -148,7 +148,12 @@ export function StorytimeHome() {
           <SessionLibrary />
         </section>
 
-        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
+        <form
+          className="storytime-card storytime-form"
+          onSubmit={handleCreateStory}
+          aria-describedby={!cloudReady ? "storytime-unavailable" : validationError ? "storytime-validation" : undefined}
+          aria-busy={isSubmitting}
+        >
           <p className="storytime-pill">Private story</p>
           <h2>Create a story</h2>
           <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
@@ -161,11 +166,11 @@ export function StorytimeHome() {
 
           <label className="storytime-field">
             Title
-            <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" />
+            <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" required aria-invalid={Boolean(submitError && !title.trim())} />
           </label>
           <label className="storytime-field">
             Theme
-            <input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="A family memory, a quiet turning point, a brave day" autoComplete="off" />
+            <input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="A family memory, a quiet turning point, a brave day" autoComplete="off" required aria-invalid={Boolean(submitError && !theme.trim())} />
           </label>
           <div className="storytime-grid compact">
             <label className="storytime-field">
@@ -186,7 +191,8 @@ export function StorytimeHome() {
           </div>
           <label className="storytime-field">
             Memory or source text <span className="storytime-helper">Optional</span>
-            <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
+            <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." aria-describedby="storytime-source-count" />
+            <span className="storytime-helper" id="storytime-source-count">{sourceText.length} / {MAX_SOURCE_CHARS} characters</span>
           </label>
 
           <label className="storytime-field">
@@ -221,7 +227,7 @@ export function StorytimeHome() {
           </label>
 
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
-          {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
+          {cloudReady && validationError ? <p className="storytime-helper" id="storytime-validation" role="status" aria-live="polite">{validationError}</p> : null}
 
           <div className="storytime-actions">
             <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting}>
