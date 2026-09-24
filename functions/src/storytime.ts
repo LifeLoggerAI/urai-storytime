@@ -5,6 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
+import { buildInitialStoryVersionRecord } from "./story-version.js";
 
 initializeApp();
 
@@ -311,6 +312,7 @@ export const generateStorySession = onCall(async (request) => {
   const sceneId = id("memoryScene");
   const scriptId = id("narratorScript");
   const arcId = id("emotionalArc");
+  const versionId = id("storyVersion");
 
   const session = {
     id: sessionId,
@@ -325,6 +327,8 @@ export const generateStorySession = onCall(async (request) => {
     chapterIds: [chapterId],
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
+    currentVersionId: versionId,
+    versionNumber: 1,
     provider: readiness.ready ? readiness.provider : "local_builder",
     requestId: input.requestId,
     locale: input.locale,
@@ -422,6 +426,38 @@ export const generateStorySession = onCall(async (request) => {
     updatedAt: createdAt
   };
 
+  const version = buildInitialStoryVersionRecord({
+    id: versionId,
+    userId,
+    sessionId,
+    createdAt,
+    title: input.title,
+    provider: session.provider,
+    locale: input.locale,
+    audienceAgeBand: input.audienceAgeBand,
+    consentVersion: input.consentSnapshot.consentVersion,
+    provenance: session.provenance,
+    chapter: {
+      id: chapterId,
+      title: chapter.title,
+      summary: chapter.summary
+    },
+    moment: {
+      id: momentId,
+      title: moment.title,
+      body: moment.body
+    },
+    narrator: {
+      id: scriptId,
+      text: narratorScript.text
+    },
+    emotionalArc: {
+      id: arcId,
+      arcLabel: arc.arcLabel,
+      summary: arc.summary
+    }
+  });
+
   const batch = db.batch();
   batch.set(db.collection("storySessions").doc(sessionId), session);
   batch.set(db.collection("storyChapters").doc(chapterId), chapter);
@@ -429,6 +465,7 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("memoryScenes").doc(sceneId), scene);
   batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+  batch.set(db.collection("storyVersions").doc(versionId), version);
   batch.set(generationRequest.requestRef, {
     status: "succeeded",
     sessionId,
