@@ -79,6 +79,10 @@ export function StorytimeHome() {
       setSubmitError("Sign in to create and save a private story.");
       return;
     }
+    if (!auth.currentUser.emailVerified) {
+      setSubmitError("Verify the adult/guardian account email before creating a cloud story.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
