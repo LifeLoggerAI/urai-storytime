@@ -49,6 +49,7 @@ const requiredSourceFiles = [
   'functions/src/story-provider.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
+  'functions/src/privacy-execution.ts',
   'functions/src/refresh-story-timeline.ts',
   'functions/src/rebuild-user-story-archive.ts',
   'functions/src/readiness.ts',
@@ -148,6 +149,24 @@ if (exists('functions/src/privacy-requests.ts')) {
   }
 }
 
+if (exists('functions/src/privacy-execution.ts')) {
+  const privacyExecution = read('functions/src/privacy-execution.ts');
+  for (const marker of [
+    'processStorytimeExportRequest',
+    'getStorytimeExportDownloadUrl',
+    'planStorytimeDeletion',
+    'executeStorytimeDeletion',
+    'verifyStorytimeDeletion',
+    'active_legal_hold',
+    'storytime_firebase_isolation_not_certified',
+    'story_media_storage_cleanup_not_certified',
+    'backup_expiry_pending',
+    'DELETE_STORYTIME_DATA'
+  ]) {
+    if (!privacyExecution.includes(marker)) failures.push(`Missing Storytime data-rights execution marker: ${marker}`);
+  }
+}
+
 if (exists('functions/src/index.ts')) {
   const functionsIndex = read('functions/src/index.ts');
   for (const marker of [
@@ -163,8 +182,19 @@ if (exists('functions/src/index.ts')) {
 
 if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
-  for (const marker of ['match /storySessions/{id}', 'match /publicStoryShares/{id}', 'revoked == false', 'match /storytimeUsageCounters/{id}', 'allow read, write: if false']) {
+  for (const marker of [
+    'match /storySessions/{id}',
+    'match /publicStoryShares/{id}',
+    'revoked == false',
+    'match /storytimeUsageCounters/{id}',
+    'match /privacyDeletionPlans/{planId}',
+    'match /privacyOperationReceipts/{receiptId}',
+    'allow read, write: if false'
+  ]) {
     if (!rules.includes(marker)) failures.push(`Missing Firestore rule marker: ${marker}`);
+  }
+  if (rules.includes('privacyCompletionReceipts')) {
+    failures.push('Obsolete privacyCompletionReceipts rule must not remain; privacyOperationReceipts is canonical.');
   }
 }
 

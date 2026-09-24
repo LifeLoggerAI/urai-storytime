@@ -30,6 +30,7 @@ test('settings expose truthful request controls without completion claims', () =
   assert.match(settings, /PrivacyRequestControls/);
   assert.match(controls, /Request account export/);
   assert.match(controls, /Request account deletion/);
-  assert.match(controls, /an export is not represented as complete until a completion receipt exists/);
-  assert.match(controls, /No data is represented as deleted until the governed deletion workflow records completion/);
+  assert.match(controls, /Export requests package Storytime-owned data immediately/);
+  assert.match(controls, /never represented as complete without post-delete verification/);
+  assert.match(controls, /No data has been deleted/);
 });
