@@ -51,6 +51,12 @@ function requireAuth(uid?: string) {
   }
 }
 
+function requireVerifiedAdultAccount(emailVerified?: unknown) {
+  if (emailVerified !== true) {
+    throw new HttpsError("failed-precondition", "Verify the adult/guardian account email before creating cloud stories.");
+  }
+}
+
 function allowLocalBuilder() {
   return process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true" && process.env.NODE_ENV !== "production";
 }
@@ -181,6 +187,7 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
 
 export const generateStorySession = onCall(async (request) => {
   requireAuth(request.auth?.uid);
+  requireVerifiedAdultAccount(request.auth?.token.email_verified);
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
