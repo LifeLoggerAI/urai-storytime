@@ -22,7 +22,7 @@ export function StoryVersionHistory({ versions }: { versions: StoryVersion[] }) 
           {ordered.map((version) => (
             <li key={version.id} className="storytime-card">
               <strong>Version {version.versionNumber}</strong>
-              <p>{version.reason.replaceAll("_", " ")}</p>
+              <p>{version.reason.replace(/_/g, " ")}</p>
               <p className="storytime-helper">
                 {new Date(version.createdAt).toLocaleString()} · SHA-256 {shortHash(version.contentSha256)}
               </p>
