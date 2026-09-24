@@ -477,7 +477,11 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
     }
   }
 
-  executionBlockers.push(...externalArtifactPointers(flattenExternalRows(collections)));
+  const mediaRows = flattenExternalRows(collections);
+  executionBlockers.push(...externalArtifactPointers(mediaRows));
+  if (mediaRows.length > 0) {
+    executionBlockers.push("story_media_storage_cleanup_not_certified");
+  }
 
   if (process.env.STORYTIME_BACKUP_RETENTION_POLICY_READY !== "true") {
     completionBlockers.push("backup_expiry_policy_not_certified");
