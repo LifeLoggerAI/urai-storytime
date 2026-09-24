@@ -203,7 +203,7 @@ service cloud.firestore {
     match /storyGenerationRequests/{id} { allow read, write: if false; }
     match /storyArchiveSnapshots/{id} { allow read, write: if false; }
     match /privacyDeletionPlans/{planId} { allow read, write: if false; }
-    match /privacyCompletionReceipts/{receiptId} { allow read, write: if false; }
+    match /privacyOperationReceipts/{receiptId} { allow read, write: if false; }
     match /publicStoryShares/{id} {
       allow read: if activePublicShare();
       allow create, update, delete: if false;
