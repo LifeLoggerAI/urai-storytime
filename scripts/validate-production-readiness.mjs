@@ -49,6 +49,7 @@ const requiredSourceFiles = [
   'functions/src/story-provider.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
+  'functions/src/story-versioning.ts',
   'functions/src/refresh-story-timeline.ts',
   'functions/src/rebuild-user-story-archive.ts',
   'functions/src/readiness.ts',
@@ -133,6 +134,22 @@ if (exists('functions/src/public-story-share-lifecycle.ts')) {
     'requireVerifiedAccount(request)'
   ]) {
     if (!sharing.includes(marker)) failures.push(`Missing public-share safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/story-versioning.ts')) {
+  const versions = read('functions/src/story-versioning.ts');
+  for (const marker of [
+    'storytime-version-v1',
+    'saveStoryRevision',
+    'restoreStoryVersion',
+    'listStoryVersions',
+    'expectedCurrentVersionId',
+    'providerCallMade: false',
+    'providerSpendAuthorized: false',
+    'immutable: true'
+  ]) {
+    if (!versions.includes(marker)) failures.push(`Missing Storytime version-history marker: ${marker}`);
   }
 }
 
