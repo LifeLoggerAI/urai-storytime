@@ -180,6 +180,11 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(archiveFunction, /export const rebuildUserStoryArchive/);
   assert.match(archiveFunction, /storyArchiveSnapshots/);
   assert.match(archiveFunction, /status: "completed"/);
+  assert.match(narratorFunction, /status: "completed"/);
+  assert.match(arcFunction, /status: "completed"/);
+  assert.match(weeklyFunction, /status: "completed"/);
+  assert.match(functions, /voiceover_execution_blocked/);
+  assert.match(functions, /Storytime voiceover\/media execution is disabled until a governed worker/);
   for (const moduleName of [
     'generate-narrator-script.js',
     'generate-emotional-arc-summary.js',
@@ -214,10 +219,10 @@ test('Storytime Functions emit privacy-safe audit log events', () => {
   assert.match(auditLog, /story_persisted/);
   assert.match(auditLog, /public_share_created/);
   assert.match(auditLog, /public_share_revoked/);
-  assert.match(auditLog, /voiceover_export_queued/);
+  assert.match(auditLog, /voiceover_execution_blocked/);
   assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
   assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
-  assert.match(functions, /auditLog\(\{ event: "voiceover_export_queued"/);
+  assert.match(functions, /auditLog\(\{[\s\S]*event: "voiceover_execution_blocked"/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_created"/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_revoked"/);
   assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
