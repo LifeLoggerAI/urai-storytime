@@ -25,3 +25,11 @@ export {
   executeStorytimeDeletion,
   verifyStorytimeDeletion
 } from "./privacy-execution.js";
+
+export {
+  processStorytimeExportRequest,
+  getStorytimeExportDownloadUrl,
+  planStorytimeDeletion,
+  executeStorytimeDeletion,
+  verifyStorytimeDeletion
+} from "./privacy-execution.js";
