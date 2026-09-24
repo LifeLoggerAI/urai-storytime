@@ -25,7 +25,7 @@ const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 const STORYTIME_PRIVACY_POLICY_VERSION = "urai-privacy-0.2.0-staging-scaffold";
 const STORYTIME_EXPORT_SCHEMA_VERSION = "storytime-export-v1";
 const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v1";
-const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-receipt-v1";
+const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-operation-receipt-v1";
 
 const ExportRequestSchema = z.object({
   privacyRequestId: z.string().min(1).max(300)
@@ -420,7 +420,7 @@ async function writeReceipt(args: {
   type: "export" | "deletion_mutation" | "deletion_completed";
   metadata: Record<string, unknown>;
 }) {
-  const ref = db.collection("privacyCompletionReceipts").doc();
+  const ref = db.collection("privacyOperationReceipts").doc();
   const createdAt = nowIso();
   const payload = {
     schemaVersion: STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION,
@@ -471,7 +471,7 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
   const retainedData = [
     "privacyRequests",
     "privacyDeletionPlans",
-    "privacyCompletionReceipts",
+    "privacyOperationReceipts",
     "legalHoldRecords"
   ];
 
