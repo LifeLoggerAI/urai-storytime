@@ -84,10 +84,20 @@ export function SessionLibrary() {
   }
 
   return (
-    <section className="storytime-card storytime-stack" aria-label="Saved sessions">
+    <section
+      className="storytime-card storytime-stack"
+      aria-label="Saved sessions"
+      aria-live="polite"
+      aria-busy={state.status === "loading"}
+    >
       <p className="storytime-pill">Cloud Library</p>
       <h2>Saved sessions</h2>
-      <p className={state.status === "error" ? "storytime-error" : undefined}>{state.message}</p>
+      <p
+        className={state.status === "error" ? "storytime-error" : undefined}
+        role={state.status === "error" ? "alert" : "status"}
+      >
+        {state.message}
+      </p>
       <p className="storytime-helper">Demo sessions are not written to a user account. Cloud history only appears after Firebase auth, rules, indexes, and cloud mode are configured.</p>
     </section>
   );
