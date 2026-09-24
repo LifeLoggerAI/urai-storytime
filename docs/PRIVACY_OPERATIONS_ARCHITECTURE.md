@@ -2,84 +2,79 @@
 
 ## Current State
 
-Storytime privacy operations now have a real repository-owned execution path, but production certification remains blocked by exact-head CI, isolated Firebase runtime proof, URAI Privacy review, backup-retention certification, and provider/media cleanup evidence where applicable.
+Storytime now has a bounded source implementation for privacy requests, private export packaging, short-lived signed export retrieval, deletion dry-run planning, admin-only destructive execution, and post-delete verification.
 
-The canonical implementation is split between:
+This is **not production certification**. Runtime completion still depends on exact-head CI, isolated Firebase staging/production authority, authenticated emulator/staging proof, reviewed retention/legal-hold policy, and cross-system provider/media cleanup evidence.
 
-- `functions/src/privacy-requests.ts` — verified, explicit request creation and ownership checks.
-- `functions/src/privacy-execution.ts` — private export packaging/retrieval and deletion plan/execute/verify lifecycle.
-- `src/components/storytime/PrivacyRequestControls.tsx` — user-visible request, export-package, download, and deletion dry-run controls.
-- `urai-privacy` — governing user-rights, retention, deletion, legal-hold, export, audit, and production-release authority.
+## Authority
+
+- URAI Privacy remains the ecosystem privacy control-plane authority.
+- Storytime implements only its Storytime-owned operational slice.
+- Storytime does not silently delete family/shared records, provider-held media, or another repository's authority.
+- Request creation does not equal export/deletion completion.
 
 ## Export lifecycle
 
-1. A verified user creates an explicit `export` privacy request.
-2. `processStorytimeExportRequest` inventories Storytime-owned records for the approved scope.
-3. The export is serialized to private Cloud Storage with `private, max-age=0, no-store`.
-4. A manifest records schema/policy version, record counts, blockers, and SHA-256 integrity.
-5. A privacy completion receipt records packaging evidence.
-6. `getStorytimeExportDownloadUrl` returns an owner-only signed URL with a 15-minute TTL.
-7. If family/child or external-provider dependencies are detected, the package is marked `partial_review_required` and the privacy request remains processing rather than falsely complete.
-
-The Storytime export is not represented as the whole-URAI account export. Cross-system/family/provider data remains under URAI Privacy authority.
+1. Verified user creates a Storytime privacy request.
+2. `processStorytimeExportRequest` inventories Storytime-owned records for the request scope.
+3. Sensitive secret/token-style fields are scrubbed.
+4. The JSON package and integrity manifest are written to private Storage.
+5. A completion receipt records package and manifest hashes.
+6. The owner may request a short-lived signed URL through `getStorytimeExportDownloadUrl`.
+7. If family/shared authority or external provider artifact cleanup remains unresolved, the export is labeled `partial_review_required` and the request remains in review rather than being falsely marked complete.
 
 ## Deletion lifecycle
 
-Deletion follows the URAI Privacy pattern:
-
-1. Verified user creates an explicit `deletion` privacy request.
-2. `planStorytimeDeletion` inventories current Storytime-owned targets and writes an immutable plan record.
-3. The plan receives a SHA-256 plan hash.
-4. Legal hold is checked.
-5. Account-scope deletion fails closed if family/child membership requires URAI Privacy review.
-6. Account-scope deletion fails closed unless `STORYTIME_FIREBASE_ISOLATED=true`.
-7. Provider/media references block destructive execution until their deletion path is proven.
-8. Destructive execution is admin-only and requires the exact current plan hash plus `DELETE_STORYTIME_DATA`.
-9. The server rebuilds the plan immediately before mutation; changed targets invalidate the approval.
-10. Primary-store deletion and account-auth deletion are executed only when the plan is blocker-free.
-11. A mutation receipt is retained.
-12. `verifyStorytimeDeletion` re-inventories the subject and confirms that primary targets/auth are gone.
-13. Final `completed` status remains blocked until `STORYTIME_BACKUP_RETENTION_POLICY_READY=true`.
-14. A final completion receipt is created only after verification and backup-retention certification.
+1. Verified user creates a deletion request.
+2. `planStorytimeDeletion` performs a dry-run inventory and produces a stable plan hash.
+3. The plan checks legal hold, family/shared ownership ambiguity, Firebase isolation, provider/media references, and backup-retention readiness.
+4. Destructive execution is **admin-only** through `executeStorytimeDeletion`.
+5. Execution requires the exact current plan hash and explicit confirmation string `DELETE_STORYTIME_DATA`.
+6. The executor re-plans immediately before mutation; changed targets invalidate the old plan.
+7. Account deletion is blocked unless `STORYTIME_FIREBASE_ISOLATED=true`.
+8. Family/child/shared authority blocks account deletion until URAI Privacy review resolves ownership.
+9. Storytime media/export/voiceover records block deletion until media/storage/provider cleanup is certified.
+10. After mutation, the request enters `verification_required`.
+11. `verifyStorytimeDeletion` confirms Storytime-owned targets and Auth state are actually gone.
+12. Final `completed` state remains blocked until `STORYTIME_BACKUP_RETENTION_POLICY_READY=true`.
+13. Plans, privacy requests, legal-hold evidence, and completion receipts remain retained privacy evidence.
 
 ## Server-only evidence
 
-The following are server-owned and denied to direct client access:
+The following collections are not directly readable/writable by clients:
 
 - `privacyDeletionPlans`
 - `privacyCompletionReceipts`
+- `storyGenerationRequests`
+- `storyArchiveSnapshots`
 
-`privacyRequests` are user-readable/admin-readable, server-created, and admin-updatable.
+Users interact through verified callable functions rather than forging lifecycle state.
 
-## Retained evidence
+## Family and child boundary
 
-Privacy request history, deletion plans, completion receipts, and legal-hold records are retained as governance evidence unless URAI Privacy policy changes their retention class.
+Storytime is currently adult/guardian-operated. Family membership or child-profile authority is not silently collapsed into account ownership. If an account participates in a family/shared authority graph, destructive account deletion fails closed until the cross-system privacy decision is explicitly resolved.
 
-## Hard boundaries
+## Provider and media boundary
 
-- User UI cannot call destructive deletion execution.
-- No destructive deletion occurs from a request alone.
-- No account deletion occurs while Storytime Firebase isolation is unverified.
-- No deletion executes while a legal hold is active.
-- No deletion executes across unresolved family/child ownership boundaries.
-- No provider/media artifact is claimed deleted merely because Storytime records were removed.
-- No deletion is called complete until post-delete verification passes.
-- No deletion is called complete while backup-expiry policy remains uncertified.
-- No export is called complete for the whole URAI estate when Storytime can only prove its own data scope.
+A Storytime record referencing external provider/media artifacts is not enough to prove those artifacts were deleted. Any Storytime media/export/voiceover state creates a deletion blocker until the external storage/provider deletion contract is certified.
 
-## Production blockers
+## Required remaining proof
 
-Before Storytime privacy operations are production-ready:
+Production privacy readiness still requires:
 
-- exact-head CI/functions build must pass;
-- Firebase emulator authorization behavior must pass;
-- isolated Storytime Firebase staging must be real and evidenced;
-- controlled export readback must verify package integrity and signed-link scope;
-- controlled deletion dry-run/execute/verification must prove owner/admin/cross-user behavior with synthetic data;
-- backup retention/expiry policy must be reviewed and certified;
-- family/child handling must be reviewed through URAI Privacy;
-- provider/media deletion obligations must be resolved;
-- live audit/monitoring/rollback evidence must exist;
-- required privacy/legal/security approvals must be recorded.
+- exact-head app and Functions CI;
+- emulator/staging owner/non-owner/admin behavior;
+- isolated Storytime Firebase identity;
+- real Storage package/signed-URL receipt;
+- deletion dry-run and execute receipt with synthetic data;
+- legal-hold negative/positive proof;
+- media/provider cleanup proof where enabled;
+- backup-retention review and expiry behavior;
+- monitoring/incident/rollback evidence;
+- qualified privacy/legal review.
 
-No source implementation alone satisfies those runtime gates.
+## Completion rule
+
+Storytime may say an export is complete only when its Storytime-owned package and receipt exist with no unresolved export blockers.
+
+Storytime may say deletion is complete only after destructive execution, post-delete verification, and backup-retention certification have all succeeded. A request, plan, mutation, or queue record by itself is never completion.
