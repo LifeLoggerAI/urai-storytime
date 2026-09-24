@@ -458,58 +458,20 @@ export const prepareVoiceoverJob = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Voiceover consent is required.");
   }
 
-  const createdAt = now();
-  const voiceoverJobId = id("voiceoverJob");
-  const exportId = id("storyExport");
-  const timelineEventId = id("timelineReplayEvent");
   const narratorScriptId = input.narratorScriptId || session.data.narratorScriptIds?.[0];
-
   if (!narratorScriptId) {
-    throw new HttpsError("failed-precondition", "A narrator script is required before voiceover can be queued.");
+    throw new HttpsError("failed-precondition", "A narrator script is required before voiceover can be prepared.");
   }
 
-  const voiceoverJob = {
-    id: voiceoverJobId,
+  auditLog({
+    event: "voiceover_execution_blocked",
     userId,
     sessionId: input.sessionId,
-    narratorScriptId,
-    status: "queued",
     provider: input.provider,
-    createdAt,
-    updatedAt: createdAt
-  };
-
-  const storyExport = {
-    id: exportId,
-    userId,
-    sessionId: input.sessionId,
-    exportType: input.provider === "asset_factory" ? "asset_factory_zip" : "voiceover",
-    status: "queued",
-    assetFactoryJobId: input.provider === "asset_factory" ? voiceoverJobId : null,
-    createdAt,
-    updatedAt: createdAt
-  };
-
-  const batch = db.batch();
-  batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), voiceoverJob);
-  batch.set(db.collection("storyExports").doc(exportId), storyExport);
-  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
-    id: timelineEventId,
-    userId,
-    sessionId: input.sessionId,
-    eventType: "exported",
-    label: "Voiceover export queued",
-    metadata: {
-      provider: input.provider,
-      voiceoverJobId,
-      exportId
-    },
-    createdAt,
-    updatedAt: createdAt
+    errorCode: "media_worker_not_implemented"
   });
-  await batch.commit();
-
-  auditLog({ event: "voiceover_export_queued", userId, sessionId: input.sessionId, provider: input.provider });
-  return { status: "queued", voiceoverJobId, exportId, provider: input.provider };
+  throw new HttpsError(
+    "failed-precondition",
+    "Storytime voiceover/media execution is disabled until a governed worker, provider receipts, cancellation/retry, private storage, and deletion lifecycle are implemented."
+  );
 });
-
