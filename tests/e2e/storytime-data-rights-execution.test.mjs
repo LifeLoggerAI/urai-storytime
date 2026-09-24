@@ -40,6 +40,7 @@ test('Storytime destructive deletion follows dry-run hash, legal-hold, admin-onl
     'active_legal_hold',
     'storytime_firebase_isolation_not_certified',
     'family_or_child_data_requires_urai_privacy_review',
+    'shared_aggregate_recompute_required',
     'story_media_storage_cleanup_not_certified',
     'expectedPlanHash',
     'DELETE_STORYTIME_DATA',
