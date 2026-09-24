@@ -48,6 +48,22 @@
 - [ ] Weekly scroll previews are export-ready but not auto-shared.
 - [ ] Asset-Factory jobs are disabled unless `ASSET_FACTORY_BASE_URL` and `ASSET_FACTORY_API_KEY` are configured.
 
+
+## Accessibility and browser certification
+
+Source foundations are necessary but do not count as runtime certification. See `docs/ACCESSIBILITY.md`.
+
+- [ ] Skip navigation reaches the Storytime main landmark with visible focus.
+- [ ] All launch flows are usable keyboard-only with no focus trap.
+- [ ] Visible focus survives forced-colors/high-contrast mode.
+- [ ] Automated browser accessibility scan has no critical violations on launch routes.
+- [ ] Screen-reader smoke confirms landmark, heading, form-label, error/status, story, and sharing reading order.
+- [ ] 200% text zoom preserves content and controls without hidden required information.
+- [ ] Mobile/narrow reflow remains one-column and touch targets remain usable.
+- [ ] Reduced-motion mode removes non-essential motion without hiding state.
+- [ ] Async create/auth/share/privacy failures preserve understandable focus and text feedback.
+- [ ] Accessibility/browser evidence is bound to the exact release SHA and uses synthetic test data only.
+
 ## Deployment smoke
 
 - [ ] Staging deploy completes.
