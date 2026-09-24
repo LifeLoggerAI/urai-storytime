@@ -15,6 +15,7 @@ const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString
 const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
 const MAX_GENERATIONS_PER_DAY = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_DAY || 24);
 const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
+const STORY_REQUEST_REVIEW_VERSION = "story-request-review-v1";
 
 const GenerateStorySchema = z.object({
   requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/),
@@ -28,6 +29,10 @@ const GenerateStorySchema = z.object({
   operator: z.object({
     role: z.literal("adult_or_guardian"),
     affirmed: z.literal(true)
+  }),
+  requestReview: z.object({
+    reviewed: z.literal(true),
+    reviewVersion: z.literal(STORY_REQUEST_REVIEW_VERSION)
   }),
   consentSnapshot: z.object({
     storyGeneration: z.literal(true),
@@ -118,6 +123,7 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       audienceAgeBand: input.audienceAgeBand,
       operatorRole: input.operator.role,
       consentVersion: input.consentSnapshot.consentVersion,
+      reviewVersion: input.requestReview.reviewVersion,
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -334,6 +340,7 @@ export const generateStorySession = onCall(async (request) => {
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     operator: input.operator,
+    requestReview: input.requestReview,
     provenance: {
       schemaVersion: "storytime-provenance-v1",
       sourceType: "direct_storytime_input",
