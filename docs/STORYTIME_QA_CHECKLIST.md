@@ -48,6 +48,21 @@
 - [ ] Weekly scroll previews are export-ready but not auto-shared.
 - [ ] Asset-Factory jobs are disabled unless `ASSET_FACTORY_BASE_URL` and `ASSET_FACTORY_API_KEY` are configured.
 
+## Accessibility and browser behavior
+
+- [x] Source includes visible keyboard focus for links, buttons, inputs, textareas, and selects.
+- [x] Source includes `prefers-reduced-motion` fallback.
+- [x] Source includes forced-colors borders for primary cards/inputs.
+- [x] Async cloud/library/public-share states expose polite live regions and loading state with `aria-busy`.
+- [x] Error states use alert semantics where applicable.
+- [ ] Real keyboard-only create/read/share/privacy journeys are exercised in a browser.
+- [ ] Screen reader checks cover form labels, dynamic state changes, saved-story reading order, and public-share failure states.
+- [ ] Mobile/tablet viewport checks confirm reflow, touch targets, zoom, and no horizontal clipping.
+- [ ] Automated accessibility scanning is attached to the exact release SHA.
+- [ ] Browser performance evidence is attached to the exact release SHA.
+
+Source checks above are foundations only; they do not certify browser, assistive-technology, or WCAG conformance.
+
 ## Deployment smoke
 
 - [ ] Staging deploy completes.
