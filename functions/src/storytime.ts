@@ -327,6 +327,17 @@ export const generateStorySession = onCall(async (request) => {
     requestId: input.requestId,
     audienceAgeBand: input.audienceAgeBand,
     operator: input.operator,
+    provenance: {
+      schemaVersion: "storytime-provenance-v1",
+      sourceType: "direct_storytime_input",
+      sourceId: input.requestId,
+      consentVersion: input.consentSnapshot.consentVersion,
+      aiGenerated: readiness.ready,
+      deterministicBuilder: !readiness.ready,
+      fictionalized: true,
+      edited: false,
+      factualStatus: "creative_derivative_not_source_evidence"
+    },
     whyGenerated: input.sourceSignals.length
       ? `Generated from opted-in signals: ${input.sourceSignals.join(", ")}.`
       : "Generated from your direct Storytime input.",
