@@ -138,7 +138,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.1 Guided story builder and draft workflow
 
 - **User value:** people can create a story without understanding internal terms.
-- **Current evidence:** one form for title/theme/age/mood/source.
+- **Current evidence:** the guided UX lane now provides Details → Review & consent, shows the exact payload before provider submission, supports verified-account private draft save/resume behind separate versioned draft-storage consent, expires drafts after 30 days in source logic, and deletes the saved draft when persistence is turned off or generation succeeds. Provider generation remains a separate explicit consent step.
 - **Scope:** multi-step wizard for audience, people/pets/places, genre, tone, length, language, source permissions, review; autosaved draft; validation and recovery.
 - **Areas:** Storytime components, domain schemas, Firestore drafts.
 - **Dependencies:** P0 policy/data model.
