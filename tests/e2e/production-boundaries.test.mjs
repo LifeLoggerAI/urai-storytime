@@ -13,6 +13,7 @@ const functions = read('functions/src/storytime.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const functionsIndex = read('functions/src/index.ts');
 const provider = read('functions/src/story-provider.ts');
+const mediaContract = read('src/lib/storytime/media-job-contract.ts');
 const rules = read('firestore.rules');
 const storageRules = read('storage.rules');
 const runtimeReadiness = read('src/runtime-readiness.mjs');
@@ -146,17 +147,17 @@ test('public sharing uses content-neutral expiring derivatives and private owner
   ]);
 });
 
-test('voiceover and export remain queued job records, not completed artifact claims', () => {
-  includesAll(functions, [
-    'prepareVoiceoverJob',
-    'Voiceover consent is required',
-    'voiceoverJobs',
-    'storyExports',
-    'status: "queued"',
-    'Voiceover export queued'
+test('voiceover and generated media remain hard-off until a real worker lifecycle exists', () => {
+  assert.doesNotMatch(functionsIndex, /prepareVoiceoverJob/);
+  assert.doesNotMatch(functions, /voiceoverJobs|Voiceover export queued/);
+  includesAll(mediaContract, [
+    'storytime-media-job-v1',
+    'state: "hard_off"',
+    'providerSpendAuthorized: false',
+    'publicReleaseAuthorized: false',
+    'maxAuthorizedCost: 0',
+    'STORYTIME_MEDIA_EXECUTION'
   ]);
-
-  assert.doesNotMatch(functions, /downloadURL|signedUrl|completedUrl|artifactUrl/);
   assert.match(proofReadme, /export artifact pipeline proof was available/);
 });
 
