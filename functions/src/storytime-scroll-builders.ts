@@ -12,9 +12,9 @@ export function buildWeeklyStoryScrollRecord(args: {
     weekStart: args.weekStart,
     weekEnd: args.weekEnd,
     title: "Weekly Story Scroll",
-    summary: `Queued weekly scroll from ${args.sessionIds.length} Storytime session(s).`,
+    summary: `Weekly Storytime scroll assembled from ${args.sessionIds.length} private session(s).`,
     sessionIds: args.sessionIds,
-    providerStatus: "queued",
+    providerStatus: "completed",
     createdAt: args.createdAt,
     updatedAt: args.createdAt
   };
@@ -31,7 +31,7 @@ export function buildArchiveRebuildEventRecord(args: {
     userId: args.userId,
     sessionId: args.sessionIds[0] || "user_archive",
     eventType: "created",
-    label: "Story archive rebuild queued",
+    label: "Story archive snapshot rebuilt",
     metadata: {
       action: "rebuildUserStoryArchive",
       sessionCount: args.sessionIds.length
