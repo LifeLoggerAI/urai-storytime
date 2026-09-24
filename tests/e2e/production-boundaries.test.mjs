@@ -30,7 +30,12 @@ test('cloud Storytime creation stays gated behind auth, cloud mode, consent, pro
     'Sign in to create and save a private story.',
     'SAFETY_TERMS',
     'consentSnapshot',
-    'storyGeneration: true',
+    'adultGuardianAffirmed',
+    'generationConsent',
+    'providerProcessingConsent',
+    'storyGeneration: generationConsent',
+    'providerProcessing: providerProcessingConsent',
+    'consentVersion: STORY_GENERATION_CONSENT_VERSION',
     'voiceover: false',
     'publicSharing: false',
     'memoryUse: false'
@@ -40,11 +45,16 @@ test('cloud Storytime creation stays gated behind auth, cloud mode, consent, pro
   includesAll(functions, [
     'requireAuth(request.auth?.uid)',
     'GenerateStorySchema.parse',
-    'Story generation consent is required',
+    'role: z.literal("adult_or_guardian")',
+    'storyGeneration: z.literal(true)',
+    'providerProcessing: z.literal(true)',
+    'claimGenerationRequest(userId, input)',
     'Story input requires safety review before generation',
     'enforceGenerationQuota(userId)',
     'requireConfiguredStoryProvider(userId)',
-    'generateStoryWithProvider'
+    'generateStoryWithProvider',
+    'providerOutputText(generated)',
+    'generation_blocked_output_safety'
   ]);
 });
 
@@ -55,7 +65,10 @@ test('OpenAI provider cannot be claimed live without provider, key, and model ga
     'STORYTIME_OPENAI_MODEL',
     'provider === "openai"',
     'response_format',
-    'json_object'
+    'json_object',
+    'new AbortController()',
+    'audienceInstruction(input.audienceAgeBand)',
+    'assertProviderOutputSafe(output)'
   ]);
   assert.match(provider, /Story provider is not configured/);
   assert.match(proofReadme, /PARTIAL \/ BLOCKED FROM READY/);
