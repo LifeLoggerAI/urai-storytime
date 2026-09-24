@@ -113,6 +113,10 @@ if (exists('functions/src/storytime.ts')) {
     'storyGeneration: z.literal(true)',
     'providerProcessing: z.literal(true)',
     'role: z.literal("adult_or_guardian")',
+    'reviewed: z.literal(true)',
+    'reviewVersion: z.literal(STORY_REQUEST_REVIEW_VERSION)',
+    'processedRequestSha256 = reviewedRequestSha256(input)',
+    'db.collection("storyVersions").doc(versionId)',
     'Story input requires safety review before generation',
     'generation_blocked_output_safety',
     'claimGenerationRequest',
@@ -177,7 +181,15 @@ if (exists('functions/src/index.ts')) {
 
 if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
-  for (const marker of ['match /storySessions/{id}', 'match /publicStoryShares/{id}', 'revoked == false', 'match /storytimeUsageCounters/{id}', 'allow read, write: if false']) {
+  for (const marker of [
+    'match /storySessions/{id}',
+    'match /storyVersions/{id}',
+    'allow create, update, delete: if false',
+    'match /publicStoryShares/{id}',
+    'revoked == false',
+    'match /storytimeUsageCounters/{id}',
+    'allow read, write: if false'
+  ]) {
     if (!rules.includes(marker)) failures.push(`Missing Firestore rule marker: ${marker}`);
   }
 }
