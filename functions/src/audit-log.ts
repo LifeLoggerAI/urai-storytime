@@ -18,7 +18,9 @@ export type StorytimeAuditEvent =
   | "privacy_deletion_planned"
   | "privacy_deletion_blocked"
   | "privacy_deletion_executed"
-  | "privacy_deletion_verified";
+  | "privacy_deletion_verified"
+  | "moderation_case_escalated"
+  | "moderation_case_closed_blocked";
 
 export type StorytimeAuditPayload = {
   event: StorytimeAuditEvent;

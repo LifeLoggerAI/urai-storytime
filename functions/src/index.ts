@@ -26,3 +26,9 @@ export {
   verifyStorytimeDeletion
 } from "./privacy-execution.js";
 
+
+export {
+  listStorytimeModerationCases,
+  getStorytimeModerationCase,
+  transitionStorytimeModerationCase
+} from "./moderation-operations.js";
