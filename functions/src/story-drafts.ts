@@ -45,6 +45,8 @@ export const saveStoryDraft = onCall(async (request) => {
   const now = Timestamp.now();
   const expiresAt = Timestamp.fromMillis(now.toMillis() + DRAFT_RETENTION_DAYS * 86_400_000);
   const ref = draftRef(userId);
+  const existing = await ref.get();
+  const createdAt = existing.data()?.createdAt instanceof Timestamp ? existing.data()?.createdAt : now;
   await ref.set({
     schemaVersion: DRAFT_SCHEMA_VERSION,
     userId,
@@ -52,7 +54,7 @@ export const saveStoryDraft = onCall(async (request) => {
     status: "draft",
     providerSubmitted: false,
     publicSharingAuthorized: false,
-    createdAt: now,
+    createdAt,
     updatedAt: now,
     expiresAt
   }, { merge: true });
