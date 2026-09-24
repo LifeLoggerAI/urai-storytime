@@ -1,78 +1,111 @@
 # URAI Storytime emulator behavior proof spec
 
-This document defines the behavioral Firebase emulator proof required before URAI Storytime can move from PARTIAL to READY.
+This document defines the executable Firebase authorization proof required before URAI Storytime can move from source-present security controls to staging/runtime authority.
 
-The current repo has static source checks for rules, routes, functions, provider gates, and production boundaries. This spec defines the next required behavioral checks that must be run in Firebase emulators or an isolated staging Firebase project with non-sensitive test data.
+The emulator suite uses **synthetic identities and synthetic records only**. It does not establish production IAM, deployed revision identity, legal/privacy approval, or provider readiness.
 
-## Required test identities
+## Test identities
 
-Use only synthetic users:
+- `ownerUser`: owns a private Storytime session.
+- `otherUser`: must be denied access to owner-private records.
+- `adminUser`: synthetic emulator-only `admin: true` claim.
+- `signedOut`: unauthenticated context.
+- family Storage identities use synthetic `familyIds` claims.
 
-- `ownerUser`: creates a private Storytime session and public share.
-- `otherUser`: attempts to read or modify owner-only records and must be denied.
-- `adminUser`: has an admin custom claim only in emulator/staging tests.
-- `signedOut`: unauthenticated request and must be denied for private records.
+## Current Firestore authority matrix
 
-## Required Storytime records
+### Required allow cases
 
-Use synthetic records only. Do not use real user memories, child data, names, addresses, school names, phone numbers, or private story text.
+1. Owner can create private Storytime records with their own `userId` where client creation is intentionally permitted.
+2. Owner can read/update permitted fields on their own private Storytime records.
+3. Admin can read/write the dedicated moderation collection.
+4. Owner can read their own server-created privacy-request record.
+5. Admin can update a privacy-request workflow state.
+6. Owner can create append-only Storytime analytics events.
+7. Anonymous users can read only active, non-revoked, non-expired `public-story-share-v2` derivatives that contain no owner/session identifiers.
 
-Required fixture bundle:
+### Required deny cases
 
-- `storySessions/{sessionId}` with `userId: ownerUser.uid`, `visibility: private`, and a synthetic title.
-- `storyChapters/{chapterId}` with `userId: ownerUser.uid` and `sessionId`.
-- `storyMoments/{momentId}` with `userId: ownerUser.uid` and `sessionId`.
-- `memoryScenes/{sceneId}` with `userId: ownerUser.uid` and `sessionId`.
-- `narratorScripts/{scriptId}` with `userId: ownerUser.uid` and `sessionId`.
-- `emotionalArcSummaries/{arcId}` with `userId: ownerUser.uid` and `sessionId`.
-- `publicStoryShares/{shareId}` with `userId: ownerUser.uid`, `sessionId`, `slug`, `title`, `safeSummary`, `safeBody`, and `revoked: false`.
-- `voiceoverJobs/{jobId}` and `storyExports/{exportId}` with queued status only.
+1. Signed-out and cross-user clients cannot read private Storytime sessions.
+2. Cross-user clients cannot read owner chapters, moments, memory scenes, narrator scripts, or emotional arcs.
+3. Owners cannot mint or rewrite server-owned moderation/safety fields on Storytime sessions.
+4. All clients, including admin-token clients, are denied direct access to server-only:
+   - `storytimeUsageCounters`
+   - `storyGenerationRequests`
+   - `storyArchiveSnapshots`
+   - `privacyDeletionPlans`
+   - privacy operation/completion receipt collections
+5. Non-admin users cannot read/write moderation records.
+6. Privacy requests are **server-created**; owners can read their own request but cannot create/update/delete it directly.
+7. Append-only analytics records cannot be updated/deleted by clients.
+8. Public-share records are **server-created**; every client write is denied.
+9. Revoked, expired, malformed, wrong-schema, or legacy owner/session-leaking public shares are unreadable.
 
-## Required allow cases
+## Current Storage authority matrix
 
-1. Owner can create private Storytime records with `userId` equal to owner UID.
-2. Owner can read their own `storySessions` bundle records.
-3. Owner can update their own `storySessions` visibility and public share pointer.
-4. Owner can create a public-safe share with safe fields and `revoked: false`.
-5. Public/signed-out users can read a non-revoked public share record.
-6. Owner can revoke their own public share.
-7. Owner can create queued `voiceoverJobs` and `storyExports` records when the flow is explicitly consented at the callable layer.
-8. Admin can read/write moderation records.
-9. Admin can read audit logs.
-10. Owner can create a privacy request for self.
+1. Family story assets are readable/writable only by identities carrying the matching synthetic `familyIds` claim or admin.
+2. Cross-family access is denied.
+3. Family export assets are readable by the matching family claim but writable only by admin.
+4. Moderation storage is admin-only.
+5. Every unspecified Storage path is denied by default.
 
-## Required deny cases
+These tests prove the current rule contract only. They do not prove how production custom claims are issued or revoked.
 
-1. Signed-out users cannot read private `storySessions` records.
-2. `otherUser` cannot read owner private `storySessions`, `storyChapters`, `storyMoments`, `memoryScenes`, `narratorScripts`, or `emotionalArcSummaries` records.
-3. `otherUser` cannot update/delete owner private records.
-4. Client cannot read or write `storytimeUsageCounters`.
-5. Public/signed-out users cannot read a revoked public share.
-6. Client-created public share records must not contain private story body fields.
-7. Client-created public share records must not set `revoked: true` at create time.
-8. Non-admin users cannot read moderation records.
-9. Non-admin users cannot read audit logs.
-10. Users cannot delete `users`, `families`, `childProfiles`, `stories`, `storyRuns`, `privacyRequests`, or append-only analytics/audit records.
-11. Storage paths must deny by default outside explicit owner/admin story/export paths.
-12. `otherUser` cannot read owner export or voiceover artifacts.
+## Server-owned lifecycle truth
 
-## Required proof output
+The emulator specification must not reintroduce obsolete client authorities.
 
-Each emulator run must save sanitized output under a new proof folder:
+Current Storytime source intentionally makes these server-owned or hard-off:
+- public share creation/revocation mutation;
+- privacy request creation;
+- generation receipts and usage counters;
+- archive snapshots;
+- deletion plans and completion receipts;
+- moderation authority;
+- voiceover/media execution while no governed media worker exists.
 
-`launch-proof/urai-storytime-production-lock/<timestamp>/command-logs/emulator-behavior.log`
+## Exact-head workflow
 
-The proof must include:
+`.github/workflows/public-share-rules-emulator.yml` runs the authorization matrix on every pull request whose relevant rules/harness paths change, including stacked PRs.
 
-- command run
-- emulator project id
-- pass/fail result
-- list of allow cases passed
-- list of deny cases passed
-- any skipped cases with reason
-- no secrets
-- no real personal data
+The workflow:
+- checks out the exact candidate SHA;
+- uses no production credentials;
+- starts isolated Firestore + Storage emulators;
+- executes both public-share and broader authorization matrices;
+- records rules/config hashes and dependency evidence;
+- retains sanitized emulator logs and a receipt;
+- resets generated files;
+- proves the final source tree is still the exact clean candidate;
+- fails if the emulator matrix fails.
+
+## Evidence requirements
+
+The retained artifact must identify:
+- repository;
+- exact candidate SHA;
+- workflow run ID;
+- synthetic emulator project ID;
+- Firebase emulator config;
+- Firestore/Storage rule hashes;
+- allow/deny matrix;
+- exit code;
+- no production credentials;
+- no deployment;
+- no real personal data.
 
 ## Readiness boundary
 
-Until these behavioral checks pass, Firestore and Storage rules remain source-present only. Storytime must not claim live persistence, owner-only privacy enforcement, public share revoke enforcement, or export artifact protection as production-ready.
+A passing emulator receipt proves behavior of the checked-in Firestore/Storage rules against synthetic emulator fixtures.
+
+It does **not** prove:
+- production custom-claim issuance/revocation;
+- production Auth configuration;
+- production Firebase project identity;
+- deployed rules revision;
+- WIF/IAM;
+- live provider behavior;
+- child/family legal compliance;
+- monitoring/rollback.
+
+Those remain separate exact-environment gates.
