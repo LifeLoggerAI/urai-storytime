@@ -33,7 +33,7 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : "Cloud session load failed.";
 }
 
-async function loadBundle(sessionId: string): Promise<Bundle | null> {
+async function loadBundle(sessionId: string, userId: string): Promise<Bundle | null> {
   const db = getFirebaseDb();
   const snapshot = await getDoc(doc(db, "storySessions", sessionId));
   if (!snapshot.exists()) return null;
@@ -43,7 +43,11 @@ async function loadBundle(sessionId: string): Promise<Bundle | null> {
     getDocs(query(collection(db, "storyChapters"), where("sessionId", "==", sessionId), orderBy("order", "asc"))),
     getDocs(query(collection(db, "memoryScenes"), where("sessionId", "==", sessionId))),
     getDocs(query(collection(db, "narratorScripts"), where("sessionId", "==", sessionId))),
-    getDocs(query(collection(db, "storyVersions"), where("sessionId", "==", sessionId)))
+    getDocs(query(
+      collection(db, "storyVersions"),
+      where("sessionId", "==", sessionId),
+      where("userId", "==", userId)
+    ))
   ]);
 
   let arc: EmotionalArcSummary | null = null;
@@ -80,7 +84,7 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
         return;
       }
       try {
-        const bundle = await loadBundle(sessionId);
+        const bundle = await loadBundle(sessionId, user.uid);
         if (!active) return;
         if (!bundle) {
           setState({ status: "notFound", message: "No saved cloud session was found for this id." });
