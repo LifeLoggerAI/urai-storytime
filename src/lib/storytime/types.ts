@@ -255,6 +255,7 @@ export interface StoryDraft extends StorytimeBase {
   emotionalTone: "gentle" | "reflective" | "playful" | "brave" | "calm";
   audienceAgeBand: "family" | "preschool_3_5" | "early_reader_6_8" | "middle_grade_9_12";
   locale: "en-US";
+  operatorRoleAtSave: "adult_or_guardian";
   storageConsent: {
     privateDraftStorage: true;
     consentVersion: "story-draft-storage-v1";
