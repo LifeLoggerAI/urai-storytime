@@ -120,7 +120,9 @@ export function StorytimeHome() {
   }
 
   return (
-    <main className="storytime-shell">
+    <>
+      <a className="storytime-skip-link" href="#storytime-main">Skip to Storytime content</a>
+      <main className="storytime-shell" id="storytime-main" tabIndex={-1}>
       <div className="storytime-wrap">
         <nav className="storytime-nav" aria-label="Storytime">
           <a className="storytime-brand" href="/storytime">URAI Storytime</a>
@@ -148,7 +150,12 @@ export function StorytimeHome() {
           <SessionLibrary />
         </section>
 
-        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
+        <form
+          className="storytime-card storytime-form"
+          onSubmit={handleCreateStory}
+          aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}
+          aria-busy={isSubmitting}
+        >
           <p className="storytime-pill">Private story</p>
           <h2>Create a story</h2>
           <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
@@ -234,6 +241,7 @@ export function StorytimeHome() {
           </p>
         </form>
       </div>
-    </main>
+      </main>
+    </>
   );
 }
