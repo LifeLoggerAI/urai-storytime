@@ -14,10 +14,14 @@ test('OpenAI readiness requires explicit spend authorization and operator-suppli
     'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
     'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS',
     'STORYTIME_MAX_GENERATION_COST_USD',
+    'STORYTIME_PROVIDER_DAILY_BUDGET_USD',
+    'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD',
     'STORYTIME_OPENAI_MAX_OUTPUT_TOKENS'
   ]) assert.ok(provider.includes(marker), `missing provider budget marker: ${marker}`);
   assert.match(env, /STORYTIME_PROVIDER_SPEND_AUTHORIZED=false/);
   assert.match(readiness, /providerSpendAuthorized: provider\.spendAuthorized === true/);
+  assert.match(provider, /globalDailyBudgetUsd/);
+  assert.match(provider, /userDailyBudgetUsd/);
   assert.match(validator, /Live provider mode requires STORYTIME_PROVIDER_SPEND_AUTHORIZED=true/);
 });
 
