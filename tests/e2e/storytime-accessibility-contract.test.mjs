@@ -13,7 +13,8 @@ test('creation and account forms expose native requirements, busy state, and liv
   assert.match(home, /aria-busy=\{isSubmitting\}/);
   assert.match(home, /required aria-invalid=/);
   assert.match(home, /id="storytime-validation" role="status" aria-live="polite"/);
-  assert.match(home, /id="storytime-source-count" aria-live="polite"/);
+  assert.match(home, /id="storytime-source-count"/);
+  assert.doesNotMatch(home, /error instanceof Error \? error\.message/);
   assert.match(auth, /type="email"[\s\S]*required aria-invalid=/);
   assert.match(auth, /type="password"[\s\S]*required minLength=\{8\} aria-invalid=/);
 });
@@ -22,6 +23,7 @@ test('cloud loading and errors are announced without requiring visual discovery'
   assert.match(cloud, /role=\{state\.status === "error" \? "alert" : "status"\}/);
   assert.match(cloud, /aria-live=\{state\.status === "error" \? "assertive" : "polite"\}/);
   assert.match(cloud, /aria-busy=\{state\.status === "loading" \? true : undefined\}/);
+  assert.doesNotMatch(cloud, /error instanceof Error \? error\.message/);
 });
 
 test('sharing never exposes raw callable errors and announces action results', () => {
