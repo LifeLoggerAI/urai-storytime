@@ -8,6 +8,7 @@ const rules = fs.readFileSync('firestore.rules', 'utf8');
 const home = fs.readFileSync('src/components/storytime/StorytimeHome.tsx', 'utf8');
 const cloud = fs.readFileSync('src/components/storytime/CloudSession.tsx', 'utf8');
 const history = fs.readFileSync('src/components/storytime/StoryVersionHistory.tsx', 'utf8');
+const indexes = JSON.parse(fs.readFileSync('firestore.indexes.json', 'utf8'));
 
 test('initial generation commits an immutable SHA-bound version in the same persistence batch', () => {
   for (const marker of [
@@ -24,7 +25,8 @@ test('initial generation commits an immutable SHA-bound version in the same pers
     'parentVersionId: null',
     'reason: "initial_generation"',
     'immutable: true',
-    'contentSha256: sha256(snapshot)'
+    'contentSha256: sha256(snapshot)',
+    'reviewedRequestSha256: input.reviewedRequestSha256'
   ]) assert.ok(version.includes(marker), `missing immutable version marker: ${marker}`);
 });
 
@@ -36,7 +38,11 @@ test('version history is owner-readable but cannot be mutated directly by client
   assert.match(block, /allow read: if ownerOnlyReadWrite\(resource\.data\.userId\)/);
   assert.match(block, /allow create, update, delete: if false/);
   assert.match(cloud, /collection\(db, "storyVersions"\)/);
+  assert.match(cloud, /where\("userId", "==", userId\)/);
   assert.match(cloud, /StoryVersionHistory/);
+  const versionIndex = indexes.indexes.find((item) => item.collectionGroup === 'storyVersions');
+  assert.ok(versionIndex, 'storyVersions owner/session index must exist');
+  assert.deepEqual(versionIndex.fields.map((field) => field.fieldPath), ['userId', 'sessionId']);
   assert.match(history, /Editing or regeneration must create a new/);
 });
 
@@ -52,5 +58,7 @@ test('generation requires review of the exact request and changing fields invali
 
   assert.match(functions, /reviewed: z\.literal\(true\)/);
   assert.match(functions, /reviewVersion: z\.literal\(STORY_REQUEST_REVIEW_VERSION\)/);
-  assert.match(functions, /requestReview: input\.requestReview/);
+  assert.match(functions, /processedRequestSha256 = reviewedRequestSha256\(input\)/);
+  assert.match(functions, /requestReview: \{/);
+  assert.match(functions, /processedRequestSha256/);
 });
