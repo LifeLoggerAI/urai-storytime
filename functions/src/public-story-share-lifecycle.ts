@@ -25,6 +25,12 @@ function requireAuth(request: { auth?: { uid: string } | null }) {
   return request.auth.uid;
 }
 
+function requireVerifiedAccount(request: { auth?: { token?: { email_verified?: unknown } } | null }) {
+  if (request.auth?.token?.email_verified !== true) {
+    throw new HttpsError("failed-precondition", "Verify the adult/guardian account email before creating a public Storytime share.");
+  }
+}
+
 function requirePublicSharingEnabled() {
   if (process.env.STORYTIME_PUBLIC_SHARING !== "true") {
     throw new HttpsError("failed-precondition", "Public Storytime sharing is disabled.");
@@ -63,6 +69,7 @@ function activeSanitizedShare(data: DocumentData | undefined, nowMs: number) {
 
 export const createPublicStoryShare = onCall(async (request) => {
   const userId = requireAuth(request);
+  requireVerifiedAccount(request);
   requirePublicSharingEnabled();
   const input = parseCreateInput(request.data);
   const db = getFirestore();

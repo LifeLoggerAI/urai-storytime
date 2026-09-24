@@ -3,13 +3,16 @@ export type StorytimeAuditEvent =
   | "generation_blocked_auth"
   | "generation_blocked_consent"
   | "generation_blocked_safety"
+  | "generation_blocked_output_safety"
   | "generation_blocked_quota"
+  | "generation_reused"
   | "provider_unavailable"
   | "provider_failed"
   | "story_persisted"
   | "public_share_created"
   | "public_share_revoked"
-  | "voiceover_export_queued";
+  | "voiceover_export_queued"
+  | "privacy_request_created";
 
 export type StorytimeAuditPayload = {
   event: StorytimeAuditEvent;

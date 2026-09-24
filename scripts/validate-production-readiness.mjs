@@ -47,8 +47,11 @@ const requiredSourceFiles = [
   'functions/src/index.ts',
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
+  'functions/src/public-story-share-lifecycle.ts',
+  'functions/src/privacy-requests.ts',
+  'functions/src/refresh-story-timeline.ts',
+  'functions/src/rebuild-user-story-archive.ts',
   'functions/src/readiness.ts',
-  'functions/src/revoke-public-story-share.ts',
   'tests/e2e/smoke.test.mjs'
 ];
 
@@ -106,15 +109,55 @@ if (exists('functions/src/index.ts')) {
 if (exists('functions/src/storytime.ts')) {
   const functions = read('functions/src/storytime.ts');
   for (const marker of [
-    'Story generation consent is required',
+    'storyGeneration: z.literal(true)',
+    'providerProcessing: z.literal(true)',
+    'role: z.literal("adult_or_guardian")',
     'Story input requires safety review before generation',
+    'generation_blocked_output_safety',
+    'claimGenerationRequest',
     'enforceGenerationQuota',
-    'createPublicStoryShare',
-    'Public sharing requires explicit consent',
     'prepareVoiceoverJob',
     'Voiceover consent is required'
   ]) {
     if (!functions.includes(marker)) failures.push(`Missing callable safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/public-story-share-lifecycle.ts')) {
+  const sharing = read('functions/src/public-story-share-lifecycle.ts');
+  for (const marker of [
+    'createPublicStoryShare',
+    'revokePublicStoryShare',
+    'Public sharing consent is required',
+    'Only safety-approved stories can be shared',
+    'requireVerifiedAccount(request)'
+  ]) {
+    if (!sharing.includes(marker)) failures.push(`Missing public-share safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/privacy-requests.ts')) {
+  const privacy = read('functions/src/privacy-requests.ts');
+  for (const marker of [
+    'requestPrivacyOperation',
+    'confirmation: z.literal(true)',
+    'executionState: "not_started"',
+    'completionReceiptId: null'
+  ]) {
+    if (!privacy.includes(marker)) failures.push(`Missing privacy lifecycle marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/index.ts')) {
+  const functionsIndex = read('functions/src/index.ts');
+  for (const marker of [
+    './generate-narrator-script.js',
+    './generate-emotional-arc-summary.js',
+    './generate-weekly-story-scroll.js',
+    './refresh-story-timeline.js',
+    './rebuild-user-story-archive.js'
+  ]) {
+    if (!functionsIndex.includes(marker)) failures.push(`Missing real callable export: ${marker}`);
   }
 }
 

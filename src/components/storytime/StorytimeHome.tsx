@@ -7,7 +7,8 @@ import { AuthPanel } from "./AuthPanel";
 import { SessionLibrary } from "./SessionLibrary";
 
 const MAX_SOURCE_CHARS = 1200;
-const AGE_RANGES = ["3-5", "6-8", "9-12", "family"] as const;
+const AUDIENCE_AGE_BANDS = ["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"] as const;
+const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
 const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
@@ -26,12 +27,22 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Story creation was interrupted. Please try again.";
 }
 
+function createRequestId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `story-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export function StorytimeHome() {
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("");
-  const [ageRange, setAgeRange] = useState<(typeof AGE_RANGES)[number]>("family");
+  const [audienceAgeBand, setAudienceAgeBand] = useState<(typeof AUDIENCE_AGE_BANDS)[number]>("family");
   const [mood, setMood] = useState<(typeof MOODS)[number]>("reflective");
   const [sourceText, setSourceText] = useState("");
+  const [adultGuardianAffirmed, setAdultGuardianAffirmed] = useState(false);
+  const [generationConsent, setGenerationConsent] = useState(false);
+  const [providerProcessingConsent, setProviderProcessingConsent] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
@@ -39,12 +50,15 @@ export function StorytimeHome() {
   const validationError = useMemo(() => {
     if (!title.trim()) return "Add a title to continue.";
     if (!theme.trim()) return "Add a theme to continue.";
-    if (!AGE_RANGES.includes(ageRange)) return "Choose an age range.";
+    if (!AUDIENCE_AGE_BANDS.includes(audienceAgeBand)) return "Choose an audience age band.";
+    if (!adultGuardianAffirmed) return "Storytime is currently adult/guardian-operated. Confirm that you are the adult or guardian operating this story.";
+    if (!generationConsent) return "Explicit story-generation consent is required.";
+    if (!providerProcessingConsent) return "Consent to the configured story-generation provider is required before cloud generation.";
     const unsafeTerm = firstUnsafeTerm([title, theme, mood, sourceText]);
     if (unsafeTerm) return "This story seed includes sensitive content that Storytime cannot process here.";
     if (sourceText.length > MAX_SOURCE_CHARS) return `Keep the source text under ${MAX_SOURCE_CHARS} characters.`;
     return null;
-  }, [ageRange, mood, sourceText, theme, title]);
+  }, [adultGuardianAffirmed, audienceAgeBand, generationConsent, mood, providerProcessingConsent, sourceText, theme, title]);
 
   async function handleCreateStory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,6 +79,10 @@ export function StorytimeHome() {
       setSubmitError("Sign in to create and save a private story.");
       return;
     }
+    if (!auth.currentUser.emailVerified) {
+      setSubmitError("Verify the adult/guardian account email before creating a cloud story.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -74,11 +92,18 @@ export function StorytimeHome() {
         sourceText: sourceText.trim().slice(0, MAX_SOURCE_CHARS),
         emotionalTone: mood,
         symbolicMotifs: [theme.trim()],
+        requestId: createRequestId(),
+        locale: "en-US",
         sourceSignals: ["storytime form"],
-        ageRange,
-        theme: theme.trim(),
+        audienceAgeBand,
+        operator: {
+          role: "adult_or_guardian",
+          affirmed: adultGuardianAffirmed,
+        },
         consentSnapshot: {
-          storyGeneration: true,
+          storyGeneration: generationConsent,
+          providerProcessing: providerProcessingConsent,
+          consentVersion: STORY_GENERATION_CONSENT_VERSION,
           voiceover: false,
           publicSharing: false,
           memoryUse: false,
@@ -145,11 +170,11 @@ export function StorytimeHome() {
           <div className="storytime-grid compact">
             <label className="storytime-field">
               Audience
-              <select className="storytime-input" value={ageRange} onChange={(event) => setAgeRange(event.target.value as (typeof AGE_RANGES)[number])}>
-                <option value="family">Family</option>
-                <option value="3-5">Ages 3–5</option>
-                <option value="6-8">Ages 6–8</option>
-                <option value="9-12">Ages 9–12</option>
+              <select className="storytime-input" value={audienceAgeBand} onChange={(event) => setAudienceAgeBand(event.target.value as (typeof AUDIENCE_AGE_BANDS)[number])}>
+                <option value="family">Family / general</option>
+                <option value="preschool_3_5">Ages 3–5</option>
+                <option value="early_reader_6_8">Ages 6–8</option>
+                <option value="middle_grade_9_12">Ages 9–12</option>
               </select>
             </label>
             <label className="storytime-field">
@@ -164,6 +189,37 @@ export function StorytimeHome() {
             <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
           </label>
 
+          <label className="storytime-field">
+            <span>
+              <input
+                type="checkbox"
+                checked={adultGuardianAffirmed}
+                onChange={(event) => setAdultGuardianAffirmed(event.target.checked)}
+              />{" "}
+              I confirm that I am the adult or guardian operating this Storytime request.
+            </span>
+          </label>
+          <label className="storytime-field">
+            <span>
+              <input
+                type="checkbox"
+                checked={generationConsent}
+                onChange={(event) => setGenerationConsent(event.target.checked)}
+              />{" "}
+              I consent to Storytime using the information in this form to create this private story.
+            </span>
+          </label>
+          <label className="storytime-field">
+            <span>
+              <input
+                type="checkbox"
+                checked={providerProcessingConsent}
+                onChange={(event) => setProviderProcessingConsent(event.target.checked)}
+              />{" "}
+              I consent to the configured story-generation provider processing the information in this form for this request.
+            </span>
+          </label>
+
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
           {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
 
@@ -172,7 +228,10 @@ export function StorytimeHome() {
               {isSubmitting ? "Creating story…" : "Create story"}
             </button>
           </div>
-          <p className="storytime-helper">Storytime only submits the information in this form after you choose Create story.</p>
+          <p className="storytime-helper">
+            Storytime is currently adult/guardian-operated. Audience age bands shape the requested story; they do not create or authorize a child account.
+            Nothing is submitted until you affirm the operator boundary, give the generation/provider consents above, and choose Create story.
+          </p>
         </form>
       </div>
     </main>

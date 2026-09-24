@@ -133,7 +133,7 @@ service cloud.firestore {
     }
     match /privacyRequests/{requestId} {
       allow read: if isSelf(resource.data.userId) || isAdmin();
-      allow create: if isSelf(request.resource.data.userId);
+      allow create: if false;
       allow update: if isAdmin();
       allow delete: if false;
     }
@@ -200,6 +200,8 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     match /storytimeUsageCounters/{id} { allow read, write: if false; }
+    match /storyGenerationRequests/{id} { allow read, write: if false; }
+    match /storyArchiveSnapshots/{id} { allow read, write: if false; }
     match /publicStoryShares/{id} {
       allow read: if activePublicShare();
       allow create, update, delete: if false;
