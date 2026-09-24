@@ -84,6 +84,8 @@ if (exists('functions/src/story-provider.ts')) {
     'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
     'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS',
     'STORYTIME_MAX_GENERATION_COST_USD',
+    'STORYTIME_PROVIDER_DAILY_BUDGET_USD',
+    'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD',
     'STORYTIME_OPENAI_MAX_OUTPUT_TOKENS',
     'storytime-provider-receipt-v1',
     'estimatedMaxCostUsd',
