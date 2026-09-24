@@ -137,12 +137,6 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if false;
     }
-    match /privacyDeletionPlans/{id} { allow read, write: if false; }
-    match /privacyCompletionReceipts/{id} { allow read, write: if false; }
-      allow read, write: if false;
-    }
-      allow read, write: if false;
-    }
     match /storySessions/{id} {
       allow create: if ownerStorySessionCreate();
       allow read, delete: if ownerOnlyReadWrite(resource.data.userId);
