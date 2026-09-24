@@ -15,3 +15,5 @@ export {
   getFiniteTimeProductionReadiness
 } from "./finite-time-registry.js";
 export { health, readiness } from "./readiness.js";
+
+export { requestPrivacyOperation } from "./privacy-requests.js";
