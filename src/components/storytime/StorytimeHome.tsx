@@ -9,6 +9,7 @@ import { SessionLibrary } from "./SessionLibrary";
 const MAX_SOURCE_CHARS = 1200;
 const AUDIENCE_AGE_BANDS = ["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"] as const;
 const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
+const STORY_REQUEST_REVIEW_VERSION = "story-request-review-v1";
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
 const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
@@ -43,9 +44,32 @@ export function StorytimeHome() {
   const [adultGuardianAffirmed, setAdultGuardianAffirmed] = useState(false);
   const [generationConsent, setGenerationConsent] = useState(false);
   const [providerProcessingConsent, setProviderProcessingConsent] = useState(false);
+  const [reviewedFingerprint, setReviewedFingerprint] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
+
+  const requestReviewFingerprint = useMemo(() => JSON.stringify({
+    title: title.trim(),
+    theme: theme.trim(),
+    audienceAgeBand,
+    mood,
+    sourceText: sourceText.trim(),
+    adultGuardianAffirmed,
+    generationConsent,
+    providerProcessingConsent,
+    locale: "en-US"
+  }), [
+    adultGuardianAffirmed,
+    audienceAgeBand,
+    generationConsent,
+    mood,
+    providerProcessingConsent,
+    sourceText,
+    theme,
+    title
+  ]);
+  const requestReviewed = reviewedFingerprint === requestReviewFingerprint;
 
   const validationError = useMemo(() => {
     if (!title.trim()) return "Add a title to continue.";
@@ -54,11 +78,12 @@ export function StorytimeHome() {
     if (!adultGuardianAffirmed) return "Storytime is currently adult/guardian-operated. Confirm that you are the adult or guardian operating this story.";
     if (!generationConsent) return "Explicit story-generation consent is required.";
     if (!providerProcessingConsent) return "Consent to the configured story-generation provider is required before cloud generation.";
+    if (!requestReviewed) return "Review the exact Storytime request before generation.";
     const unsafeTerm = firstUnsafeTerm([title, theme, mood, sourceText]);
     if (unsafeTerm) return "This story seed includes sensitive content that Storytime cannot process here.";
     if (sourceText.length > MAX_SOURCE_CHARS) return `Keep the source text under ${MAX_SOURCE_CHARS} characters.`;
     return null;
-  }, [adultGuardianAffirmed, audienceAgeBand, generationConsent, mood, providerProcessingConsent, sourceText, theme, title]);
+  }, [adultGuardianAffirmed, audienceAgeBand, generationConsent, mood, providerProcessingConsent, requestReviewed, sourceText, theme, title]);
 
   async function handleCreateStory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,6 +124,10 @@ export function StorytimeHome() {
         operator: {
           role: "adult_or_guardian",
           affirmed: adultGuardianAffirmed,
+        },
+        requestReview: {
+          reviewed: requestReviewed,
+          reviewVersion: STORY_REQUEST_REVIEW_VERSION,
         },
         consentSnapshot: {
           storyGeneration: generationConsent,
@@ -219,6 +248,35 @@ export function StorytimeHome() {
               I consent to the configured story-generation provider processing the information in this form for this request.
             </span>
           </label>
+
+          <section className="storytime-card storytime-stack" aria-label="Review Storytime request">
+            <p className="storytime-pill">Review before generation</p>
+            <h3>Confirm exactly what Storytime will use</h3>
+            <dl>
+              <dt>Title</dt><dd>{title.trim() || "Not provided"}</dd>
+              <dt>Theme</dt><dd>{theme.trim() || "Not provided"}</dd>
+              <dt>Audience</dt><dd>{audienceAgeBand}</dd>
+              <dt>Tone</dt><dd>{mood}</dd>
+              <dt>Locale</dt><dd>English (en-US)</dd>
+              <dt>Source text</dt><dd>{sourceText.trim() ? `${sourceText.trim().length} characters` : "No optional source text"}</dd>
+              <dt>Memory integration</dt><dd>Off</dd>
+              <dt>Public sharing</dt><dd>Off</dd>
+              <dt>Voiceover</dt><dd>Off</dd>
+            </dl>
+            <p className="storytime-helper">
+              Changing any field after this confirmation automatically invalidates the review and requires a new confirmation.
+            </p>
+            <label className="storytime-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={requestReviewed}
+                  onChange={(event) => setReviewedFingerprint(event.target.checked ? requestReviewFingerprint : null)}
+                />{" "}
+                I reviewed this exact request and want Storytime to use only the information shown above for this generation.
+              </span>
+            </label>
+          </section>
 
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
           {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
