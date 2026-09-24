@@ -30,6 +30,7 @@ const weeklyFunction = read('functions/src/generate-weekly-story-scroll.ts');
 const timelineFunction = read('functions/src/refresh-story-timeline.ts');
 const archiveFunction = read('functions/src/rebuild-user-story-archive.ts');
 const storyProvider = read('functions/src/story-provider.ts');
+const mediaContract = read('src/lib/storytime/media-job-contract.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
 
@@ -172,7 +173,6 @@ test('Firebase hosting and functions config are present', () => {
 
 test('Callable functions cover private Storytime lifecycle, provider wiring, quota, and real per-callable modules', () => {
   assert.match(functions, /export const generateStorySession/);
-  assert.match(functions, /export const prepareVoiceoverJob/);
   assert.match(narratorFunction, /export const generateNarratorScript/);
   assert.match(arcFunction, /export const generateEmotionalArcSummary/);
   assert.match(weeklyFunction, /export const generateWeeklyStoryScroll/);
@@ -203,6 +203,9 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(functions, /resource-exhausted/);
   assert.match(storyProvider, /response_format/);
   assert.match(storyProvider, /Do not diagnose/);
+  assert.doesNotMatch(functionsIndex, /prepareVoiceoverJob/);
+  assert.match(mediaContract, /state: "hard_off"/);
+  assert.match(mediaContract, /providerSpendAuthorized: false/);
 });
 
 test('Storytime Functions emit privacy-safe audit log events', () => {
@@ -214,10 +217,8 @@ test('Storytime Functions emit privacy-safe audit log events', () => {
   assert.match(auditLog, /story_persisted/);
   assert.match(auditLog, /public_share_created/);
   assert.match(auditLog, /public_share_revoked/);
-  assert.match(auditLog, /voiceover_export_queued/);
   assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
   assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
-  assert.match(functions, /auditLog\(\{ event: "voiceover_export_queued"/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_created"/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_revoked"/);
   assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
