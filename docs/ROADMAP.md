@@ -153,7 +153,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.2 Story reader, editor, regeneration, and version history
 
 - **User value:** users can read, correct, and selectively improve stories without regenerating everything.
-- **Current evidence:** static chapter cards and narrator text.
+- **Current evidence:** new generated sessions now receive immutable `storytime-version-v1` version 1; the cloud reader renders stored story moments; verified owners can make bounded title/chapter/moment/narrator corrections that create a new immutable version with optimistic concurrency, and can restore an older version only by creating another new version. Edit/restore operations make no provider call and authorize no provider spend. Older unversioned sessions remain read-only rather than being silently migrated.
 - **Scope:** scene/chapter reader, edit, regenerate section, compare versions, restore, progress, loading/error/retry, content report.
 - **Areas:** `StoryPlayer`, story version model, Functions.
 - **Dependencies:** P0 generation jobs.
