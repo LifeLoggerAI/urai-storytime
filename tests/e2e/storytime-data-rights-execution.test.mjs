@@ -53,9 +53,9 @@ test('Storytime destructive deletion follows dry-run hash, legal-hold, admin-onl
   assert.match(controls, /No data has been deleted/);
 });
 
-test('deletion plans and completion receipts are server-only and completion cannot be claimed from a request alone', () => {
+test('deletion plans and operation receipts are server-only and completion cannot be claimed from a request alone', () => {
   assert.match(rules, /match \/privacyDeletionPlans\/\{id\}/);
-  assert.match(rules, /match \/privacyCompletionReceipts\/\{id\}/);
+  assert.match(rules, /match \/privacyOperationReceipts\/\{id\}/);
   assert.match(rules, /allow read, write: if false/);
   assert.match(execution, /completionReceiptId: null/);
   assert.match(execution, /deletionCompletionVerified: false/);
@@ -65,7 +65,7 @@ test('deletion plans and completion receipts are server-only and completion cann
 test('Storytime privacy execution retains privacy evidence and does not silently delete family/shared authority', () => {
   assert.match(execution, /privacyRequests/);
   assert.match(execution, /privacyDeletionPlans/);
-  assert.match(execution, /privacyCompletionReceipts/);
+  assert.match(execution, /privacyOperationReceipts/);
   assert.match(execution, /legalHoldRecords/);
   assert.match(execution, /familyMemberships/);
   assert.match(execution, /family_or_child_data_requires_urai_privacy_review/);
