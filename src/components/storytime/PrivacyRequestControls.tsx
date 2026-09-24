@@ -12,6 +12,20 @@ type PrivacyRequestResult = {
   reused?: boolean;
 };
 
+type ExportResult = {
+  status?: string;
+  completeness?: string;
+  blockers?: string[];
+  packageSha256?: string;
+};
+
+type DeletionPlanResult = {
+  planHash?: string;
+  executionBlockers?: string[];
+  completionBlockers?: string[];
+  readyForAdminExecution?: boolean;
+};
+
 function createRequestId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `privacy-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
@@ -57,11 +71,34 @@ export function PrivacyRequestControls() {
         confirmation: true
       });
       const id = result.data.privacyRequestId;
-      setMessage(
-        type === "export"
-          ? `Export request received${id ? ` (${id})` : ""}. This records the request; an export is not represented as complete until a completion receipt exists.`
-          : `Deletion request received${id ? ` (${id})` : ""}. No data is represented as deleted until the governed deletion workflow records completion.`
-      );
+      if (!id) throw new Error("Privacy request id is missing.");
+
+      if (type === "export") {
+        const processExport = httpsCallable<Record<string, unknown>, ExportResult>(
+          getFirebaseFunctions(),
+          "processStorytimeExportRequest"
+        );
+        const packaged = await processExport({ privacyRequestId: id });
+        const blockers = packaged.data.blockers || [];
+        setMessage(
+          blockers.length === 0
+            ? `Storytime export package is ready. Request ${id}. Integrity SHA-256: ${packaged.data.packageSha256 || "recorded by the server"}.`
+            : `Storytime export package was created as partial/review-required for request ${id}. Remaining blockers: ${blockers.join(", ")}.`
+        );
+      } else {
+        const planDeletion = httpsCallable<Record<string, unknown>, DeletionPlanResult>(
+          getFirebaseFunctions(),
+          "planStorytimeDeletion"
+        );
+        const planned = await planDeletion({ privacyRequestId: id });
+        const blockers = planned.data.executionBlockers || [];
+        const completionBlockers = planned.data.completionBlockers || [];
+        setMessage(
+          blockers.length === 0
+            ? `Deletion dry-run is ready for governed admin execution. Request ${id}; plan hash ${planned.data.planHash || "recorded by the server"}. No data has been deleted. Completion blockers: ${completionBlockers.join(", ") || "none currently reported"}.`
+            : `Deletion request ${id} is blocked before destructive execution: ${blockers.join(", ")}. No data has been deleted.`
+        );
+      }
       setConfirmation(false);
     } catch {
       setMessage("The privacy request could not be created. No export or deletion has been represented as completed.");
@@ -75,8 +112,9 @@ export function PrivacyRequestControls() {
       <p className="storytime-pill">Privacy requests</p>
       <h2>Export or deletion requests</h2>
       <p>
-        These controls create a private, auditable request. They do not claim that an export or deletion has finished;
-        completion requires the governed backend workflow and a completion receipt.
+        These controls create a private, auditable request. Export requests package Storytime-owned data immediately when
+        the governed backend can do so. Deletion requests produce a dry-run plan first; destructive execution is admin-only,
+        revalidated against the exact plan hash, and never represented as complete without post-delete verification.
       </p>
       {!cloudReady ? <p className="storytime-helper">Privacy requests are unavailable until the verified cloud runtime is enabled.</p> : null}
       {cloudReady && !signedIn ? <p className="storytime-helper">Sign in to create a privacy request.</p> : null}
