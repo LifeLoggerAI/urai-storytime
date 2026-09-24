@@ -138,7 +138,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.1 Guided story builder and draft workflow
 
 - **User value:** people can create a story without understanding internal terms.
-- **Current evidence:** the current form captures title/theme/audience/tone/source, adult/guardian authority, generation/provider consent, and now requires a versioned review of the exact request fingerprint before generation; changing any reviewed field invalidates the review. Multi-step guidance, private draft autosave/resume, people/pets/places, length/genre and draft recovery remain open.
+- **Current evidence:** the current form captures title/theme/audience/tone/source, adult/guardian authority, generation/provider consent, and requires versioned review of the exact request before generation. The current product child adds explicit opt-in private draft autosave/resume, verified-owner server writes, optimistic revision fencing, owner-scoped draft listing, explicit delete, and guarantees that resumed drafts restore no generation/provider consent or request-review approval. Multi-step guidance plus richer people/pets/places, length, genre, and conflict-recovery UX remain open.
 - **Scope:** multi-step wizard for audience, people/pets/places, genre, tone, length, language, source permissions, review; autosaved draft; validation and recovery.
 - **Areas:** Storytime components, domain schemas, Firestore drafts.
 - **Dependencies:** P0 policy/data model.
