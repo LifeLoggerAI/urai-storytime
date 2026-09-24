@@ -123,3 +123,39 @@ export function assertStorytimeIntegrationIsHardOff(envelope: StorytimeIntegrati
     throw new Error("Storytime future-system integration must remain hard-off until separately approved.");
   }
 }
+
+
+type PrivateIntegrationBase = {
+  storySessionId: string;
+  storyVersionId?: string;
+  privacyClass: Exclude<StorytimePrivacyClass, "public_safe">;
+  provenance: StorytimeProvenanceReference[];
+  generatedAt?: string;
+};
+
+export function buildStudioNarrativeGraphEnvelope(
+  args: PrivateIntegrationBase & { payload: StudioNarrativeGraphPayload }
+) {
+  return buildHardOffStorytimeIntegration({
+    ...args,
+    destinationSystem: "urai-studio"
+  });
+}
+
+export function buildContentStoryPackageEnvelope(
+  args: PrivateIntegrationBase & { payload: ContentStoryPackagePayload }
+) {
+  return buildHardOffStorytimeIntegration({
+    ...args,
+    destinationSystem: "urai-content"
+  });
+}
+
+export function buildSpatialReplayManifestEnvelope(
+  args: PrivateIntegrationBase & { payload: SpatialReplayManifestPayload }
+) {
+  return buildHardOffStorytimeIntegration({
+    ...args,
+    destinationSystem: "urai-spatial"
+  });
+}
