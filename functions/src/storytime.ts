@@ -311,6 +311,7 @@ export const generateStorySession = onCall(async (request) => {
   const sceneId = id("memoryScene");
   const scriptId = id("narratorScript");
   const arcId = id("emotionalArc");
+  const storyVersionId = id("storyVersion");
 
   const session = {
     id: sessionId,
@@ -325,6 +326,8 @@ export const generateStorySession = onCall(async (request) => {
     chapterIds: [chapterId],
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
+    currentVersionId: storyVersionId,
+    currentVersionNumber: 1,
     provider: readiness.ready ? readiness.provider : "local_builder",
     requestId: input.requestId,
     locale: input.locale,
@@ -422,6 +425,48 @@ export const generateStorySession = onCall(async (request) => {
     updatedAt: createdAt
   };
 
+  const storyVersion = {
+    schemaVersion: "storytime-version-v1",
+    id: storyVersionId,
+    userId,
+    sessionId,
+    versionNumber: 1,
+    parentVersionId: null,
+    restoredFromVersionId: null,
+    reason: "initial_generation",
+    editReason: "Initial generated Storytime version",
+    snapshot: {
+      title: session.title,
+      chapters: [{
+        id: chapterId,
+        order: chapter.order,
+        title: chapter.title,
+        summary: chapter.summary
+      }],
+      moments: [{
+        id: momentId,
+        chapterId,
+        order: moment.order,
+        title: moment.title,
+        body: moment.body
+      }],
+      narratorScripts: [{
+        id: scriptId,
+        chapterId,
+        text: narratorScript.text
+      }]
+    },
+    provenance: {
+      sourceStoryProvenance: session.provenance,
+      userEdited: false,
+      providerCallMade: readiness.ready,
+      providerSpendAuthorized: false
+    },
+    safetyStatus: outputModeration.safetyStatus,
+    immutable: true,
+    createdAt
+  };
+
   const batch = db.batch();
   batch.set(db.collection("storySessions").doc(sessionId), session);
   batch.set(db.collection("storyChapters").doc(chapterId), chapter);
@@ -429,6 +474,7 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("memoryScenes").doc(sceneId), scene);
   batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+  batch.set(db.collection("storyVersions").doc(storyVersionId), storyVersion);
   batch.set(generationRequest.requestRef, {
     status: "succeeded",
     sessionId,

@@ -57,6 +57,8 @@ Implemented or source-wired in code:
 - Firebase callable lifecycle hooks
 - Firestore rules/index scaffolding
 - Storytime domain models and safety helpers
+- Immutable Storytime version 1 on new stories
+- Provider-free owner edit/restore history with optimistic concurrency
 - Runtime readiness gates that default production status to blocked
 - CI validation workflow
 - Production-boundary regression tests
