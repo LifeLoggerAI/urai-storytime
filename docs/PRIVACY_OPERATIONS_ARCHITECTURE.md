@@ -19,7 +19,7 @@ This is **not production certification**. Runtime completion still depends on ex
 2. `processStorytimeExportRequest` inventories Storytime-owned records for the request scope.
 3. Sensitive secret/token-style fields are scrubbed.
 4. The JSON package and integrity manifest are written to private Storage.
-5. A completion receipt records package and manifest hashes.
+5. An operation receipt records package and manifest hashes; the privacy request itself is marked complete only when no export blockers remain.
 6. The owner may request a short-lived signed URL through `getStorytimeExportDownloadUrl`.
 7. If family/shared authority or external provider artifact cleanup remains unresolved, the export is labeled `partial_review_required` and the request remains in review rather than being falsely marked complete.
 
@@ -37,14 +37,14 @@ This is **not production certification**. Runtime completion still depends on ex
 10. After mutation, the request enters `verification_required`.
 11. `verifyStorytimeDeletion` confirms Storytime-owned targets and Auth state are actually gone.
 12. Final `completed` state remains blocked until `STORYTIME_BACKUP_RETENTION_POLICY_READY=true`.
-13. Plans, privacy requests, legal-hold evidence, and completion receipts remain retained privacy evidence.
+13. Plans, privacy requests, legal-hold evidence, and operation receipts remain retained privacy evidence.
 
 ## Server-only evidence
 
 The following collections are not directly readable/writable by clients:
 
 - `privacyDeletionPlans`
-- `privacyCompletionReceipts`
+- `privacyOperationReceipts`
 - `storyGenerationRequests`
 - `storyArchiveSnapshots`
 
