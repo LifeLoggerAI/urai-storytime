@@ -27,8 +27,8 @@ type State =
   | { status: "error"; message: string }
   | { status: "ready"; bundle: Bundle };
 
-function toMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Cloud session load failed.";
+function toMessage() {
+  return "We couldn’t load that private Storytime session. Check your account and try again.";
 }
 
 async function loadBundle(sessionId: string): Promise<Bundle | null> {
@@ -83,8 +83,8 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
           return;
         }
         setState({ status: "ready", bundle });
-      } catch (error) {
-        if (active) setState({ status: "error", message: toMessage(error) });
+      } catch {
+        if (active) setState({ status: "error", message: toMessage() });
       }
     });
     return () => {
