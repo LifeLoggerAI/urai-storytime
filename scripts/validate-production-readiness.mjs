@@ -43,6 +43,8 @@ const requiredSourceFiles = [
   'src/components/storytime/CloudSession.tsx',
   'src/components/storytime/ShareStory.tsx',
   'src/components/storytime/ShareControls.tsx',
+  'src/app/layout.tsx',
+  'src/app/globals.css',
   'functions/package.json',
   'functions/src/index.ts',
   'functions/src/storytime.ts',
@@ -70,6 +72,22 @@ if (exists('README.md')) {
   const readme = read('README.md');
   if (!/Not production\/live-published verified/i.test(readme)) {
     warnings.push('README should continue to state that production/live publication is not verified until deploy proof exists.');
+  }
+}
+
+if (exists('src/app/layout.tsx') && exists('src/app/globals.css')) {
+  const layout = read('src/app/layout.tsx');
+  const styles = read('src/app/globals.css');
+  for (const marker of ['storytime-skip-link', 'storytime-main-content']) {
+    if (!layout.includes(marker)) failures.push(`Missing active Storytime accessibility marker: ${marker}`);
+  }
+  for (const marker of [
+    'text-size-adjust: 100%',
+    ':where(a, button, input, textarea, select):focus-visible',
+    '@media (prefers-reduced-motion: reduce)',
+    '@media (forced-colors: active)'
+  ]) {
+    if (!styles.includes(marker)) failures.push(`Missing Storytime accessibility style marker: ${marker}`);
   }
 }
 
