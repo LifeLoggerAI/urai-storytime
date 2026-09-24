@@ -4,15 +4,15 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('functions/src/storytime-record-builders.ts', 'utf8');
 
-test('record builders create queued narrator script records', () => {
+test('record builders create completed deterministic narrator script records', () => {
   assert.match(source, /export function buildNarratorScriptRecord/);
-  assert.match(source, /providerStatus: "queued"/);
+  assert.match(source, /providerStatus: "completed"/);
   assert.match(source, /scriptType: args\.scriptType \|\| "memory_replay"/);
   assert.match(source, /voiceTone: args\.voiceTone \|\| "warm"/);
   assert.match(source, /chapterId: args\.chapterId \|\| args\.session\.chapterIds\?\.\[0\]/);
 });
 
-test('record builders create queued emotional arc records', () => {
+test('record builders create completed deterministic emotional arc records', () => {
   assert.match(source, /export function buildEmotionalArcRecord/);
   assert.match(source, /arcLabel: args\.arcLabel \|\| "gentle return"/);
   assert.match(source, /startTone: args\.session\.emotionalTone \|\| "reflective"/);
