@@ -3,6 +3,7 @@ export interface StoryProviderInput {
   sourceText?: string;
   emotionalTone: string;
   symbolicMotifs: string[];
+  locale: "en-US";
   audienceAgeBand: "family" | "preschool_3_5" | "early_reader_6_8" | "middle_grade_9_12";
 }
 
@@ -87,6 +88,7 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     "Return JSON only with keys: chapterTitle, chapterSummary, momentTitle, momentBody, narratorText, scenePrompt, visualMood, audioMood, arcLabel, arcSummary, peakTone, resolutionTone.",
     "Do not diagnose, shame, intensify fear, expose private personal details, or create public-share text.",
     audienceInstruction(input.audienceAgeBand),
+    `Locale: ${input.locale}. Do not silently translate or switch languages.`,
     `Title: ${input.title}`,
     `Tone: ${input.emotionalTone}`,
     `Motifs: ${input.symbolicMotifs.join(", ") || "soft light"}`,
