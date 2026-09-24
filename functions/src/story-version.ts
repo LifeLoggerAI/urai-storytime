@@ -12,6 +12,8 @@ export interface InitialStoryVersionInput {
   locale: string;
   audienceAgeBand: string;
   consentVersion: string;
+  reviewVersion: string;
+  reviewedRequestSha256: string;
   provenance: Record<string, unknown>;
   chapter: {
     id: string;
@@ -45,6 +47,8 @@ export function buildInitialStoryVersionRecord(input: InitialStoryVersionInput) 
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     consentVersion: input.consentVersion,
+    reviewVersion: input.reviewVersion,
+    reviewedRequestSha256: input.reviewedRequestSha256,
     provenance: input.provenance,
     chapter: input.chapter,
     moment: input.moment,
