@@ -136,16 +136,29 @@ Until that exists, flagged Storytime content stays blocked.
 
 ## Guardian and user reporting
 
+Current source now includes a category-only owner reporting path for private Storytime sessions.
+
+The report:
+
+- requires authenticated ownership of the target session;
+- is idempotent;
+- stores a bounded category rather than a free-form copy of story content;
+- writes a server-owned `storySafetyReports` record;
+- creates a sanitized `user_report` moderation case;
+- carries a target-reference fingerprint rather than raw story text;
+- is included in Storytime export/deletion inventory;
+- explicitly states that Storytime reporting is not emergency monitoring or clinical support.
+
 Still required before family-facing production claims:
 
-- user/guardian report control;
-- report categories and abuse prevention;
-- report acknowledgement/status;
-- emergency/severe-risk escalation policy;
+- live acknowledgement/status UX beyond initial receipt;
+- operational escalation ownership and response targets;
+- abuse/spam controls around reporting;
+- secure content-review channel where case investigation requires minimum-necessary content;
+- guardian/family role policy where a reporter is acting for another person;
 - governed support channel;
-- deletion/privacy integration;
-- auditable operator actions;
-- clear boundary that Storytime is not emergency or clinical care.
+- emergency/severe-risk policy that does not misrepresent Storytime as an emergency service;
+- staging/runtime authorization and audit evidence.
 
 Do not invent emergency monitoring or response capabilities.
 
@@ -205,7 +218,7 @@ Storytime moderation/child-safety remains **NO-GO for family/child production cl
 - approved safety policy and policy version exist;
 - provider moderation/data treatment is reviewed where a provider is enabled;
 - secure human review exists for any workflow that can approve/release flagged content;
-- user/guardian reporting and escalation are implemented for the enabled launch posture;
+- user/guardian reporting is runtime-proven and operational escalation is implemented for the enabled launch posture;
 - moderator/Admin access is least-privilege and operationally reviewed;
 - runtime authorization and audit evidence pass;
 - child/family privacy and legal review is complete for the exact enabled feature set.

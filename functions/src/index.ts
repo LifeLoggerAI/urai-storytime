@@ -32,3 +32,5 @@ export {
   getStorytimeModerationCase,
   transitionStorytimeModerationCase
 } from "./moderation-operations.js";
+
+export { reportStorytimeSafetyConcern } from "./safety-reports.js";

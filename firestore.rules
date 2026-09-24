@@ -125,6 +125,11 @@ service cloud.firestore {
       allow create: if canManageFamily(request.resource.data.familyId);
       allow update, delete: if false;
     }
+    match /storySafetyReports/{reportId} {
+      allow read: if isSelf(resource.data.userId) || isAdmin();
+      allow create, update, delete: if false;
+    }
+    match /storytimeSafetyReportCounters/{id} { allow read, write: if false; }
     match /moderation/{moderationId} {
       allow read: if isAdmin();
       allow write: if false;

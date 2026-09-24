@@ -185,7 +185,7 @@ Still required for external launch where applicable:
 - rate limits beyond current generation quotas;
 - operational alerts;
 - provider/cost anomaly detection;
-- user/guardian reporting;
+- runtime-proven user/guardian reporting and abuse controls;
 - incident/escalation ownership.
 
 ## Data rights
@@ -238,7 +238,7 @@ Do not launch Storytime as a child/family production product until the exact ena
 - executable Auth/Firestore/Storage authorization evidence;
 - provider data/cost/safety proof for any enabled provider;
 - secure moderation operations appropriate to enabled claims;
-- user/guardian reporting path where required;
+- runtime-proven category-only user/guardian reporting plus governed escalation where required;
 - complete data-rights runtime evidence;
 - accessibility/browser/mobile/performance evidence;
 - monitoring, backup, incident and rollback evidence;

@@ -81,7 +81,12 @@ Do not claim complete narration accessibility while voiceover/media execution is
 - [ ] Moderation records contain reason codes/fingerprints rather than raw story bodies.
 - [ ] Storytime-generated narrative is labeled as creative derivative, not source memory evidence.
 - [ ] User-facing errors do not expose raw provider/callable response text.
-- [ ] UI does not claim therapy, diagnosis, child-account readiness, multilingual certification, or media/provider readiness without evidence.
+- [ ] UI does not claim therapy, diagnosis, child-account readiness, multilingual certification, emergency monitoring, or media/provider readiness without evidence.
+- [ ] Owner category-only safety reporting creates a server-owned report and sanitized `user_report` moderation case.
+- [ ] Safety reporting does not copy raw story text or free-form sensitive notes into the moderation queue.
+- [ ] Safety reports are included in export/deletion inventories.
+- [ ] Cross-owner safety reporting is denied.
+- [ ] Reporting abuse/rate controls and operator escalation are proven before family-facing production claims.
 
 ## Data rights
 

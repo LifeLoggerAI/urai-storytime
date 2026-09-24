@@ -59,7 +59,7 @@ function sanitizedCase(id: string, data: DocumentData) {
     moderationId: id,
     schemaVersion: data.schemaVersion === MODERATION_SCHEMA_VERSION ? MODERATION_SCHEMA_VERSION : "unknown",
     requestId: typeof data.requestId === "string" ? data.requestId : null,
-    stage: data.stage === "input" || data.stage === "output" ? data.stage : "unknown",
+    stage: data.stage === "input" || data.stage === "output" || data.stage === "user_report" ? data.stage : "unknown",
     status: typeof data.status === "string" ? data.status : "unknown",
     reasonCodes: stringList(data.reasonCodes),
     contentSha256: typeof data.contentSha256 === "string" ? data.contentSha256 : null,
