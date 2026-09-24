@@ -10,6 +10,7 @@ if (getApps().length === 0) initializeApp();
 const db = getFirestore();
 const REPORT_SCHEMA_VERSION = "storytime-safety-report-v1";
 const MODERATION_SCHEMA_VERSION = "storytime-moderation-review-v1";
+const MAX_SAFETY_REPORTS_PER_DAY = Number(process.env.STORYTIME_MAX_SAFETY_REPORTS_PER_DAY || 10);
 
 const ReportSchema = z.object({
   requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/),
@@ -33,6 +34,10 @@ function digest(value: string) {
   return createHash("sha256").update(value, "utf8").digest("hex");
 }
 
+function utcDayId(date = new Date()) {
+  return `${date.getUTCFullYear()}${String(date.getUTCMonth() + 1).padStart(2, "0")}${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
 export const reportStorytimeSafetyConcern = onCall(async (request) => {
   const userId = requireAuth(request.auth?.uid);
   const input = ReportSchema.parse(request.data);
@@ -40,11 +45,13 @@ export const reportStorytimeSafetyConcern = onCall(async (request) => {
   const reportId = `${userId}_${input.requestId}`;
   const reportRef = db.collection("storySafetyReports").doc(reportId);
   const moderationRef = db.collection("moderation").doc(`safetyReport_${digest(reportId).slice(0, 40)}`);
+  const counterRef = db.collection("storytimeSafetyReportCounters").doc(`${userId}_${utcDayId()}`);
 
   const result = await db.runTransaction(async (transaction) => {
-    const [sessionSnapshot, reportSnapshot] = await Promise.all([
+    const [sessionSnapshot, reportSnapshot, counterSnapshot] = await Promise.all([
       transaction.get(sessionRef),
-      transaction.get(reportRef)
+      transaction.get(reportRef),
+      transaction.get(counterRef)
     ]);
 
     if (!sessionSnapshot.exists || sessionSnapshot.data()?.userId !== userId) {
@@ -61,6 +68,11 @@ export const reportStorytimeSafetyConcern = onCall(async (request) => {
       };
     }
 
+    const reportCount = Number(counterSnapshot.data()?.count || 0);
+    if (reportCount >= MAX_SAFETY_REPORTS_PER_DAY) {
+      throw new HttpsError("resource-exhausted", "Daily Storytime safety-report limit reached. Try again later.");
+    }
+
     const session = sessionSnapshot.data() ?? {};
     const now = Timestamp.now();
     const targetFingerprintSha256 = digest(
@@ -71,6 +83,13 @@ export const reportStorytimeSafetyConcern = onCall(async (request) => {
         safetyStatus: session.safetyStatus ?? null
       })
     );
+
+    transaction.set(counterRef, {
+      userId,
+      scope: "day",
+      count: reportCount + 1,
+      updatedAt: now
+    }, { merge: true });
 
     transaction.create(reportRef, {
       schemaVersion: REPORT_SCHEMA_VERSION,
