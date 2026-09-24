@@ -23,6 +23,8 @@ test('Storytime export packages owner data privately with integrity and short-li
   ]) assert.ok(execution.includes(marker), `missing export marker: ${marker}`);
   assert.match(index, /processStorytimeExportRequest/);
   assert.match(index, /getStorytimeExportDownloadUrl/);
+  assert.match(execution, /exportCompleteness !== "complete_for_storytime_owned_data"/);
+  assert.match(execution, /requires privacy review before download can be authorized/);
 });
 
 test('Storytime deletion is dry-run/hash/admin-only and revalidated before destructive mutation', () => {
