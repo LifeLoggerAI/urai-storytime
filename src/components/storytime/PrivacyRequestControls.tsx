@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
 
 type PrivacyRequestType = "export" | "deletion";
-
 type PrivacyRequestResult = {
   privacyRequestId?: string;
   status?: string;
@@ -14,7 +13,6 @@ type PrivacyRequestResult = {
 };
 
 type ExportResult = {
-  privacyRequestId?: string;
   status?: string;
   completeness?: string;
   blockers?: string[];
@@ -30,6 +28,8 @@ type ExportDownloadResult = {
 
 type DeletionPlanResult = {
   planHash?: string;
+  counts?: Record<string, number>;
+  storageObjectCount?: number;
   executionBlockers?: string[];
   completionBlockers?: string[];
   readyForAdminExecution?: boolean;
@@ -40,19 +40,13 @@ function createRequestId() {
   return `privacy-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function blockerSummary(blockers: string[] | undefined) {
-  if (!blockers?.length) return "";
-  return ` Blockers: ${blockers.join(", ")}.`;
-}
-
 export function PrivacyRequestControls() {
   const cloudReady = isStorytimeCloudModeEnabled();
   const [signedIn, setSignedIn] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [confirmation, setConfirmation] = useState(false);
-  const [working, setWorking] = useState<PrivacyRequestType | "download" | null>(null);
+  const [working, setWorking] = useState<PrivacyRequestType | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [exportRequestId, setExportRequestId] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadExpiresAt, setDownloadExpiresAt] = useState<string | null>(null);
 
@@ -80,80 +74,65 @@ export function PrivacyRequestControls() {
 
     setWorking(type);
     try {
-      const functions = getFirebaseFunctions();
-      const createRequest = httpsCallable<Record<string, unknown>, PrivacyRequestResult>(
-        functions,
+      const callable = httpsCallable<Record<string, unknown>, PrivacyRequestResult>(
+        getFirebaseFunctions(),
         "requestPrivacyOperation"
       );
-      const created = await createRequest({
+      const result = await callable({
         requestId: createRequestId(),
         type,
         scope: "account",
         confirmation: true
       });
-      const privacyRequestId = created.data.privacyRequestId;
-      if (!privacyRequestId) throw new Error("Privacy request id was not returned.");
+      const id = result.data.privacyRequestId;
+      if (!id) throw new Error("Privacy request id is missing.");
 
       if (type === "export") {
         const processExport = httpsCallable<Record<string, unknown>, ExportResult>(
-          functions,
+          getFirebaseFunctions(),
           "processStorytimeExportRequest"
         );
-        const processed = await processExport({ privacyRequestId });
-        const blockers = processed.data.blockers || [];
+        const packaged = await processExport({ privacyRequestId: id });
+        const blockers = packaged.data.blockers || [];
 
-        const getDownload = httpsCallable<Record<string, unknown>, ExportDownloadResult>(
-          functions,
-          "getStorytimeExportDownloadUrl"
-        );
-        const download = await getDownload({ privacyRequestId });
-        if (download.data.url) setDownloadUrl(download.data.url);
-        if (download.data.expiresAt) setDownloadExpiresAt(download.data.expiresAt);
-
-        setMessage(
-          processed.data.completeness === "complete_for_storytime_owned_data"
-            ? "Storytime export package is ready. It contains the Storytime-owned data currently covered by this repository."
-            : `Storytime prepared a partial export that requires privacy review before it can be represented as a complete account export.${blockerSummary(blockers)}`
-        );
+        if (blockers.length === 0) {
+          const getDownload = httpsCallable<Record<string, unknown>, ExportDownloadResult>(
+            getFirebaseFunctions(),
+            "getStorytimeExportDownloadUrl"
+          );
+          const download = await getDownload({ privacyRequestId: id });
+          setDownloadUrl(download.data.url ?? null);
+          setDownloadExpiresAt(download.data.expiresAt ?? null);
+          setMessage(
+            `Storytime export package is ready. Request ${id}. Integrity SHA-256: ${packaged.data.packageSha256 || "recorded by the server"}.`
+          );
+        } else {
+          setMessage(
+            `Storytime export package was created as partial/review-required for request ${id}. Remaining blockers: ${blockers.join(", ")}.`
+          );
+        }
       } else {
         const planDeletion = httpsCallable<Record<string, unknown>, DeletionPlanResult>(
-          functions,
+          getFirebaseFunctions(),
           "planStorytimeDeletion"
         );
-        const planned = await planDeletion({ privacyRequestId });
-        const executionBlockers = planned.data.executionBlockers || [];
+        const planned = await planDeletion({ privacyRequestId: id });
+        const blockers = planned.data.executionBlockers || [];
         const completionBlockers = planned.data.completionBlockers || [];
+        const targets = Object.entries(planned.data.counts ?? {})
+          .filter(([, count]) => count > 0)
+          .map(([name, count]) => `${name}=${count}`)
+          .join(", ");
 
         setMessage(
-          planned.data.readyForAdminExecution
-            ? `Deletion plan created. Destructive deletion is not user-triggered; an authorized privacy administrator must execute the exact plan hash ${planned.data.planHash || "recorded by the server"} and completion still requires post-delete verification.${blockerSummary(completionBlockers)}`
-            : `Deletion request recorded but destructive execution is blocked until the listed privacy/runtime prerequisites are resolved.${blockerSummary(executionBlockers)}${blockerSummary(completionBlockers)}`
+          blockers.length === 0
+            ? `Deletion dry-run is ready for governed admin execution. Request ${id}; plan hash ${planned.data.planHash || "recorded by the server"}. Targets: ${targets || "none"}. No data has been deleted. Completion blockers: ${completionBlockers.join(", ") || "none currently reported"}.`
+            : `Deletion request ${id} is blocked before destructive execution: ${blockers.join(", ")}. Planned targets: ${targets || "none"}. No data has been deleted.`
         );
       }
-
       setConfirmation(false);
     } catch {
-      setMessage("The privacy operation could not be completed safely. No export or deletion has been represented as complete.");
-    } finally {
-      setWorking(null);
-    }
-  }
-
-  async function downloadExport() {
-    if (!exportRequestId) return;
-    setWorking("download");
-    setMessage(null);
-    try {
-      const getDownload = httpsCallable<Record<string, unknown>, { url?: string; expiresAt?: string; completeness?: string }>(
-        getFirebaseFunctions(),
-        "getStorytimeExportDownloadUrl"
-      );
-      const result = await getDownload({ privacyRequestId: exportRequestId });
-      if (!result.data.url) throw new Error("Export URL is unavailable.");
-      window.location.assign(result.data.url);
-      setMessage(`A short-lived private export link was created for request ${exportRequestId}. It expires at ${result.data.expiresAt || "the server-recorded expiry"}.`);
-    } catch {
-      setMessage("The private export download could not be prepared. The export request remains unchanged.");
+      setMessage("The privacy operation could not be completed safely. No export or deletion has been represented as completed.");
     } finally {
       setWorking(null);
     }
@@ -164,10 +143,11 @@ export function PrivacyRequestControls() {
       <p className="storytime-pill">Privacy requests</p>
       <h2>Export or deletion requests</h2>
       <p>
-        Storytime can package the data owned by this repository and can prepare a deletion plan. Account deletion remains
-        fail-closed behind admin execution, legal-hold checks, environment isolation, provider/media cleanup, and completion verification.
+        These controls create a private, auditable request. Export requests package Storytime-owned data immediately when
+        the governed backend can do so. Deletion requests produce a dry-run plan first; destructive execution is admin-only,
+        revalidated against the exact plan hash, and never represented as complete without post-delete verification.
       </p>
-      {!cloudReady ? <p className="storytime-helper">Privacy operations are unavailable until the verified cloud runtime is enabled.</p> : null}
+      {!cloudReady ? <p className="storytime-helper">Privacy requests are unavailable until the verified cloud runtime is enabled.</p> : null}
       {cloudReady && !signedIn ? <p className="storytime-helper">Sign in to create a privacy request.</p> : null}
       {cloudReady && signedIn && !emailVerified ? <p className="storytime-helper">Verify the account email before creating a privacy request.</p> : null}
       <label className="storytime-field">
@@ -178,7 +158,7 @@ export function PrivacyRequestControls() {
             onChange={(event) => setConfirmation(event.target.checked)}
             disabled={!cloudReady || !signedIn || !emailVerified || working !== null}
           />{" "}
-          I understand this submits an account-level privacy request and that cross-system data may require separate governed processing.
+          I understand this submits an account-level privacy request for review and processing.
         </span>
       </label>
       <div className="storytime-actions">
@@ -188,7 +168,7 @@ export function PrivacyRequestControls() {
           onClick={() => submit("export")}
           disabled={!confirmation || working !== null || !cloudReady || !signedIn || !emailVerified}
         >
-          {working === "export" ? "Preparing export…" : "Prepare Storytime export"}
+          {working === "export" ? "Submitting…" : "Request account export"}
         </button>
         <button
           className="storytime-button secondary"
@@ -196,7 +176,7 @@ export function PrivacyRequestControls() {
           onClick={() => submit("deletion")}
           disabled={!confirmation || working !== null || !cloudReady || !signedIn || !emailVerified}
         >
-          {working === "deletion" ? "Preparing deletion plan…" : "Request account deletion plan"}
+          {working === "deletion" ? "Submitting…" : "Request account deletion"}
         </button>
       </div>
       {message ? <p role="status">{message}</p> : null}
@@ -205,7 +185,7 @@ export function PrivacyRequestControls() {
           <a href={downloadUrl} rel="noreferrer">
             Download private Storytime export
           </a>
-          {downloadExpiresAt ? ` — link expires ${new Date(downloadExpiresAt).toLocaleString()}` : ""}
+          {downloadExpiresAt ? ` — link expires ${downloadExpiresAt}` : ""}
         </p>
       ) : null}
     </section>
