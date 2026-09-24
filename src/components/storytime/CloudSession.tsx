@@ -8,6 +8,7 @@ import type { EmotionalArcSummary, MemoryScene, NarratorScript, StoryChapter, St
 import { ChapterTimeline } from "./ChapterTimeline";
 import { EmotionalArcViewer } from "./EmotionalArcViewer";
 import { MemorySceneCard } from "./MemorySceneCard";
+import { SafetyReportControls } from "./SafetyReportControls";
 import { ShareControls } from "./ShareControls";
 import { StoryPlayer } from "./StoryPlayer";
 
@@ -104,6 +105,7 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
           {bundle.arc ? <EmotionalArcViewer arc={bundle.arc} /> : <article className="storytime-card"><h2>No saved arc</h2><p>This cloud session has no saved emotional arc yet.</p></article>}
         </section>
         <ShareControls session={bundle.session} />
+        <SafetyReportControls session={bundle.session} />
       </section>
     );
   }
