@@ -49,6 +49,7 @@ const requiredSourceFiles = [
   'functions/src/story-provider.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
+  'functions/src/privacy-execution.ts',
   'functions/src/refresh-story-timeline.ts',
   'functions/src/rebuild-user-story-archive.ts',
   'functions/src/readiness.ts',
@@ -145,6 +146,24 @@ if (exists('functions/src/privacy-requests.ts')) {
     'completionReceiptId: null'
   ]) {
     if (!privacy.includes(marker)) failures.push(`Missing privacy lifecycle marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/privacy-execution.ts')) {
+  const privacyExecution = read('functions/src/privacy-execution.ts');
+  for (const marker of [
+    'processStorytimeExportRequest',
+    'getStorytimeExportDownloadUrl',
+    'planStorytimeDeletion',
+    'executeStorytimeDeletion',
+    'verifyStorytimeDeletion',
+    'active_legal_hold',
+    'storytime_firebase_isolation_not_certified',
+    'story_media_storage_cleanup_not_certified',
+    'backup_expiry_pending',
+    'DELETE_STORYTIME_DATA'
+  ]) {
+    if (!privacyExecution.includes(marker)) failures.push(`Missing Storytime data-rights execution marker: ${marker}`);
   }
 }
 
