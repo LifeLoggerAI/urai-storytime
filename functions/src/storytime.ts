@@ -6,7 +6,9 @@ import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import {
   generateStoryWithProvider,
+  getStoryProviderCostPreflight,
   getStoryProviderReadiness,
+  type StoryProviderInput,
   type StoryProviderOutput,
   type StoryProviderReceipt
 } from "./story-provider.js";
@@ -95,6 +97,165 @@ function quotaWindowId(date: Date, scope: "hour" | "day") {
 
 function generationRequestId(userId: string, requestId: string) {
   return `${userId}_${requestId}`;
+}
+
+function roundedUsd(value: number) {
+  return Math.round(value * 100_000_000) / 100_000_000;
+}
+
+function providerInputFromRequest(input: z.infer<typeof GenerateStorySchema>, source: string): StoryProviderInput {
+  return {
+    title: input.title,
+    sourceText: source,
+    emotionalTone: input.emotionalTone,
+    symbolicMotifs: input.symbolicMotifs,
+    locale: input.locale,
+    audienceAgeBand: input.audienceAgeBand
+  };
+}
+
+type ProviderBudgetReservation = {
+  reservationId: string;
+  dayId: string;
+  estimatedMaxCostUsd: number;
+  globalDailyBudgetUsd: number;
+  userDailyBudgetUsd: number;
+};
+
+async function reserveProviderBudget(
+  userId: string,
+  requestId: string,
+  providerInput: StoryProviderInput
+): Promise<ProviderBudgetReservation> {
+  const preflight = getStoryProviderCostPreflight(providerInput);
+  const dayId = quotaWindowId(new Date(), "day");
+  const reservationId = generationRequestId(userId, requestId);
+  const globalRef = db.collection("storytimeProviderBudgetCounters").doc(`global_${dayId}`);
+  const userRef = db.collection("storytimeProviderBudgetCounters").doc(`user_${userId}_${dayId}`);
+  const reservationRef = db.collection("storytimeProviderBudgetReservations").doc(reservationId);
+
+  await db.runTransaction(async (transaction) => {
+    const [globalSnapshot, userSnapshot, reservationSnapshot] = await Promise.all([
+      transaction.get(globalRef),
+      transaction.get(userRef),
+      transaction.get(reservationRef)
+    ]);
+
+    if (reservationSnapshot.exists) {
+      throw new HttpsError("already-exists", "A provider budget reservation already exists for this Storytime request.");
+    }
+
+    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
+    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
+    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
+    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
+    const estimate = preflight.estimatedMaxCostUsd;
+
+    if (globalActual + globalReserved + estimate > preflight.globalDailyBudgetUsd) {
+      throw new HttpsError("resource-exhausted", "Storytime provider daily budget is exhausted.");
+    }
+    if (userActual + userReserved + estimate > preflight.userDailyBudgetUsd) {
+      throw new HttpsError("resource-exhausted", "Your Storytime provider daily budget is exhausted.");
+    }
+
+    const updatedAt = now();
+    transaction.set(globalRef, {
+      scope: "global_day",
+      dayId,
+      actualCostUsd: roundedUsd(globalActual),
+      reservedCostUsd: roundedUsd(globalReserved + estimate),
+      budgetLimitUsd: preflight.globalDailyBudgetUsd,
+      updatedAt
+    }, { merge: true });
+    transaction.set(userRef, {
+      scope: "user_day",
+      userId,
+      dayId,
+      actualCostUsd: roundedUsd(userActual),
+      reservedCostUsd: roundedUsd(userReserved + estimate),
+      budgetLimitUsd: preflight.userDailyBudgetUsd,
+      updatedAt
+    }, { merge: true });
+    transaction.create(reservationRef, {
+      schemaVersion: "storytime-provider-budget-reservation-v1",
+      userId,
+      requestId,
+      dayId,
+      status: "reserved",
+      estimatedMaxCostUsd: estimate,
+      globalDailyBudgetUsd: preflight.globalDailyBudgetUsd,
+      userDailyBudgetUsd: preflight.userDailyBudgetUsd,
+      createdAt: updatedAt,
+      updatedAt
+    });
+  });
+
+  return {
+    reservationId,
+    dayId,
+    estimatedMaxCostUsd: preflight.estimatedMaxCostUsd,
+    globalDailyBudgetUsd: preflight.globalDailyBudgetUsd,
+    userDailyBudgetUsd: preflight.userDailyBudgetUsd
+  };
+}
+
+async function settleProviderBudget(
+  userId: string,
+  reservation: ProviderBudgetReservation,
+  actualCostUsd: number
+) {
+  const globalRef = db.collection("storytimeProviderBudgetCounters").doc(`global_${reservation.dayId}`);
+  const userRef = db.collection("storytimeProviderBudgetCounters").doc(`user_${userId}_${reservation.dayId}`);
+  const reservationRef = db.collection("storytimeProviderBudgetReservations").doc(reservation.reservationId);
+
+  await db.runTransaction(async (transaction) => {
+    const [globalSnapshot, userSnapshot, reservationSnapshot] = await Promise.all([
+      transaction.get(globalRef),
+      transaction.get(userRef),
+      transaction.get(reservationRef)
+    ]);
+    const reservationData = reservationSnapshot.data() ?? {};
+    if (reservationData.status === "settled") return;
+    if (!reservationSnapshot.exists || reservationData.userId !== userId) {
+      throw new HttpsError("failed-precondition", "Storytime provider budget reservation is unavailable.");
+    }
+
+    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
+    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
+    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
+    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
+    const reserved = Number(reservationData.estimatedMaxCostUsd || reservation.estimatedMaxCostUsd);
+    const updatedAt = now();
+
+    transaction.set(globalRef, {
+      actualCostUsd: roundedUsd(globalActual + actualCostUsd),
+      reservedCostUsd: roundedUsd(Math.max(0, globalReserved - reserved)),
+      updatedAt
+    }, { merge: true });
+    transaction.set(userRef, {
+      actualCostUsd: roundedUsd(userActual + actualCostUsd),
+      reservedCostUsd: roundedUsd(Math.max(0, userReserved - reserved)),
+      updatedAt
+    }, { merge: true });
+    transaction.update(reservationRef, {
+      status: "settled",
+      actualCostUsd: roundedUsd(actualCostUsd),
+      settledAt: updatedAt,
+      updatedAt
+    });
+  });
+}
+
+async function holdProviderBudgetReservation(
+  reservation: ProviderBudgetReservation,
+  failureCode: string
+) {
+  await db.collection("storytimeProviderBudgetReservations").doc(reservation.reservationId).set({
+    status: "held_after_failure",
+    failureCode,
+    heldCostUsd: reservation.estimatedMaxCostUsd,
+    updatedAt: now()
+  }, { merge: true });
 }
 
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
@@ -268,18 +429,38 @@ export const generateStorySession = onCall(async (request) => {
     }, { merge: true });
     throw error;
   }
+  const providerInput = providerInputFromRequest(input, source);
+  let budgetReservation: ProviderBudgetReservation | null = null;
+  if (readiness.ready) {
+    try {
+      budgetReservation = await reserveProviderBudget(userId, input.requestId, providerInput);
+      await generationRequest.requestRef.set({
+        providerBudgetReservationId: budgetReservation.reservationId,
+        providerBudgetDayId: budgetReservation.dayId,
+        providerEstimatedMaxCostUsd: budgetReservation.estimatedMaxCostUsd,
+        updatedAt: now()
+      }, { merge: true });
+    } catch (error) {
+      await generationRequest.requestRef.set({
+        status: "failed",
+        errorCode: error instanceof HttpsError ? error.code : "budget_reservation_failed",
+        updatedAt: now()
+      }, { merge: true });
+      auditLog({
+        event: "generation_blocked_budget",
+        userId,
+        provider: readiness.provider,
+        errorCode: error instanceof HttpsError ? error.code : "budget_reservation_failed"
+      });
+      throw error;
+    }
+  }
+
   let generated: StoryProviderOutput;
   let providerReceipt: StoryProviderReceipt;
   try {
     if (readiness.ready) {
-      const providerResult = await generateStoryWithProvider({
-        title: input.title,
-        sourceText: source,
-        emotionalTone: input.emotionalTone,
-        symbolicMotifs: input.symbolicMotifs,
-        locale: input.locale,
-        audienceAgeBand: input.audienceAgeBand
-      });
+      const providerResult = await generateStoryWithProvider(providerInput);
       generated = providerResult.output;
       providerReceipt = providerResult.receipt;
     } else {
@@ -302,13 +483,41 @@ export const generateStorySession = onCall(async (request) => {
       };
     }
   } catch (error) {
+    if (budgetReservation) {
+      await holdProviderBudgetReservation(
+        budgetReservation,
+        error instanceof Error ? error.name : "provider_failure"
+      );
+    }
     await generationRequest.requestRef.set({
       status: "failed",
       errorCode: error instanceof Error ? error.name : "unknown",
+      providerBudgetStatus: budgetReservation ? "held_after_failure" : "not_reserved",
       updatedAt: now()
     }, { merge: true });
     auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
     throw new HttpsError("internal", "Story generation could not be completed safely. Please try again.");
+  }
+
+  if (budgetReservation && providerReceipt.provider === "openai") {
+    try {
+      await settleProviderBudget(userId, budgetReservation, providerReceipt.actualCostUsd);
+      await generationRequest.requestRef.set({
+        providerBudgetStatus: "settled",
+        providerActualCostUsd: providerReceipt.actualCostUsd,
+        updatedAt: now()
+      }, { merge: true });
+    } catch (error) {
+      await holdProviderBudgetReservation(budgetReservation, "budget_settlement_failed");
+      await generationRequest.requestRef.set({
+        status: "failed",
+        errorCode: "budget_settlement_failed",
+        providerBudgetStatus: "held_after_failure",
+        updatedAt: now()
+      }, { merge: true });
+      auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_settlement_failed" });
+      throw new HttpsError("internal", "Story generation cost receipt could not be settled safely.");
+    }
   }
 
   const outputSafetyText = providerOutputText(generated);
