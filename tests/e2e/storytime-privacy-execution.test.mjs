@@ -54,6 +54,8 @@ test('privacy evidence collections are server-only', () => {
 
 test('settings initiate export packaging and deletion planning but never destructive execution', () => {
   assert.match(controls, /processStorytimeExportRequest/);
+  assert.match(controls, /getStorytimeExportDownloadUrl/);
+  assert.match(controls, /Download latest Storytime export/);
   assert.match(controls, /planStorytimeDeletion/);
   assert.match(controls, /No data has been deleted/);
   assert.doesNotMatch(controls, /executeStorytimeDeletion/);
