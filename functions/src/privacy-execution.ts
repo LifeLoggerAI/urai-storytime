@@ -684,6 +684,9 @@ export const getStorytimeExportDownloadUrl = onCall(async (request) => {
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export");
   const path = String(privacyRequest.data.exportPath ?? "");
   if (!path) throw new HttpsError("failed-precondition", "Storytime export package is not ready.");
+  if (privacyRequest.data.exportCompleteness !== "complete_for_storytime_owned_data") {
+    throw new HttpsError("failed-precondition", "Storytime export requires privacy review before download can be authorized.");
+  }
 
   const expiresAt = Date.now() + EXPORT_SIGNED_URL_TTL_MS;
   const [url] = await bucket.file(path).getSignedUrl({ action: "read", expires: expiresAt });
