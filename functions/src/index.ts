@@ -17,3 +17,11 @@ export {
 export { health, readiness } from "./readiness.js";
 
 export { requestPrivacyOperation } from "./privacy-requests.js";
+
+export {
+  processStorytimeExportRequest,
+  getStorytimeExportDownloadUrl,
+  planStorytimeDeletion,
+  executeStorytimeDeletion,
+  verifyStorytimeDeletion
+} from "./privacy-execution.js";
