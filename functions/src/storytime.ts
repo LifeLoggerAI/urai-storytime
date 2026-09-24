@@ -4,7 +4,12 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
-import { generateStoryWithProvider, getStoryProviderReadiness, type StoryProviderOutput } from "./story-provider.js";
+import {
+  generateStoryWithProvider,
+  getStoryProviderReadiness,
+  type StoryProviderOutput,
+  type StoryProviderReceipt
+} from "./story-provider.js";
 
 initializeApp();
 
@@ -264,17 +269,38 @@ export const generateStorySession = onCall(async (request) => {
     throw error;
   }
   let generated: StoryProviderOutput;
+  let providerReceipt: StoryProviderReceipt;
   try {
-    generated = readiness.ready
-      ? await generateStoryWithProvider({
-          title: input.title,
-          sourceText: source,
-          emotionalTone: input.emotionalTone,
-          symbolicMotifs: input.symbolicMotifs,
-          locale: input.locale,
-          audienceAgeBand: input.audienceAgeBand
-        })
-      : fallbackProviderOutput(input, source);
+    if (readiness.ready) {
+      const providerResult = await generateStoryWithProvider({
+        title: input.title,
+        sourceText: source,
+        emotionalTone: input.emotionalTone,
+        symbolicMotifs: input.symbolicMotifs,
+        locale: input.locale,
+        audienceAgeBand: input.audienceAgeBand
+      });
+      generated = providerResult.output;
+      providerReceipt = providerResult.receipt;
+    } else {
+      generated = fallbackProviderOutput(input, source);
+      providerReceipt = {
+        schemaVersion: "storytime-provider-receipt-v1",
+        provider: "local_builder",
+        model: "deterministic-v1",
+        providerRequestId: null,
+        promptTokens: null,
+        completionTokens: null,
+        totalTokens: null,
+        configuredInputUsdPerMillionTokens: null,
+        configuredOutputUsdPerMillionTokens: null,
+        estimatedMaxCostUsd: 0,
+        actualCostUsd: 0,
+        maxAllowedCostUsd: null,
+        attemptCount: 1,
+        costStatus: "no_provider_spend"
+      };
+    }
   } catch (error) {
     await generationRequest.requestRef.set({
       status: "failed",
@@ -326,6 +352,7 @@ export const generateStorySession = onCall(async (request) => {
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
     provider: readiness.ready ? readiness.provider : "local_builder",
+    providerReceipt,
     requestId: input.requestId,
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
@@ -434,6 +461,7 @@ export const generateStorySession = onCall(async (request) => {
     sessionId,
     safetyStatus: outputModeration.safetyStatus,
     provider: session.provider,
+    providerReceipt,
     updatedAt: createdAt
   }, { merge: true });
   await batch.commit();

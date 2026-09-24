@@ -63,12 +63,19 @@ test('OpenAI provider cannot be claimed live without provider, key, and model ga
     'STORYTIME_GENERATION_PROVIDER',
     'OPENAI_API_KEY',
     'STORYTIME_OPENAI_MODEL',
+    'STORYTIME_PROVIDER_SPEND_AUTHORIZED',
+    'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_MAX_GENERATION_COST_USD',
     'provider === "openai"',
     'response_format',
     'json_object',
     'new AbortController()',
     'audienceInstruction(input.audienceAgeBand)',
-    'assertProviderOutputSafe(output)'
+    'assertProviderOutputSafe(output)',
+    'storytime-provider-receipt-v1',
+    'estimatedMaxCostUsd',
+    'actualCostUsd'
   ]);
   assert.match(provider, /Story provider is not configured/);
   assert.match(proofReadme, /PARTIAL \/ BLOCKED FROM READY/);

@@ -76,8 +76,20 @@ if (exists('README.md')) {
 
 if (exists('functions/src/story-provider.ts')) {
   const provider = read('functions/src/story-provider.ts');
-  if (!provider.includes('STORYTIME_GENERATION_PROVIDER') || !provider.includes('OPENAI_API_KEY') || !provider.includes('STORYTIME_OPENAI_MODEL')) {
-    failures.push('Story provider readiness gates must require provider, API key, and model config.');
+  for (const marker of [
+    'STORYTIME_GENERATION_PROVIDER',
+    'OPENAI_API_KEY',
+    'STORYTIME_OPENAI_MODEL',
+    'STORYTIME_PROVIDER_SPEND_AUTHORIZED',
+    'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_MAX_GENERATION_COST_USD',
+    'STORYTIME_OPENAI_MAX_OUTPUT_TOKENS',
+    'storytime-provider-receipt-v1',
+    'estimatedMaxCostUsd',
+    'actualCostUsd'
+  ]) {
+    if (!provider.includes(marker)) failures.push(`Story provider readiness/receipt gate missing: ${marker}`);
   }
 }
 

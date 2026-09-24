@@ -22,10 +22,59 @@ export interface StoryProviderOutput {
   resolutionTone: string;
 }
 
+export interface StoryProviderReceipt {
+  schemaVersion: "storytime-provider-receipt-v1";
+  provider: "openai" | "local_builder";
+  model: string;
+  providerRequestId: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  configuredInputUsdPerMillionTokens: number | null;
+  configuredOutputUsdPerMillionTokens: number | null;
+  estimatedMaxCostUsd: number;
+  actualCostUsd: number;
+  maxAllowedCostUsd: number | null;
+  attemptCount: 1;
+  costStatus: "priced_from_configured_rates" | "no_provider_spend";
+}
+
+export interface StoryProviderResult {
+  output: StoryProviderOutput;
+  receipt: StoryProviderReceipt;
+}
+
 const REQUIRED_OPENAI_ENV = ["OPENAI_API_KEY", "STORYTIME_OPENAI_MODEL"];
 
+function positiveNumber(name: string) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function boundedOutputTokens() {
+  const configured = Number(process.env.STORYTIME_OPENAI_MAX_OUTPUT_TOKENS || 900);
+  if (!Number.isFinite(configured)) return 900;
+  return Math.min(2000, Math.max(128, Math.floor(configured)));
+}
+
+function providerPricingConfig() {
+  return {
+    spendAuthorized: process.env.STORYTIME_PROVIDER_SPEND_AUTHORIZED === "true",
+    inputUsdPerMillionTokens: positiveNumber("STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS"),
+    outputUsdPerMillionTokens: positiveNumber("STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS"),
+    maxGenerationCostUsd: positiveNumber("STORYTIME_MAX_GENERATION_COST_USD"),
+    maxOutputTokens: boundedOutputTokens()
+  };
+}
+
 function missingOpenAIEnv() {
-  return REQUIRED_OPENAI_ENV.filter((key) => !process.env[key]?.trim());
+  const missing = REQUIRED_OPENAI_ENV.filter((key) => !process.env[key]?.trim());
+  const pricing = providerPricingConfig();
+  if (!pricing.spendAuthorized) missing.push("STORYTIME_PROVIDER_SPEND_AUTHORIZED=true");
+  if (pricing.inputUsdPerMillionTokens === null) missing.push("STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS>0");
+  if (pricing.outputUsdPerMillionTokens === null) missing.push("STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS>0");
+  if (pricing.maxGenerationCostUsd === null) missing.push("STORYTIME_MAX_GENERATION_COST_USD>0");
+  return missing;
 }
 
 export function getStoryProviderReadiness() {
@@ -34,7 +83,8 @@ export function getStoryProviderReadiness() {
   return {
     provider,
     ready: provider === "openai" && missing.length === 0,
-    missing
+    missing,
+    spendAuthorized: provider === "openai" && providerPricingConfig().spendAuthorized
   };
 }
 
@@ -77,12 +127,13 @@ function readString(record: Record<string, unknown>, key: keyof StoryProviderOut
   return (typeof value === "string" && value.trim() ? value.trim() : fallback).slice(0, maxLength);
 }
 
-export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderOutput> {
+export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderResult> {
   const readiness = getStoryProviderReadiness();
   if (!readiness.ready) {
     throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
   }
 
+  const systemPrompt = "You write safe, gentle, private-by-default story session records for a family-facing product. Output strict JSON only.";
   const prompt = [
     "Create a family-safe private reflective Storytime session.",
     "Return JSON only with keys: chapterTitle, chapterSummary, momentTitle, momentBody, narratorText, scenePrompt, visualMood, audioMood, arcLabel, arcSummary, peakTone, resolutionTone.",
@@ -94,6 +145,25 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     `Motifs: ${input.symbolicMotifs.join(", ") || "soft light"}`,
     `Source: ${input.sourceText || "No source text provided."}`
   ].join("\n");
+
+  const pricing = providerPricingConfig();
+  if (
+    pricing.inputUsdPerMillionTokens === null
+    || pricing.outputUsdPerMillionTokens === null
+    || pricing.maxGenerationCostUsd === null
+  ) {
+    throw new Error("Story provider pricing/budget configuration is incomplete.");
+  }
+
+  // UTF-8 bytes are used as a deliberately conservative ceiling for input-token budgeting.
+  const conservativeInputTokenCeiling = Buffer.byteLength(`${systemPrompt}\n${prompt}`, "utf8");
+  const estimatedMaxCostUsd =
+    (conservativeInputTokenCeiling / 1_000_000) * pricing.inputUsdPerMillionTokens
+    + (pricing.maxOutputTokens / 1_000_000) * pricing.outputUsdPerMillionTokens;
+
+  if (estimatedMaxCostUsd > pricing.maxGenerationCostUsd) {
+    throw new Error("Story provider request exceeds the configured per-request cost ceiling.");
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
@@ -107,10 +177,11 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     body: JSON.stringify({
       model: process.env.STORYTIME_OPENAI_MODEL,
       messages: [
-        { role: "system", content: "You write safe, gentle, private-by-default story session records for a family-facing product. Output strict JSON only." },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt }
       ],
       temperature: 0.4,
+      max_tokens: pricing.maxOutputTokens,
       response_format: { type: "json_object" }
     })
   }).finally(() => clearTimeout(timeout));
@@ -119,9 +190,38 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     throw new Error(`Story provider request failed with status ${response.status}.`);
   }
 
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  const payload = await response.json() as {
+    id?: string;
+    model?: string;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+    choices?: Array<{ message?: { content?: string } }>;
+  };
   const content = payload.choices?.[0]?.message?.content;
   if (!content) throw new Error("Story provider returned no content.");
+
+  const providerRequestId = response.headers.get("x-request-id") || payload.id;
+  const promptTokens = payload.usage?.prompt_tokens;
+  const completionTokens = payload.usage?.completion_tokens;
+  const totalTokens = payload.usage?.total_tokens;
+  if (
+    !providerRequestId
+    || typeof promptTokens !== "number" || !Number.isInteger(promptTokens) || promptTokens < 0
+    || typeof completionTokens !== "number" || !Number.isInteger(completionTokens) || completionTokens < 0
+    || typeof totalTokens !== "number" || !Number.isInteger(totalTokens) || totalTokens < 0
+  ) {
+    throw new Error("Story provider usage receipt is incomplete.");
+  }
+
+  const actualCostUsd =
+    (Number(promptTokens) / 1_000_000) * pricing.inputUsdPerMillionTokens
+    + (Number(completionTokens) / 1_000_000) * pricing.outputUsdPerMillionTokens;
+  if (actualCostUsd > pricing.maxGenerationCostUsd) {
+    throw new Error("Story provider actual cost exceeded the configured per-request ceiling.");
+  }
 
   const parsed = JSON.parse(content) as unknown;
   assertStringRecord(parsed);
@@ -141,5 +241,23 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     resolutionTone: readString(parsed, "resolutionTone", "settled", 80)
   };
   assertProviderOutputSafe(output);
-  return output;
+  return {
+    output,
+    receipt: {
+      schemaVersion: "storytime-provider-receipt-v1",
+      provider: "openai",
+      model: payload.model || process.env.STORYTIME_OPENAI_MODEL!,
+      providerRequestId,
+      promptTokens: Number(promptTokens),
+      completionTokens: Number(completionTokens),
+      totalTokens: Number(totalTokens),
+      configuredInputUsdPerMillionTokens: pricing.inputUsdPerMillionTokens,
+      configuredOutputUsdPerMillionTokens: pricing.outputUsdPerMillionTokens,
+      estimatedMaxCostUsd,
+      actualCostUsd,
+      maxAllowedCostUsd: pricing.maxGenerationCostUsd,
+      attemptCount: 1,
+      costStatus: "priced_from_configured_rates"
+    }
+  };
 }
