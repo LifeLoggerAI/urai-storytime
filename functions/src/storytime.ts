@@ -38,12 +38,6 @@ const GenerateStorySchema = z.object({
   })
 });
 
-const PrepareVoiceoverJobSchema = z.object({
-  sessionId: z.string().min(1),
-  narratorScriptId: z.string().min(1).optional(),
-  provider: z.enum(["web_speech_fallback", "asset_factory", "tts_provider"]).default("asset_factory")
-});
-
 const safetyPatterns = [
   { code: "self_harm", pattern: /\b(?:suicide|self[- ]?harm|kill myself|kill yourself)\b/i },
   { code: "graphic_violence", pattern: /\b(?:blood|weapon|murder|gore|graphic violence)\b/i },
@@ -447,69 +441,3 @@ export const generateStorySession = onCall(async (request) => {
     reused: false
   };
 });
-
-export const prepareVoiceoverJob = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  const userId = request.auth!.uid;
-  const input = PrepareVoiceoverJobSchema.parse(request.data);
-  const session = await readOwnedStorySession(input.sessionId, userId);
-
-  if (session.data.consentSnapshot?.voiceover !== true) {
-    throw new HttpsError("failed-precondition", "Voiceover consent is required.");
-  }
-
-  const createdAt = now();
-  const voiceoverJobId = id("voiceoverJob");
-  const exportId = id("storyExport");
-  const timelineEventId = id("timelineReplayEvent");
-  const narratorScriptId = input.narratorScriptId || session.data.narratorScriptIds?.[0];
-
-  if (!narratorScriptId) {
-    throw new HttpsError("failed-precondition", "A narrator script is required before voiceover can be queued.");
-  }
-
-  const voiceoverJob = {
-    id: voiceoverJobId,
-    userId,
-    sessionId: input.sessionId,
-    narratorScriptId,
-    status: "queued",
-    provider: input.provider,
-    createdAt,
-    updatedAt: createdAt
-  };
-
-  const storyExport = {
-    id: exportId,
-    userId,
-    sessionId: input.sessionId,
-    exportType: input.provider === "asset_factory" ? "asset_factory_zip" : "voiceover",
-    status: "queued",
-    assetFactoryJobId: input.provider === "asset_factory" ? voiceoverJobId : null,
-    createdAt,
-    updatedAt: createdAt
-  };
-
-  const batch = db.batch();
-  batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), voiceoverJob);
-  batch.set(db.collection("storyExports").doc(exportId), storyExport);
-  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
-    id: timelineEventId,
-    userId,
-    sessionId: input.sessionId,
-    eventType: "exported",
-    label: "Voiceover export queued",
-    metadata: {
-      provider: input.provider,
-      voiceoverJobId,
-      exportId
-    },
-    createdAt,
-    updatedAt: createdAt
-  });
-  await batch.commit();
-
-  auditLog({ event: "voiceover_export_queued", userId, sessionId: input.sessionId, provider: input.provider });
-  return { status: "queued", voiceoverJobId, exportId, provider: input.provider };
-});
-

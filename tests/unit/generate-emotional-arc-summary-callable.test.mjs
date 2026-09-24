@@ -24,4 +24,5 @@ test('emotional arc callable writes summary and links session in a batch', () =>
   assert.match(source, /db\.collection\("emotionalArcSummaries"\)/);
   assert.match(source, /batch\.update\(session\.ref, \{ emotionalArcSummaryId, updatedAt: createdAt \}\)/);
   assert.match(source, /await batch\.commit\(\)/);
+  assert.match(source, /status: "completed"/);
 });

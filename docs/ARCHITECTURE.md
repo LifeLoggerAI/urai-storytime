@@ -25,9 +25,9 @@ flowchart TB
 
   FS --> Sessions[Story sessions/chapters/moments/scenes/scripts/arcs]
   FS --> Shares[Public-safe shares]
-  FS --> Jobs[Voiceover/export queue records]
+  FS --> Local[Locally compiled narrator/arcs/weekly scrolls]
 
-  Adapter[Asset-Factory TypeScript adapter] -. not dispatched by worker .-> AssetFactory[asset-factory API]
+  MediaContract[Hard-off media job contract] -. execution disabled .-> AssetFactory[asset-factory / TTS / image providers]
 ```
 
 ## Active frontend surfaces
@@ -49,17 +49,17 @@ There are no active Next API routes. Backend operations are Firebase callable Fu
 - `generateStorySession`
 - `createPublicStoryShare`
 - `revokePublicStoryShare`
-- `prepareVoiceoverJob` (queue records only)
+- `generateNarratorScript` — synchronous local record persistence
+- `generateEmotionalArcSummary` — synchronous local record persistence
+- `generateWeeklyStoryScroll` — synchronous local compilation/persistence
+- `refreshStoryTimeline` — synchronous timeline persistence
+- `rebuildUserStoryArchive` — bounded server-owned archive snapshot
 
-### Placeholder hooks
+### Hard-off future media
 
-- `generateNarratorScript`
-- `generateEmotionalArcSummary`
-- `generateWeeklyStoryScroll`
-- `refreshStoryTimeline`
-- `rebuildUserStoryArchive`
+Voiceover, illustration, audio-package, and Asset Factory media execution are **not** exported as a callable while no reviewed worker/receipt lifecycle exists. Their future interface lives in `src/lib/storytime/media-job-contract.ts` with `state: "hard_off"`, zero authorized spend, and no public-release authority.
 
-A callable name existing is not evidence that its business process exists.
+A callable name or contract existing is not evidence of provider execution or completed media.
 
 ## Current data ownership
 
@@ -69,7 +69,7 @@ Storytime owns:
 - sessions, chapters, moments, scenes, narrator scripts, and emotional arcs;
 - user Storytime preferences;
 - public-safe derivatives and share lifecycle;
-- Storytime export/voiceover job metadata;
+- Storytime text-derived records and hard-off media contract metadata;
 - consent, safety, provider, cost, and provenance receipts for Storytime operations.
 
 Storytime must not own raw canonical Life Map, relationship, location, health, or calendar records. Future integrations receive a minimum-necessary, purpose-bound snapshot through versioned APIs.
@@ -85,8 +85,6 @@ Active or source-wired collections include:
 - `narratorScripts`
 - `emotionalArcSummaries`
 - `publicStoryShares`
-- `voiceoverJobs`
-- `storyExports`
 - `timelineReplayEvents`
 - `storytimeUsageCounters`
 

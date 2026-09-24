@@ -2,36 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const source = fs.readFileSync('functions/src/storytime.ts', 'utf8');
+const index = fs.readFileSync('functions/src/index.ts', 'utf8');
+const functions = fs.readFileSync('functions/src/storytime.ts', 'utf8');
+const media = fs.readFileSync('src/lib/storytime/media-job-contract.ts', 'utf8');
+const env = fs.readFileSync('.env.example', 'utf8');
 
-test('prepareVoiceoverJob validates request shape and auth-owned session access', () => {
-  assert.match(source, /const PrepareVoiceoverJobSchema = z\.object/);
-  assert.match(source, /sessionId: z\.string\(\)\.min\(1\)/);
-  assert.match(source, /provider: z\.enum\(\["web_speech_fallback", "asset_factory", "tts_provider"\]\)/);
-  assert.match(source, /async function readOwnedStorySession/);
-  assert.match(source, /sessionSnap\.data\(\)\?\.userId !== userId/);
-  assert.match(source, /permission-denied/);
+test('voiceover/media work is not exposed as an unconsumed production callable', () => {
+  assert.doesNotMatch(index, /prepareVoiceoverJob/);
+  assert.doesNotMatch(functions, /export const prepareVoiceoverJob/);
+  assert.doesNotMatch(functions, /voiceoverJobs/);
+  assert.doesNotMatch(functions, /storyExports/);
+  assert.doesNotMatch(functions, /Voiceover export queued/);
 });
 
-test('prepareVoiceoverJob requires voiceover consent and a narrator script before queueing', () => {
-  assert.match(source, /consentSnapshot\?\.voiceover !== true/);
-  assert.match(source, /Voiceover consent is required/);
-  assert.match(source, /const narratorScriptId = input\.narratorScriptId \|\| session\.data\.narratorScriptIds\?\.\[0\]/);
-  assert.match(source, /A narrator script is required before voiceover can be queued/);
-});
-
-test('prepareVoiceoverJob persists voiceoverJobs, storyExports, and timelineReplayEvents atomically', () => {
-  assert.match(source, /const batch = db\.batch\(\)/);
-  assert.match(source, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
-  assert.match(source, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
-  assert.match(source, /db\.collection\("timelineReplayEvents"\)\.doc\(timelineEventId\)/);
-  assert.match(source, /await batch\.commit\(\)/);
-});
-
-test('prepareVoiceoverJob records export and provider metadata without calling external media providers', () => {
-  assert.match(source, /exportType: input\.provider === "asset_factory" \? "asset_factory_zip" : "voiceover"/);
-  assert.match(source, /assetFactoryJobId: input\.provider === "asset_factory" \? voiceoverJobId : null/);
-  assert.match(source, /eventType: "exported"/);
-  assert.match(source, /label: "Voiceover export queued"/);
-  assert.doesNotMatch(source, /fetch\(/);
+test('future media contract requires explicit consent and zero-spend hard-off authority', () => {
+  assert.match(media, /storytime-media-job-v1/);
+  assert.match(media, /mediaGeneration: true/);
+  assert.match(media, /providerProcessing: true/);
+  assert.match(media, /voiceUse\?: true/);
+  assert.match(media, /providerSpendAuthorized: false/);
+  assert.match(media, /publicReleaseAuthorized: false/);
+  assert.match(media, /maxAuthorizedCost: 0/);
+  assert.match(media, /state: "hard_off"/);
+  assert.match(env, /STORYTIME_MEDIA_EXECUTION=false/);
 });

@@ -47,5 +47,5 @@ export const generateEmotionalArcSummary = onCall(async (request) => {
   batch.update(session.ref, { emotionalArcSummaryId, updatedAt: createdAt });
   await batch.commit();
 
-  return { status: "queued", emotionalArcSummaryId };
+  return { status: "completed", emotionalArcSummaryId };
 });
