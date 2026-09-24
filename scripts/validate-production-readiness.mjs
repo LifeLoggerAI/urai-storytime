@@ -182,8 +182,19 @@ if (exists('functions/src/index.ts')) {
 
 if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
-  for (const marker of ['match /storySessions/{id}', 'match /publicStoryShares/{id}', 'revoked == false', 'match /storytimeUsageCounters/{id}', 'allow read, write: if false']) {
+  for (const marker of [
+    'match /storySessions/{id}',
+    'match /publicStoryShares/{id}',
+    'revoked == false',
+    'match /storytimeUsageCounters/{id}',
+    'match /privacyDeletionPlans/{planId}',
+    'match /privacyCompletionReceipts/{receiptId}',
+    'allow read, write: if false'
+  ]) {
     if (!rules.includes(marker)) failures.push(`Missing Firestore rule marker: ${marker}`);
+  }
+  if (rules.includes('privacyOperationReceipts')) {
+    failures.push('Obsolete privacyOperationReceipts rule must not remain; privacyCompletionReceipts is canonical.');
   }
 }
 
