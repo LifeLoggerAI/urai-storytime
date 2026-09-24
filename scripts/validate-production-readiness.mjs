@@ -49,6 +49,7 @@ const requiredSourceFiles = [
   'functions/src/story-provider.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
+  'functions/src/story-drafts.ts',
   'functions/src/refresh-story-timeline.ts',
   'functions/src/rebuild-user-story-archive.ts',
   'functions/src/readiness.ts',
@@ -133,6 +134,20 @@ if (exists('functions/src/public-story-share-lifecycle.ts')) {
     'requireVerifiedAccount(request)'
   ]) {
     if (!sharing.includes(marker)) failures.push(`Missing public-share safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/story-drafts.ts')) {
+  const drafts = read('functions/src/story-drafts.ts');
+  for (const marker of [
+    'storytime-draft-v1',
+    'storytime-draft-storage-consent-v1',
+    'draftStorageConsent: z.literal(true)',
+    'providerSubmitted: false',
+    'publicSharingAuthorized: false',
+    'DRAFT_RETENTION_DAYS = 30'
+  ]) {
+    if (!drafts.includes(marker)) failures.push(`Missing private Storytime draft marker: ${marker}`);
   }
 }
 
