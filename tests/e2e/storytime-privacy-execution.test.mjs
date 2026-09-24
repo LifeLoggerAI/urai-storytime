@@ -41,6 +41,7 @@ test('Storytime deletion is dry-run/hash/admin-only and revalidated before destr
     'family_or_child_data_requires_urai_privacy_review',
     'verification_required',
     'backup_expiry_pending',
+    'shared_aggregate_recompute_required',
     'retry_required',
     'external provider artifact references'
   ]) assert.ok(execution.includes(marker), `missing deletion marker: ${marker}`);
