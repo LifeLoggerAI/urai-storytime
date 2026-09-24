@@ -3,6 +3,7 @@ export interface StoryProviderInput {
   sourceText?: string;
   emotionalTone: string;
   symbolicMotifs: string[];
+  audienceAgeBand: "family" | "preschool_3_5" | "early_reader_6_8" | "middle_grade_9_12";
 }
 
 export interface StoryProviderOutput {
@@ -42,6 +43,34 @@ function assertStringRecord(value: unknown): asserts value is Record<string, unk
   }
 }
 
+const SENSITIVE_OUTPUT_TERMS = [
+  "suicide",
+  "self-harm",
+  "kill yourself",
+  "explicit sexual",
+  "rape",
+  "weapon",
+  "diagnosis",
+  "clinical depression",
+  "bipolar",
+  "schizophrenia"
+];
+
+function assertProviderOutputSafe(output: StoryProviderOutput) {
+  const combined = Object.values(output).join(" ").toLowerCase();
+  const hit = SENSITIVE_OUTPUT_TERMS.find((term) => combined.includes(term));
+  if (hit) {
+    throw new Error("Story provider output requires safety review.");
+  }
+}
+
+function audienceInstruction(ageBand: StoryProviderInput["audienceAgeBand"]) {
+  if (ageBand === "preschool_3_5") return "Audience: ages 3-5. Use very simple language, low emotional intensity, no frightening escalation, and no unsafe advice.";
+  if (ageBand === "early_reader_6_8") return "Audience: ages 6-8. Use clear concrete language, gentle stakes, and no frightening escalation or unsafe advice.";
+  if (ageBand === "middle_grade_9_12") return "Audience: ages 9-12. Keep language age-appropriate, emotionally grounded, and avoid adult themes or unsafe advice.";
+  return "Audience: family/general. Keep the story suitable for shared family reading and avoid adult themes or unsafe advice.";
+}
+
 function readString(record: Record<string, unknown>, key: keyof StoryProviderOutput, fallback: string, maxLength: number) {
   const value = record[key];
   return (typeof value === "string" && value.trim() ? value.trim() : fallback).slice(0, maxLength);
@@ -57,14 +86,18 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     "Create a family-safe private reflective Storytime session.",
     "Return JSON only with keys: chapterTitle, chapterSummary, momentTitle, momentBody, narratorText, scenePrompt, visualMood, audioMood, arcLabel, arcSummary, peakTone, resolutionTone.",
     "Do not diagnose, shame, intensify fear, expose private personal details, or create public-share text.",
+    audienceInstruction(input.audienceAgeBand),
     `Title: ${input.title}`,
     `Tone: ${input.emotionalTone}`,
     `Motifs: ${input.symbolicMotifs.join(", ") || "soft light"}`,
     `Source: ${input.sourceText || "No source text provided."}`
   ].join("\n");
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
@@ -78,11 +111,10 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
       temperature: 0.4,
       response_format: { type: "json_object" }
     })
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Story provider request failed: ${response.status} ${errorText.slice(0, 300)}`);
+    throw new Error(`Story provider request failed with status ${response.status}.`);
   }
 
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -92,7 +124,7 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
   const parsed = JSON.parse(content) as unknown;
   assertStringRecord(parsed);
 
-  return {
+  const output = {
     chapterTitle: readString(parsed, "chapterTitle", "Chapter One: The Signal Becomes a Story", 140),
     chapterSummary: readString(parsed, "chapterSummary", "A private moment was shaped into a gentle narrative replay.", 800),
     momentTitle: readString(parsed, "momentTitle", "A moment worth remembering", 140),
@@ -106,4 +138,6 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     peakTone: readString(parsed, "peakTone", "noticed", 80),
     resolutionTone: readString(parsed, "resolutionTone", "settled", 80)
   };
+  assertProviderOutputSafe(output);
+  return output;
 }
