@@ -278,9 +278,6 @@ export const saveStoryRevision = onCall(async (request) => {
   });
 
   const batch = db.batch();
-  if (input.title !== undefined) {
-    batch.update(bundle.session.ref, { title: input.title, updatedAt: version.createdAt });
-  }
   for (const edit of input.chapterEdits) {
     const doc = bundle.chapters.find((item) => item.id === edit.chapterId)!;
     batch.update(doc.ref, { summary: edit.summary, updatedAt: version.createdAt });
@@ -297,12 +294,14 @@ export const saveStoryRevision = onCall(async (request) => {
     batch.update(doc.ref, { text: edit.text, updatedAt: version.createdAt });
   }
   batch.set(versionRef, version);
-  batch.update(bundle.session.ref, {
+  const sessionPatch: Record<string, unknown> = {
     currentVersionId: versionRef.id,
     currentVersionNumber: nextVersionNumber,
     "provenance.edited": true,
     updatedAt: version.createdAt
-  });
+  };
+  if (input.title !== undefined) sessionPatch.title = input.title;
+  batch.update(bundle.session.ref, sessionPatch);
   await batch.commit();
 
   auditLog({ event: "story_revision_saved", userId, sessionId: input.sessionId });
