@@ -98,6 +98,22 @@ function generationRequestId(userId: string, requestId: string) {
   return `${userId}_${requestId}`;
 }
 
+function reviewedRequestSha256(input: z.infer<typeof GenerateStorySchema>) {
+  const reviewedRequest = {
+    title: input.title,
+    sourceText: input.sourceText ?? "",
+    emotionalTone: input.emotionalTone,
+    symbolicMotifs: input.symbolicMotifs,
+    sourceSignals: input.sourceSignals,
+    locale: input.locale,
+    audienceAgeBand: input.audienceAgeBand,
+    operator: input.operator,
+    requestReview: input.requestReview,
+    consentSnapshot: input.consentSnapshot
+  };
+  return createHash("sha256").update(JSON.stringify(reviewedRequest), "utf8").digest("hex");
+}
+
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
   const requestRef = db.collection("storyGenerationRequests").doc(generationRequestId(userId, input.requestId));
   const result = await db.runTransaction(async (transaction) => {
@@ -124,6 +140,7 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       operatorRole: input.operator.role,
       consentVersion: input.consentSnapshot.consentVersion,
       reviewVersion: input.requestReview.reviewVersion,
+      reviewedRequestSha256: reviewedRequestSha256(input),
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -233,6 +250,7 @@ export const generateStorySession = onCall(async (request) => {
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
+  const processedRequestSha256 = reviewedRequestSha256(input);
   const source = input.sourceText || "A quiet signal became a private URAI story.";
   const inputSafetyText = `${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`;
   const mod = moderate(inputSafetyText);
@@ -340,7 +358,10 @@ export const generateStorySession = onCall(async (request) => {
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     operator: input.operator,
-    requestReview: input.requestReview,
+    requestReview: {
+      ...input.requestReview,
+      processedRequestSha256
+    },
     provenance: {
       schemaVersion: "storytime-provenance-v1",
       sourceType: "direct_storytime_input",
@@ -443,6 +464,8 @@ export const generateStorySession = onCall(async (request) => {
     locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     consentVersion: input.consentSnapshot.consentVersion,
+    reviewVersion: input.requestReview.reviewVersion,
+    reviewedRequestSha256: processedRequestSha256,
     provenance: session.provenance,
     chapter: {
       id: chapterId,
