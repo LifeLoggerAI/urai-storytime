@@ -42,12 +42,11 @@ Firebase callable functions include:
 - `generateNarratorScript`
 - `generateEmotionalArcSummary`
 - `generateWeeklyStoryScroll`
-- `prepareVoiceoverJob`
 - `refreshStoryTimeline`
 - `rebuildUserStoryArchive`
 - `revokePublicStoryShare`
 
-These functions enforce auth boundaries, consent checks, private-by-default story sessions, public sharing consent, redaction scaffolds, queued-only export/voiceover status, default public-share expiration, and owner revoke support. They still require Firebase environment configuration and staging/production verification before public launch claims.
+These functions enforce auth boundaries, consent checks, private-by-default story sessions, public sharing consent, redaction boundaries, synchronous Storytime-derived text artifacts, default public-share expiration, and owner revoke support. Voiceover/image/media provider execution is deliberately not exported as a callable while no real consumer/receipt lifecycle exists; future media work is represented only by the zero-spend hard-off Storytime media-job contract. They still require Firebase environment configuration and staging/production verification before public launch claims.
 
 ## Current production boundary
 
@@ -114,6 +113,7 @@ STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false
 STORYTIME_PUBLIC_SHARE_TTL_DAYS=30
 ASSET_FACTORY_BASE_URL=
 ASSET_FACTORY_API_KEY=
+STORYTIME_MEDIA_EXECUTION=false
 OPENAI_API_KEY=
 STORYTIME_OPENAI_MODEL=
 ```
