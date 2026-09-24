@@ -1,3 +1,4 @@
+import { buildHardOffStorytimeIntegration, type StorytimeProvenanceReference } from "./integration-contracts";
 import type { StoryChapter, StoryExport, StorySession } from "./types";
 
 export interface AssetFactoryStoryInput {
@@ -50,16 +51,25 @@ function getAssetFactoryConfig() {
   return { baseUrl, apiKey };
 }
 
+function requireAssetFactoryExecutionAuthorization() {
+  if (process.env.STORYTIME_ASSET_FACTORY_EXECUTION !== "true") {
+    throw new Error("Asset-Factory execution is hard-off for Storytime.");
+  }
+}
+
 async function requestAssetFactory<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { baseUrl, apiKey } = getAssetFactoryConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,
+    signal: controller.signal,
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${apiKey}`,
       ...(init.headers || {})
     }
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) {
     throw new Error(`Asset-Factory request failed: ${res.status}`);
@@ -91,7 +101,22 @@ export function toAssetFactoryInput(session: StorySession, chapters: StoryChapte
   };
 }
 
+export function toHardOffAssetFactoryIntegration(
+  session: StorySession,
+  chapters: StoryChapter[],
+  provenance: StorytimeProvenanceReference[]
+) {
+  return buildHardOffStorytimeIntegration({
+    storySessionId: session.id,
+    destinationSystem: "asset-factory",
+    privacyClass: "owner_only",
+    provenance,
+    payload: toAssetFactoryInput(session, chapters)
+  });
+}
+
 export async function createAssetFactoryJob(input: AssetFactoryStoryInput): Promise<AssetFactoryJobResponse> {
+  requireAssetFactoryExecutionAuthorization();
   return requestAssetFactory<AssetFactoryJobResponse>("/v1/jobs", {
     method: "POST",
     body: JSON.stringify(input)
