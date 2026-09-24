@@ -5,6 +5,7 @@ export type StorytimeAuditEvent =
   | "generation_blocked_safety"
   | "generation_blocked_output_safety"
   | "generation_blocked_quota"
+  | "generation_blocked_budget"
   | "generation_reused"
   | "provider_unavailable"
   | "provider_failed"
