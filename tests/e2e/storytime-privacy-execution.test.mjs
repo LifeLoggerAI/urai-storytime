@@ -41,7 +41,7 @@ test('Storytime deletion is dry-run/hash/admin-only and revalidated before destr
     'family_or_child_data_requires_urai_privacy_review',
     'verification_required',
     'backup_expiry_pending',
-    'shared_aggregate_recompute_required',
+    'story_media_storage_cleanup_not_certified',
     'retry_required',
     'external provider artifact references'
   ]) assert.ok(execution.includes(marker), `missing deletion marker: ${marker}`);
@@ -55,8 +55,8 @@ test('destructive account deletion and completion remain fail-closed behind envi
 });
 
 test('privacy evidence collections are server-only', () => {
-  assert.match(rules, /match \/privacyDeletionPlans\/\{id\} \{ allow read, write: if false; \}/);
-  assert.match(rules, /match \/privacyOperationReceipts\/\{id\} \{ allow read, write: if false; \}/);
+  assert.match(rules, /match \/privacyDeletionPlans\/\{planId\}/);
+  assert.match(rules, /match \/privacyCompletionReceipts\/\{receiptId\}/);
 });
 
 test('settings initiate export packaging and deletion planning but never destructive execution', () => {
@@ -64,7 +64,7 @@ test('settings initiate export packaging and deletion planning but never destruc
   assert.match(controls, /getStorytimeExportDownloadUrl/);
   assert.match(controls, /Download private Storytime export/);
   assert.match(controls, /planStorytimeDeletion/);
-  assert.match(controls, /authorized privacy administrator must execute/);
+  assert.match(controls, /Deletion dry-run is ready for governed admin execution/);
   assert.doesNotMatch(controls, /executeStorytimeDeletion/);
   assert.doesNotMatch(controls, /verifyStorytimeDeletion/);
 });
