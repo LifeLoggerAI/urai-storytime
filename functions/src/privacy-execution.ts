@@ -116,6 +116,8 @@ type StoredPrivacyRequest = {
   exportManifestPath?: string | null;
   exportPackageSha256?: string | null;
   exportCompleteness?: string | null;
+  exportBlockers?: string[];
+  exportManifestSha256?: string | null;
   deletionPlanHash?: string | null;
   deletionPlanId?: string | null;
 };
@@ -571,6 +573,22 @@ export const processStorytimeExportRequest = onCall(async (request) => {
   const input = ExportRequestSchema.parse(request.data);
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export");
 
+  if (
+    privacyRequest.data.executionState === "completed"
+    && privacyRequest.data.exportPath
+    && privacyRequest.data.exportManifestPath
+    && privacyRequest.data.exportPackageSha256
+  ) {
+    return {
+      privacyRequestId: input.privacyRequestId,
+      status: "completed",
+      completeness: privacyRequest.data.exportCompleteness ?? "complete_for_storytime_owned_data",
+      blockers: privacyRequest.data.exportBlockers ?? [],
+      packageSha256: privacyRequest.data.exportPackageSha256,
+      reused: true
+    };
+  }
+
   const scope = privacyRequest.data.scope;
   const sessionId = privacyRequest.data.sessionId ?? null;
   const collections = scope === "account"
@@ -655,7 +673,8 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     completeness: manifest.completeness,
     blockers,
     recordCounts: manifest.recordCounts,
-    packageSha256: packageDigest
+    packageSha256: packageDigest,
+    reused: false
   };
 });
 
