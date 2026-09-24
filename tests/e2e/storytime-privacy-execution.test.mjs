@@ -39,6 +39,7 @@ test('Storytime deletion is dry-run/hash/admin-only and revalidated before destr
     'active_legal_hold',
     'storytime_firebase_isolation_not_certified',
     'family_or_child_data_requires_urai_privacy_review',
+    'shared_aggregate_recompute_required',
     'verification_required',
     'backup_expiry_pending',
     'story_media_storage_cleanup_not_certified',
