@@ -184,6 +184,13 @@ export const generateStorySession = onCall(async (request) => {
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
+  const source = input.sourceText || "A quiet signal became a private URAI story.";
+  const mod = moderate(`${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`);
+  if (mod.hits.length) {
+    auditLog({ event: "generation_blocked_safety", userId, safetyStatus: mod.safetyStatus, errorCode: "unsafe_input" });
+    throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
+  }
+
   const generationRequest = await claimGenerationRequest(userId, input);
   if (generationRequest.reusedSessionId) {
     auditLog({ event: "generation_reused", userId, sessionId: generationRequest.reusedSessionId });
@@ -195,14 +202,16 @@ export const generateStorySession = onCall(async (request) => {
     };
   }
 
-  const source = input.sourceText || "A quiet signal became a private URAI story.";
-  const mod = moderate(`${input.title} ${source} ${input.emotionalTone} ${input.symbolicMotifs.join(" ")}`);
-  if (mod.hits.length) {
-    auditLog({ event: "generation_blocked_safety", userId, safetyStatus: mod.safetyStatus, errorCode: "unsafe_input" });
-    throw new HttpsError("failed-precondition", "Story input requires safety review before generation.");
+  try {
+    await enforceGenerationQuota(userId);
+  } catch (error) {
+    await generationRequest.requestRef.set({
+      status: "failed",
+      errorCode: error instanceof HttpsError ? error.code : "quota_error",
+      updatedAt: now()
+    }, { merge: true });
+    throw error;
   }
-
-  await enforceGenerationQuota(userId);
   const readiness = requireConfiguredStoryProvider(userId);
   let generated: StoryProviderOutput;
   try {
@@ -264,7 +273,7 @@ export const generateStorySession = onCall(async (request) => {
     whyGenerated: input.sourceSignals.length
       ? `Generated from opted-in signals: ${input.sourceSignals.join(", ")}.`
       : "Generated from your direct Storytime input.",
-    safetyStatus: mod.safetyStatus,
+    safetyStatus: outputModeration.safetyStatus,
     consentSnapshot: input.consentSnapshot,
     createdAt,
     updatedAt: createdAt
