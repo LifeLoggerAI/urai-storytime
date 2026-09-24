@@ -202,6 +202,8 @@ service cloud.firestore {
     match /storytimeUsageCounters/{id} { allow read, write: if false; }
     match /storyGenerationRequests/{id} { allow read, write: if false; }
     match /storyArchiveSnapshots/{id} { allow read, write: if false; }
+    match /privacyDeletionPlans/{id} { allow read, write: if false; }
+    match /privacyCompletionReceipts/{id} { allow read, write: if false; }
     match /publicStoryShares/{id} {
       allow read: if activePublicShare();
       allow create, update, delete: if false;
