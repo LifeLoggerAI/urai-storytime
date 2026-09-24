@@ -183,7 +183,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.4 Real moderation and administrative operations
 
 - **User value:** unsafe requests and outputs are handled consistently, with accountable human review when required.
-- **Current evidence:** current hardening replaces the broad substring gate with reason-coded patterns, pre/post-generation checks, SHA-256 fingerprints, server-only pending moderation records without raw story content, and typed audit events. A governed moderator/admin review UI, approved policy engine/provider, escalation/appeal process, and live operational proof remain open.
+- **Current evidence:** current hardening uses reason-coded pre/post-generation checks, SHA-256 fingerprints, server-only pending moderation records without raw story content, and typed audit events. A versioned hard-off `storytime-admin-moderation-v1` contract now defines Storytime → Admin review handoff and Admin → Storytime decision receipts with hashed subject references, separation of duties, policy version, evidence receipt, and audit-event requirements. A live Admin queue, approved policy engine/provider, privileged runtime roles, escalation/appeal process, and operational proof remain open.
 - **Scope:** policy engine, moderation provider adapter, review states, admin queue in `urai-admin`, server-only audit log, reason codes, appeals/reporting.
 - **Areas:** Functions safety modules, admin contract, Firestore rules.
 - **Dependencies:** approved safety policy and role provisioning.
