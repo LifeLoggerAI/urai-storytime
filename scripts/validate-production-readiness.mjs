@@ -47,6 +47,7 @@ const requiredSourceFiles = [
   'functions/src/index.ts',
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
+  'functions/src/story-version.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
   'functions/src/refresh-story-timeline.ts',
@@ -120,6 +121,19 @@ if (exists('functions/src/storytime.ts')) {
     'Voiceover consent is required'
   ]) {
     if (!functions.includes(marker)) failures.push(`Missing callable safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/story-version.ts')) {
+  const versions = read('functions/src/story-version.ts');
+  for (const marker of [
+    'story-version-v1',
+    'versionNumber: 1',
+    'parentVersionId: null',
+    'immutable: true',
+    'contentSha256'
+  ]) {
+    if (!versions.includes(marker)) failures.push(`Missing immutable story-version marker: ${marker}`);
   }
 }
 
