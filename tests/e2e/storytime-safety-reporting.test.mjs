@@ -21,6 +21,10 @@ test('safety reports are owner-scoped, idempotent, category-only, and server-own
   assert.match(index, /safety-reports\.js/);
   assert.match(rules, /match \/storySafetyReports\/\{reportId\}/);
   assert.match(rules, /allow create, update, delete: if false/);
+  assert.match(fn, /MAX_SAFETY_REPORTS_PER_DAY/);
+  assert.match(fn, /storytimeSafetyReportCounters/);
+  assert.match(fn, /resource-exhausted/);
+  assert.match(rules, /match \/storytimeSafetyReportCounters\/\{id\} \{ allow read, write: if false; \}/);
   assert.doesNotMatch(fn, /note:|details:|storyText:|sourceText:/);
 });
 
