@@ -10,7 +10,7 @@ const authority = fs.readFileSync(resolvePath('docs/CANONICAL_APP_ROOT.md'), 'ut
 const legacyReadme = fs.readFileSync(resolvePath('legacy/static-demo/README.md'), 'utf8');
 
 test('obsolete static Storytime entrypoints remain absent', () => {
-  for (const file of ['src/index.html', 'src/app.js', 'src/styles.css']) {
+  for (const file of ['src/index.html', 'src/app.js', 'src/styles.css', 'src/story-engine.mjs']) {
     assert.equal(fs.existsSync(resolvePath(file)), false, `${file} must not return to the active source tree`);
   }
 });
@@ -35,12 +35,13 @@ test('no package script serves or deploys a static src directory', () => {
   }
 });
 
-test('legacy documentation is non-runnable and canonical authority is explicit', () => {
+test('legacy archive is non-runnable and canonical authority is explicit', () => {
   assert.match(authority, /only active URAI Storytime application is the Next\.js\/Firebase internal-alpha implementation/);
   assert.match(authority, /src\/index\.html/);
   assert.match(authority, /tests\/e2e\/canonical-app-root\.test\.mjs/);
-  assert.match(legacyReadme, /documentation-only/);
+  assert.match(legacyReadme, /solely for historical\/unit-test evidence/);
   assert.match(legacyReadme, /must not contain an HTML entrypoint/);
   assert.equal(fs.existsSync(resolvePath('legacy/static-demo/index.html')), false);
   assert.equal(fs.existsSync(resolvePath('legacy/static-demo/package.json')), false);
+  assert.equal(fs.existsSync(resolvePath('legacy/static-demo/story-engine.mjs')), true);
 });
