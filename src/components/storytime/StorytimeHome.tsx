@@ -148,7 +148,12 @@ export function StorytimeHome() {
           <SessionLibrary />
         </section>
 
-        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
+        <form
+          className="storytime-card storytime-form"
+          onSubmit={handleCreateStory}
+          aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}
+          aria-busy={isSubmitting}
+        >
           <p className="storytime-pill">Private story</p>
           <h2>Create a story</h2>
           <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
@@ -221,7 +226,7 @@ export function StorytimeHome() {
           </label>
 
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
-          {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
+          {cloudReady && validationError ? <p className="storytime-helper" role="status" aria-live="polite">{validationError}</p> : null}
 
           <div className="storytime-actions">
             <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting}>
