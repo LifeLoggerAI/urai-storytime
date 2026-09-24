@@ -56,7 +56,7 @@ test('destructive account deletion and completion remain fail-closed behind envi
 
 test('privacy evidence collections are server-only', () => {
   assert.match(rules, /match \/privacyDeletionPlans\/\{planId\}/);
-  assert.match(rules, /match \/privacyCompletionReceipts\/\{receiptId\}/);
+  assert.match(rules, /match \/privacyOperationReceipts\/\{receiptId\}/);
 });
 
 test('settings initiate export packaging and deletion planning but never destructive execution', () => {
