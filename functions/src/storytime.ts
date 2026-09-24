@@ -513,12 +513,3 @@ export const prepareVoiceoverJob = onCall(async (request) => {
   return { status: "queued", voiceoverJobId, exportId, provider: input.provider };
 });
 
-export const refreshStoryTimeline = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Story timeline refresh hook ready." };
-});
-
-export const rebuildUserStoryArchive = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Story archive rebuild hook ready." };
-});
