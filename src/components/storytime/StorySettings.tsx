@@ -37,8 +37,8 @@ export function StorySettings({ preferences }: { preferences?: Partial<UserStory
         })}
       </div>
       <p>
-        Story preferences remain read-only until their persisted policy and consent semantics are verified. Privacy requests
-        below are a separate server-owned lifecycle and remain truthful about requested versus completed state.
+        Story preferences remain read-only in the demo build until their persisted policy and consent semantics are verified.
+        Privacy requests below are a separate server-owned lifecycle and remain truthful about requested versus completed state.
       </p>
       <PrivacyRequestControls />
     </section>
