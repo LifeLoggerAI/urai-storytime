@@ -40,7 +40,7 @@ Before enabling child-directed use:
 - document retention and deletion for child-associated data;
 - review applicable laws with qualified counsel.
 
-The current UI age selector is not an effective safety control until the server validates and applies it.
+The current Storytime cloud path now validates and applies the canonical audience age band server-side. This remains an audience-content policy control, not guardian verification, child identity, or legal age assurance.
 
 ## Generation safety
 
@@ -56,7 +56,7 @@ Required pipeline:
 8. versioned safety receipt;
 9. no public/media output until the safe story version is approved.
 
-A small substring blocklist is a conservative demo signal, not production moderation.
+Current source uses reason-coded pre/post patterns plus sanitized moderation cases. These remain conservative engineering safeguards, not an approved production moderation policy/provider or human-review certification.
 
 ## Public sharing
 
@@ -126,7 +126,7 @@ Implement and test:
 - minimal lawful/security audit tombstones;
 - idempotent retry and completion receipt.
 
-Rules that deny deletion are acceptable only as a temporary client boundary when a verified server deletion workflow exists. That workflow does not yet exist.
+Storytime now has a source-level server deletion workflow with plan hashing, legal/family/provider/isolation blockers, admin-only destructive execution, recovery state, post-delete verification and backup-retention completion gating. It is not production-verified until isolated runtime receipts prove that lifecycle.
 
 ## Analytics
 
