@@ -8,21 +8,24 @@ import type { StorySession } from "@/lib/storytime/types";
 type CreateShareResult = { shareId?: string; slug?: string };
 type RevokeShareResult = { status?: string; shareId?: string };
 
-function toMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Share action failed.";
+function toMessage() {
+  return "We couldn’t complete that sharing request. No private story data was exposed.";
 }
 
 export function ShareControls({ session }: { session: StorySession }) {
   const sharingReady = isStorytimePublicSharingEnabled();
   const [consent, setConsent] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageIsError, setMessageIsError] = useState(false);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const currentShareId = session.publicShareId || null;
 
   async function createShare() {
     setMessage(null);
+    setMessageIsError(false);
     if (!consent) {
+      setMessageIsError(true);
       setMessage("Explicit public-sharing consent is required before creating a share.");
       return;
     }
@@ -33,7 +36,8 @@ export function ShareControls({ session }: { session: StorySession }) {
       setShareSlug(result.data.slug || null);
       setMessage("Public-safe share created. Re-open the session after refresh to see persisted share status.");
     } catch (error) {
-      setMessage(toMessage(error));
+      setMessageIsError(true);
+      setMessage(toMessage());
     } finally {
       setWorking(false);
     }
@@ -41,7 +45,9 @@ export function ShareControls({ session }: { session: StorySession }) {
 
   async function revokeShare() {
     setMessage(null);
+    setMessageIsError(false);
     if (!currentShareId) {
+      setMessageIsError(true);
       setMessage("No active public share id is attached to this session.");
       return;
     }
@@ -52,7 +58,8 @@ export function ShareControls({ session }: { session: StorySession }) {
       setShareSlug(null);
       setMessage("Public share revoked. Refresh the session to confirm private visibility.");
     } catch (error) {
-      setMessage(toMessage(error));
+      setMessageIsError(true);
+      setMessage(toMessage());
     } finally {
       setWorking(false);
     }
@@ -84,7 +91,11 @@ export function ShareControls({ session }: { session: StorySession }) {
         </>
       )}
       {shareSlug ? <p><a href={`/share/story/${encodeURIComponent(shareSlug)}`}>Open public-safe share</a></p> : null}
-      {message ? <p className="storytime-helper">{message}</p> : null}
+      {message ? (
+        <p className={messageIsError ? "storytime-error" : "storytime-helper"} role={messageIsError ? "alert" : "status"} aria-live={messageIsError ? "assertive" : "polite"}>
+          {message}
+        </p>
+      ) : null}
     </section>
   );
 }
