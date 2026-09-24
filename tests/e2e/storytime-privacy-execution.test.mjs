@@ -18,7 +18,8 @@ test('Storytime export packages owner data privately with integrity and short-li
     'private, max-age=0, no-store',
     'EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000',
     'complete_for_storytime_owned_data',
-    'partial_review_required'
+    'partial_review_required',
+    'authAccountMetadata'
   ]) assert.ok(execution.includes(marker), `missing export marker: ${marker}`);
   assert.match(index, /processStorytimeExportRequest/);
   assert.match(index, /getStorytimeExportDownloadUrl/);
@@ -37,7 +38,9 @@ test('Storytime deletion is dry-run/hash/admin-only and revalidated before destr
     'storytime_firebase_isolation_not_certified',
     'family_or_child_data_requires_urai_privacy_review',
     'verification_required',
-    'backup_expiry_pending'
+    'backup_expiry_pending',
+    'retry_required',
+    'external provider artifact references'
   ]) assert.ok(execution.includes(marker), `missing deletion marker: ${marker}`);
 });
 
@@ -45,6 +48,7 @@ test('destructive account deletion and completion remain fail-closed behind envi
   assert.match(execution, /STORYTIME_FIREBASE_ISOLATED !== "true"/);
   assert.match(execution, /STORYTIME_BACKUP_RETENTION_POLICY_READY !== "true"/);
   assert.match(env, /STORYTIME_BACKUP_RETENTION_POLICY_READY=false/);
+  assert.equal((env.match(/STORYTIME_BACKUP_RETENTION_POLICY_READY=false/g) || []).length, 1);
 });
 
 test('privacy evidence collections are server-only', () => {
@@ -55,9 +59,9 @@ test('privacy evidence collections are server-only', () => {
 test('settings initiate export packaging and deletion planning but never destructive execution', () => {
   assert.match(controls, /processStorytimeExportRequest/);
   assert.match(controls, /getStorytimeExportDownloadUrl/);
-  assert.match(controls, /Download latest Storytime export/);
+  assert.match(controls, /Download private Storytime export/);
   assert.match(controls, /planStorytimeDeletion/);
-  assert.match(controls, /No data has been deleted/);
+  assert.match(controls, /authorized privacy administrator must execute/);
   assert.doesNotMatch(controls, /executeStorytimeDeletion/);
   assert.doesNotMatch(controls, /verifyStorytimeDeletion/);
 });
