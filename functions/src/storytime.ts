@@ -45,6 +45,10 @@ const GenerateStorySchema = z.object({
   })
 });
 
+const CancelStoryGenerationSchema = z.object({
+  requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/)
+});
+
 const PrepareVoiceoverJobSchema = z.object({
   sessionId: z.string().min(1),
   narratorScriptId: z.string().min(1).optional(),
@@ -73,6 +77,12 @@ function requireVerifiedAdultAccount(emailVerified?: unknown) {
   }
 }
 
+function requireAdmin(token?: Record<string, unknown>) {
+  if (token?.admin !== true) {
+    throw new HttpsError("permission-denied", "Storytime operator access is required.");
+  }
+}
+
 function allowLocalBuilder() {
   return process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER === "true" && process.env.NODE_ENV !== "production";
 }
@@ -97,6 +107,31 @@ function quotaWindowId(date: Date, scope: "hour" | "day") {
 
 function generationRequestId(userId: string, requestId: string) {
   return `${userId}_${requestId}`;
+}
+
+function generationRequestRef(userId: string, requestId: string) {
+  return db.collection("storyGenerationRequests").doc(generationRequestId(userId, requestId));
+}
+
+async function isGenerationCancellationRequested(userId: string, requestId: string) {
+  const snapshot = await generationRequestRef(userId, requestId).get();
+  if (!snapshot.exists) return false;
+  const data = snapshot.data() || {};
+  if (data.userId !== userId) {
+    throw new HttpsError("permission-denied", "Story generation request is unavailable.");
+  }
+  return data.cancellationRequested === true
+    || data.status === "cancellation_requested"
+    || data.status === "cancelled";
+}
+
+async function markGenerationCancelled(userId: string, requestId: string) {
+  await generationRequestRef(userId, requestId).set({
+    status: "cancelled",
+    cancellationRequested: true,
+    cancelledAt: now(),
+    updatedAt: now()
+  }, { merge: true });
 }
 
 function roundedUsd(value: number) {
@@ -283,7 +318,7 @@ async function retainProviderDeadLetter(args: {
 }
 
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
-  const requestRef = db.collection("storyGenerationRequests").doc(generationRequestId(userId, input.requestId));
+  const requestRef = generationRequestRef(userId, input.requestId);
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(requestRef);
     if (snapshot.exists) {
@@ -293,6 +328,9 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       }
       if (data.status === "succeeded" && typeof data.sessionId === "string") {
         return { requestRef, reusedSessionId: data.sessionId as string };
+      }
+      if (data.status === "cancelled" || data.status === "cancellation_requested" || data.cancellationRequested === true) {
+        throw new HttpsError("cancelled", "This Storytime request was cancelled.");
       }
       if (data.status === "processing") {
         throw new HttpsError("already-exists", "This Storytime request is already being processed.");
@@ -453,6 +491,12 @@ export const generateStorySession = onCall(async (request) => {
     }, { merge: true });
     throw error;
   }
+  if (await isGenerationCancellationRequested(userId, input.requestId)) {
+    await markGenerationCancelled(userId, input.requestId);
+    auditLog({ event: "generation_cancelled", userId });
+    throw new HttpsError("cancelled", "Story generation was cancelled before provider execution.");
+  }
+
   const providerInput = providerInputFromRequest(input, source);
   let budgetReservation: ProviderBudgetReservation | null = null;
   if (readiness.ready) {
@@ -552,6 +596,12 @@ export const generateStorySession = onCall(async (request) => {
       auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_settlement_failed" });
       throw new HttpsError("internal", "Story generation cost receipt could not be settled safely.");
     }
+  }
+
+  if (await isGenerationCancellationRequested(userId, input.requestId)) {
+    await markGenerationCancelled(userId, input.requestId);
+    auditLog({ event: "generation_cancelled", userId, provider: readiness.provider });
+    throw new HttpsError("cancelled", "Story generation was cancelled. Provider receipt was retained, but no story output was persisted.");
   }
 
   const outputSafetyText = providerOutputText(generated);
@@ -716,6 +766,68 @@ export const generateStorySession = onCall(async (request) => {
     safetyStatus: outputModeration.safetyStatus,
     provider: session.provider,
     reused: false
+  };
+});
+
+export const cancelStoryGeneration = onCall(async (request) => {
+  requireAuth(request.auth?.uid);
+  const userId = request.auth!.uid;
+  const input = CancelStoryGenerationSchema.parse(request.data);
+  const requestRef = generationRequestRef(userId, input.requestId);
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(requestRef);
+    if (!snapshot.exists) {
+      throw new HttpsError("not-found", "Story generation request was not found.");
+    }
+    const data = snapshot.data() || {};
+    if (data.userId !== userId) {
+      throw new HttpsError("permission-denied", "Story generation request is unavailable.");
+    }
+    if (data.status === "succeeded") {
+      throw new HttpsError("failed-precondition", "Completed stories cannot be cancelled.");
+    }
+    if (data.status === "cancelled") return;
+    transaction.set(requestRef, {
+      status: "cancellation_requested",
+      cancellationRequested: true,
+      cancellationRequestedAt: now(),
+      updatedAt: now()
+    }, { merge: true });
+  });
+
+  auditLog({ event: "generation_cancellation_requested", userId });
+  return { requestId: input.requestId, status: "cancellation_requested" };
+});
+
+export const listStorytimeProviderReconciliationQueue = onCall(async (request) => {
+  requireAuth(request.auth?.uid);
+  requireAdmin(request.auth?.token as Record<string, unknown> | undefined);
+
+  const snapshot = await db.collection("storytimeProviderDeadLetters")
+    .where("status", "==", "requires_provider_receipt_reconciliation")
+    .limit(50)
+    .get();
+
+  auditLog({ event: "provider_reconciliation_viewed", userId: request.auth!.uid });
+  return {
+    items: snapshot.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        requestId: typeof data.requestId === "string" ? data.requestId : null,
+        reservationId: typeof data.reservationId === "string" ? data.reservationId : null,
+        dayId: typeof data.dayId === "string" ? data.dayId : null,
+        status: typeof data.status === "string" ? data.status : "unknown",
+        failureCode: typeof data.failureCode === "string" ? data.failureCode : "unknown",
+        heldCostUsd: Number(data.heldCostUsd || 0),
+        createdAt: typeof data.createdAt === "string" ? data.createdAt : null,
+        updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : null,
+        containsRawStoryContent: false,
+        retryAuthorized: data.retryAuthorized === true,
+        cancellationRequested: data.cancellationRequested === true
+      };
+    })
   };
 });
 
