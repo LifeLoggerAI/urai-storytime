@@ -1,9 +1,18 @@
-# Legacy static Storytime demo
+# Archived static Storytime demo
 
-The former static/hash-router entrypoints are intentionally not retained as runnable files in the current tree.
+This directory contains historical Storytime prototype code retained only for regression/history purposes.
 
-Historical versions of `src/index.html`, `src/app.js`, and `src/styles.css` remain available through Git history before commit `ab89a95137a048fdd669e36485ed2dd6cef6d146` and its follow-up deletion commits.
+It is **not** a production or launch runtime.
 
-This directory is documentation-only. It must not contain an HTML entrypoint, package manifest, Hosting configuration, deployment workflow, or executable preview command.
+Canonical Storytime runtime authority is:
 
-Canonical application authority is documented in `docs/CANONICAL_APP_ROOT.md` and remains the Next.js/Firebase app under `src/app`, `src/components/storytime`, `src/lib`, and `functions/src`.
+- `src/app/**`
+- `src/components/storytime/**`
+- `src/lib/storytime/**`
+- Firebase callable Functions under `functions/src/**`
+
+The archived `story-engine.mjs` uses a local deterministic template and historical child-name/demo semantics. It is retained only so historical behavior can remain covered by a unit test. It must not be imported by production application code, deployment scripts, provider adapters, or current product policy.
+
+The former static/hash-router HTML/application entrypoints are not retained as runnable files in the current tree. Historical versions remain available through Git history.
+
+This directory must not gain a Hosting target, deployment workflow, package entrypoint, or production import path.
