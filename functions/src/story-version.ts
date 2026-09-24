@@ -64,6 +64,7 @@ export function buildInitialStoryVersionRecord(input: InitialStoryVersionInput) 
     immutable: true,
     snapshot,
     contentSha256: sha256(snapshot),
-    createdAt: input.createdAt
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt
   };
 }
