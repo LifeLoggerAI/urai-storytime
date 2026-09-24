@@ -29,6 +29,7 @@ export function evaluateStorytimeTechnicalReadiness(): StorytimeTechnicalReadine
     isolatedFirebaseProject: process.env.STORYTIME_FIREBASE_ISOLATED === 'true',
     cloudMode: process.env.STORYTIME_CLOUD_MODE === 'true',
     providerConfigured: provider.ready === true,
+    providerSpendAuthorized: provider.spendAuthorized === true,
     deterministicFallbackDisabled: process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER !== 'true',
     publicSharingExplicit: publicSharingValue === 'true' || publicSharingValue === 'false',
     publicShareTtlBounded: boundedShareTtl(process.env.STORYTIME_PUBLIC_SHARE_TTL_DAYS),
