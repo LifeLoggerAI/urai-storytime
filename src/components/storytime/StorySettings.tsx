@@ -1,3 +1,4 @@
+import { PrivacyRequestControls } from "./PrivacyRequestControls";
 import type { UserStoryPreferences } from "@/lib/storytime/types";
 
 const settingRows = [
@@ -36,9 +37,10 @@ export function StorySettings({ preferences }: { preferences?: Partial<UserStory
         })}
       </div>
       <p>
-        This page is intentionally read-only in the demo build. Do not treat these settings as live account controls until
-        Firebase auth, Firestore persistence, security rules, and privacy/legal review are verified.
+        Story preferences remain read-only until their persisted policy and consent semantics are verified. Privacy requests
+        below are a separate server-owned lifecycle and remain truthful about requested versus completed state.
       </p>
+      <PrivacyRequestControls />
     </section>
   );
 }
