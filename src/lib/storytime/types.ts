@@ -36,6 +36,7 @@ export interface StorySession extends StorytimeBase {
   requestReview?: {
     reviewed: true;
     reviewVersion: "story-request-review-v1";
+    processedRequestSha256?: string;
   };
   provenance?: {
     schemaVersion: "storytime-provenance-v1";
@@ -233,6 +234,8 @@ export interface StoryVersion extends StorytimeBase {
     locale: string;
     audienceAgeBand: string;
     consentVersion: string;
+    reviewVersion: string;
+    reviewedRequestSha256: string;
     provenance: Record<string, unknown>;
     chapter: { id: string; title: string; summary: string };
     moment: { id: string; title: string; body: string };
