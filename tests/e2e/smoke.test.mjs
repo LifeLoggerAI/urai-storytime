@@ -29,6 +29,8 @@ const arcFunction = read('functions/src/generate-emotional-arc-summary.ts');
 const weeklyFunction = read('functions/src/generate-weekly-story-scroll.ts');
 const timelineFunction = read('functions/src/refresh-story-timeline.ts');
 const archiveFunction = read('functions/src/rebuild-user-story-archive.ts');
+const versionFunction = read('functions/src/story-versioning.ts');
+const revisionEditor = read('src/components/storytime/StoryRevisionEditor.tsx');
 const storyProvider = read('functions/src/story-provider.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
@@ -75,7 +77,9 @@ test('Storytime session route accepts real ids and does not fabricate demo sessi
   assert.match(storytimeSessionRoute, /<CloudSession sessionId=\{sessionId\}/);
   assert.match(cloudSession, /storySessions/);
   assert.match(cloudSession, /storyChapters/);
+  assert.match(cloudSession, /storyMoments/);
   assert.match(cloudSession, /memoryScenes/);
+  assert.match(cloudSession, /StoryRevisionEditor/);
   assert.match(cloudSession, /narratorScripts/);
   assert.match(cloudSession, /Sign in is required/);
   assert.match(cloudSession, /No saved cloud session/);
@@ -203,6 +207,9 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(functions, /resource-exhausted/);
   assert.match(storyProvider, /response_format/);
   assert.match(storyProvider, /Do not diagnose/);
+  assert.match(versionFunction, /saveStoryRevision/);
+  assert.match(versionFunction, /restoreStoryVersion/);
+  assert.match(revisionEditor, /Save new version/);
 });
 
 test('Storytime Functions emit privacy-safe audit log events', () => {
