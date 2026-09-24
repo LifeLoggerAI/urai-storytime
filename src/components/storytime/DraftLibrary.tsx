@@ -22,7 +22,7 @@ export function DraftLibrary() {
   useEffect(() => {
     if (!cloudReady) return undefined;
     let active = true;
-    return onAuthStateChanged(getFirebaseAuth(), async (user) => {
+    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
       if (!active) return;
       if (!user) {
         setState({ status: "signedOut", drafts: [] });
@@ -46,6 +46,7 @@ export function DraftLibrary() {
     });
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [cloudReady]);
 
