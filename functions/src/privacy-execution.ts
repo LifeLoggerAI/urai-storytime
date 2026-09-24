@@ -261,19 +261,19 @@ async function activeLegalHold(userId: string) {
   const user = await db.collection("users").doc(userId).get();
   if (user.exists && user.data()?.legalHold === true) return true;
 
+  // Keep legal-hold lookup executable without requiring a hidden composite index.
+  // We query the subject key only, then evaluate active status in trusted server code.
   const byUid = await db.collection("legalHoldRecords")
     .where("uid", "==", userId)
-    .where("status", "==", "active")
-    .limit(1)
+    .limit(25)
     .get();
-  if (!byUid.empty) return true;
+  if (byUid.docs.some((doc) => doc.data()?.status === "active")) return true;
 
   const byUserId = await db.collection("legalHoldRecords")
     .where("userId", "==", userId)
-    .where("status", "==", "active")
-    .limit(1)
+    .limit(25)
     .get();
-  return !byUserId.empty;
+  return byUserId.docs.some((doc) => doc.data()?.status === "active");
 }
 
 function externalArtifactPointers(rows: Array<{ collection: string; id: string; data: DocumentData }>) {
