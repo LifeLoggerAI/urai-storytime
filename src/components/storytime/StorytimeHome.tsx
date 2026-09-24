@@ -239,6 +239,25 @@ export function StorytimeHome() {
   ]);
   const requestReviewed = reviewedFingerprint === requestReviewFingerprint;
 
+  async function handleDeleteDraft() {
+    if (!draftId) return;
+    setDraftStatus("Deleting private draft…");
+    try {
+      const deleteDraft = httpsCallable<Record<string, unknown>, { deleted?: boolean }>(
+        getFirebaseFunctions(),
+        "deleteStoryDraft"
+      );
+      await deleteDraft({ draftId });
+      setDraftId(null);
+      setDraftRevision(0);
+      setLastSavedDraftFingerprint(null);
+      setDraftStorageConsent(false);
+      setDraftStatus("Private draft deleted.");
+    } catch {
+      setDraftStatus("Private draft could not be deleted. No generation/provider request was made.");
+    }
+  }
+
   const validationError = useMemo(() => {
     if (!title.trim()) return "Add a title to continue.";
     if (!theme.trim()) return "Add a theme to continue.";
@@ -308,6 +327,17 @@ export function StorytimeHome() {
       });
 
       if (!result.data.sessionId) throw new Error("Story creation did not complete.");
+      if (draftId) {
+        try {
+          const deleteDraft = httpsCallable<Record<string, unknown>, { deleted?: boolean }>(
+            getFirebaseFunctions(),
+            "deleteStoryDraft"
+          );
+          await deleteDraft({ draftId });
+        } catch {
+          // Story generation succeeded. A stale private draft can still be deleted later by the owner.
+        }
+      }
       window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
     } catch (error) {
       setSubmitError(errorMessage(error));
@@ -343,6 +373,7 @@ export function StorytimeHome() {
         <section className="storytime-grid compact" aria-label="Account and story library">
           <AuthPanel />
           <SessionLibrary />
+          <DraftLibrary />
         </section>
 
         <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
@@ -385,6 +416,37 @@ export function StorytimeHome() {
             Memory or source text <span className="storytime-helper">Optional</span>
             <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
           </label>
+
+          <section className="storytime-card storytime-stack" aria-label="Private draft storage">
+            <p className="storytime-pill">Private draft</p>
+            <label className="storytime-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={draftStorageConsent}
+                  onChange={(event) => {
+                    setDraftStorageConsent(event.target.checked);
+                    setDraftStatus(event.target.checked
+                      ? "Private draft autosave enabled. This does not authorize generation or provider processing."
+                      : "Private draft autosave stopped. Any existing saved draft remains until you delete it.");
+                  }}
+                  disabled={!cloudReady}
+                />{" "}
+                Save this form as a private Storytime draft while I work.
+              </span>
+            </label>
+            <p className="storytime-helper">
+              Draft storage is separate from story-generation and provider consent. Drafts never store those approvals.
+            </p>
+            {draftStatus ? <p role="status">{draftStatus}</p> : null}
+            {draftId ? (
+              <div className="storytime-actions">
+                <button className="storytime-button secondary" type="button" onClick={handleDeleteDraft} disabled={draftSaving}>
+                  Delete saved draft
+                </button>
+              </div>
+            ) : null}
+          </section>
 
           <label className="storytime-field">
             <span>
@@ -450,8 +512,8 @@ export function StorytimeHome() {
           {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
 
           <div className="storytime-actions">
-            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting}>
-              {isSubmitting ? "Creating story…" : "Create story"}
+            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
+              {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create story"}
             </button>
           </div>
           <p className="storytime-helper">
