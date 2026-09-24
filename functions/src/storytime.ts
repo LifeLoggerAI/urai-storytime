@@ -17,6 +17,7 @@ const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
 
 const GenerateStorySchema = z.object({
   requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/),
+  locale: z.literal("en-US"),
   title: z.string().min(1).max(120),
   sourceText: z.string().max(12000).optional(),
   emotionalTone: z.string().max(80).default("reflective"),
@@ -270,6 +271,7 @@ export const generateStorySession = onCall(async (request) => {
           sourceText: source,
           emotionalTone: input.emotionalTone,
           symbolicMotifs: input.symbolicMotifs,
+          locale: input.locale,
           audienceAgeBand: input.audienceAgeBand
         })
       : fallbackProviderOutput(input, source);
@@ -325,6 +327,7 @@ export const generateStorySession = onCall(async (request) => {
     emotionalArcSummaryId: arcId,
     provider: readiness.ready ? readiness.provider : "local_builder",
     requestId: input.requestId,
+    locale: input.locale,
     audienceAgeBand: input.audienceAgeBand,
     operator: input.operator,
     provenance: {
