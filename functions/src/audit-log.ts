@@ -20,7 +20,8 @@ export type StorytimeAuditEvent =
   | "privacy_deletion_executed"
   | "privacy_deletion_verified"
   | "moderation_case_escalated"
-  | "moderation_case_closed_blocked";
+  | "moderation_case_closed_blocked"
+  | "safety_report_created";
 
 export type StorytimeAuditPayload = {
   event: StorytimeAuditEvent;
