@@ -18,9 +18,10 @@ test('weekly story scroll callable verifies every source session is owned', () =
   assert.match(source, /for \(const sessionId of input\.sessionIds\)/);
 });
 
-test('weekly story scroll callable writes queued weeklyStoryScrolls record', () => {
+test('weekly story scroll callable writes completed weeklyStoryScrolls record', () => {
   assert.match(source, /buildWeeklyStoryScrollRecord/);
   assert.match(source, /db\.collection\("weeklyStoryScrolls"\)/);
   assert.match(source, /weeklyStoryScrollId/);
   assert.match(source, /sessionCount: ownedSessionIds\.length/);
+  assert.match(source, /status: "completed"/);
 });
