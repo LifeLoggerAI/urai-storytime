@@ -24,6 +24,11 @@ const functions = read('functions/src/storytime.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const auditLog = read('functions/src/audit-log.ts');
 const functionsIndex = read('functions/src/index.ts');
+const narratorFunction = read('functions/src/generate-narrator-script.ts');
+const arcFunction = read('functions/src/generate-emotional-arc-summary.ts');
+const weeklyFunction = read('functions/src/generate-weekly-story-scroll.ts');
+const timelineFunction = read('functions/src/refresh-story-timeline.ts');
+const archiveFunction = read('functions/src/rebuild-user-story-archive.ts');
 const storyProvider = read('functions/src/story-provider.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
@@ -96,7 +101,8 @@ test('Storytime builder normalizes bounded user input', () => {
 test('Storytime settings preserve consent and launch boundaries', () => {
   assert.match(storySettings, /private by default/i);
   assert.match(storySettings, /read-only in the demo build/i);
-  assert.match(storySettings, /Firebase auth, Firestore persistence, security rules/);
+  assert.match(storySettings, /persisted policy and consent semantics are verified/);
+  assert.match(storySettings, /PrivacyRequestControls/);
   assert.match(storySettings, /Public-safe shares require consent, redaction, and safety review/);
   assert.match(globals, /\.storytime-button:disabled/);
 });
@@ -164,22 +170,30 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /npm --prefix functions run build/);
 });
 
-test('Callable functions cover private Storytime lifecycle, provider wiring, and quota gate', () => {
-  for (const name of [
-    'generateStorySession',
-    'generateNarratorScript',
-    'generateEmotionalArcSummary',
-    'generateWeeklyStoryScroll',
-    'prepareVoiceoverJob',
-    'refreshStoryTimeline',
-    'rebuildUserStoryArchive'
+test('Callable functions cover private Storytime lifecycle, provider wiring, quota, and real per-callable modules', () => {
+  assert.match(functions, /export const generateStorySession/);
+  assert.match(functions, /export const prepareVoiceoverJob/);
+  assert.match(narratorFunction, /export const generateNarratorScript/);
+  assert.match(arcFunction, /export const generateEmotionalArcSummary/);
+  assert.match(weeklyFunction, /export const generateWeeklyStoryScroll/);
+  assert.match(timelineFunction, /export const refreshStoryTimeline/);
+  assert.match(archiveFunction, /export const rebuildUserStoryArchive/);
+  assert.match(archiveFunction, /storyArchiveSnapshots/);
+  assert.match(archiveFunction, /status: "completed"/);
+  for (const moduleName of [
+    'generate-narrator-script.js',
+    'generate-emotional-arc-summary.js',
+    'generate-weekly-story-scroll.js',
+    'refresh-story-timeline.js',
+    'rebuild-user-story-archive.js'
   ]) {
-    assert.match(functions, new RegExp(`export const ${name}`));
+    assert.ok(functionsIndex.includes(moduleName), `index must export real callable module ${moduleName}`);
   }
   assert.match(functionsIndex, /createPublicStoryShare, revokePublicStoryShare/);
   assert.match(shareLifecycle, /Public sharing consent is required/);
   assert.match(shareLifecycle, /Only safety-approved stories can be shared/);
-  assert.match(functions, /Story generation consent is required/);
+  assert.match(functions, /storyGeneration: z\.literal\(true\)/);
+  assert.match(functions, /providerProcessing: z\.literal\(true\)/);
   assert.match(functions, /requireConfiguredStoryProvider/);
   assert.match(functions, /generateStoryWithProvider/);
   assert.match(functions, /MAX_GENERATIONS_PER_HOUR/);
