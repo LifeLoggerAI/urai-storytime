@@ -93,6 +93,7 @@ export function StorytimeHome() {
         emotionalTone: mood,
         symbolicMotifs: [theme.trim()],
         requestId: createRequestId(),
+        locale: "en-US",
         sourceSignals: ["storytime form"],
         audienceAgeBand,
         operator: {
