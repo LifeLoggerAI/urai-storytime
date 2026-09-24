@@ -94,6 +94,129 @@ export function StorytimeHome() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
 
+  const currentDraftFingerprint = useMemo(() => draftFingerprint({
+    title,
+    theme,
+    audienceAgeBand,
+    mood,
+    sourceText
+  }), [audienceAgeBand, mood, sourceText, theme, title]);
+
+  useEffect(() => {
+    if (!cloudReady || typeof window === "undefined") return undefined;
+    const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
+    if (!requestedDraftId) return undefined;
+    if (!validDraftId(requestedDraftId)) {
+      setDraftStatus("The requested private draft id is invalid.");
+      return undefined;
+    }
+
+    let active = true;
+    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
+      if (!active || !user) return;
+      try {
+        const snapshot = await getDoc(doc(getFirebaseDb(), "storyDrafts", requestedDraftId));
+        if (!active) return;
+        if (!snapshot.exists()) {
+          setDraftStatus("That private draft is unavailable.");
+          return;
+        }
+        const data = snapshot.data();
+        setTitle(typeof data.title === "string" ? data.title : "");
+        setTheme(typeof data.theme === "string" ? data.theme : "");
+        setAudienceAgeBand(AUDIENCE_AGE_BANDS.includes(data.audienceAgeBand) ? data.audienceAgeBand : "family");
+        setMood(MOODS.includes(data.emotionalTone) ? data.emotionalTone : "reflective");
+        setSourceText(typeof data.sourceText === "string" ? data.sourceText.slice(0, MAX_SOURCE_CHARS) : "");
+        setAdultGuardianAffirmed(false);
+        setGenerationConsent(false);
+        setProviderProcessingConsent(false);
+        setReviewedFingerprint(null);
+        setDraftStorageConsent(true);
+        setDraftId(snapshot.id);
+        setDraftRevision(Number(data.revision || 0));
+        setLastSavedDraftFingerprint(draftFingerprint({
+          title: typeof data.title === "string" ? data.title : "",
+          theme: typeof data.theme === "string" ? data.theme : "",
+          audienceAgeBand: AUDIENCE_AGE_BANDS.includes(data.audienceAgeBand) ? data.audienceAgeBand : "family",
+          mood: MOODS.includes(data.emotionalTone) ? data.emotionalTone : "reflective",
+          sourceText: typeof data.sourceText === "string" ? data.sourceText.slice(0, MAX_SOURCE_CHARS) : ""
+        }));
+        setDraftStatus("Private draft resumed. Generation and provider consent were not restored.");
+      } catch {
+        if (active) setDraftStatus("That private draft could not be loaded.");
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [cloudReady]);
+
+  useEffect(() => {
+    if (!cloudReady || !draftStorageConsent || draftSaving) return undefined;
+    if (currentDraftFingerprint === lastSavedDraftFingerprint) return undefined;
+    if (!title.trim() && !theme.trim() && !sourceText.trim()) return undefined;
+
+    const user = getFirebaseAuth().currentUser;
+    if (!user || !user.emailVerified) return undefined;
+
+    const fingerprintAtSave = currentDraftFingerprint;
+    const idAtSave = draftId || createDraftId();
+    const expectedRevision = draftId ? draftRevision : 0;
+
+    const timer = window.setTimeout(async () => {
+      setDraftSaving(true);
+      setDraftStatus("Saving private draft…");
+      try {
+        const saveDraft = httpsCallable<Record<string, unknown>, SaveDraftResponse>(
+          getFirebaseFunctions(),
+          "saveStoryDraft"
+        );
+        const result = await saveDraft({
+          draftId: idAtSave,
+          expectedRevision,
+          title: title.slice(0, 120),
+          theme: theme.slice(0, 80),
+          sourceText: sourceText.slice(0, MAX_SOURCE_CHARS),
+          emotionalTone: mood,
+          audienceAgeBand,
+          locale: "en-US",
+          storageConsent: {
+            privateDraftStorage: true,
+            consentVersion: DRAFT_STORAGE_CONSENT_VERSION
+          }
+        });
+        if (!result.data.draftId || typeof result.data.revision !== "number") {
+          throw new Error("Draft save did not return a revision.");
+        }
+        setDraftId(result.data.draftId);
+        setDraftRevision(result.data.revision);
+        setLastSavedDraftFingerprint(fingerprintAtSave);
+        setDraftStatus(`Private draft saved · revision ${result.data.revision}. Generation/provider consent is not stored.`);
+      } catch {
+        setDraftStatus("Private draft autosave paused. No provider request was made.");
+      } finally {
+        setDraftSaving(false);
+      }
+    }, 750);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    audienceAgeBand,
+    cloudReady,
+    currentDraftFingerprint,
+    draftId,
+    draftRevision,
+    draftSaving,
+    draftStorageConsent,
+    lastSavedDraftFingerprint,
+    mood,
+    sourceText,
+    theme,
+    title
+  ]);
+
   const requestReviewFingerprint = useMemo(() => JSON.stringify({
     title: title.trim(),
     theme: theme.trim(),
