@@ -146,16 +146,18 @@ test('public sharing uses content-neutral expiring derivatives and private owner
   ]);
 });
 
-test('voiceover and export remain queued job records, not completed artifact claims', () => {
+test('voiceover and media execution fail closed until a governed worker exists', () => {
   includesAll(functions, [
     'prepareVoiceoverJob',
     'Voiceover consent is required',
-    'voiceoverJobs',
-    'storyExports',
-    'status: "queued"',
-    'Voiceover export queued'
+    'voiceover_execution_blocked',
+    'media_worker_not_implemented',
+    'Storytime voiceover/media execution is disabled until a governed worker'
   ]);
 
+  assert.doesNotMatch(functions, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
+  assert.doesNotMatch(functions, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
+  assert.doesNotMatch(functions, /Voiceover export queued/);
   assert.doesNotMatch(functions, /downloadURL|signedUrl|completedUrl|artifactUrl/);
   assert.match(proofReadme, /export artifact pipeline proof was available/);
 });
