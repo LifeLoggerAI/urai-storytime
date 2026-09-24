@@ -476,13 +476,30 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
   ];
 
   const targets: Record<string, string[]> = {};
+  const executionBlockers: string[] = [];
   for (const [name, rows] of Object.entries(collections)) {
     if (retainedData.includes(name)) continue;
+
+    if (scope === "story_session" && sessionArrayCollections.includes(name as (typeof sessionArrayCollections)[number])) {
+      const deletable: string[] = [];
+      for (const row of rows) {
+        const linkedSessionIds = Array.isArray(row.data.sessionIds)
+          ? row.data.sessionIds.filter((value: unknown): value is string => typeof value === "string")
+          : [];
+        if (linkedSessionIds.length <= 1) {
+          deletable.push(row.id);
+        } else {
+          executionBlockers.push(`shared_aggregate_recompute_required:${name}/${row.id}`);
+        }
+      }
+      targets[name] = deletable.sort();
+      continue;
+    }
+
     targets[name] = rows.map((row) => row.id).sort();
   }
 
   const storageObjects = scope === "account" ? await exportStorageObjects(userId) : [];
-  const executionBlockers: string[] = [];
   const completionBlockers: string[] = [];
   const legalHold = await activeLegalHold(userId);
   if (legalHold) executionBlockers.push("active_legal_hold");
