@@ -15,7 +15,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <a className="storytime-skip-link" href="#storytime-main-content">Skip to Storytime content</a>
+        <div id="storytime-main-content" tabIndex={-1}>{children}</div>
+      </body>
     </html>
   );
 }

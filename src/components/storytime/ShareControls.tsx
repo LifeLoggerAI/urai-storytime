@@ -63,7 +63,7 @@ export function ShareControls({ session }: { session: StorySession }) {
       <section className="storytime-card storytime-stack" aria-label="Public sharing controls">
         <p className="storytime-pill">Public Sharing</p>
         <h2>Public sharing gated</h2>
-        <p>Public share creation is disabled until Firebase client config and NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING=true are configured and verified.</p>
+        <p role="status" aria-live="polite">Public share creation is disabled until Firebase client config and NEXT_PUBLIC_STORYTIME_PUBLIC_SHARING=true are configured and verified.</p>
       </section>
     );
   }
@@ -84,7 +84,7 @@ export function ShareControls({ session }: { session: StorySession }) {
         </>
       )}
       {shareSlug ? <p><a href={`/share/story/${encodeURIComponent(shareSlug)}`}>Open public-safe share</a></p> : null}
-      {message ? <p className="storytime-helper">{message}</p> : null}
+      {message ? <p className="storytime-helper" role="status" aria-live="polite">{message}</p> : null}
     </section>
   );
 }

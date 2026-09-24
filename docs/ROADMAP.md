@@ -213,7 +213,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.6 Browser, mobile, accessibility, security, and performance certification
 
 - **User value:** stable, understandable product across common devices and assistive technology.
-- **Current evidence:** source smoke only; no real browser E2E/a11y/performance receipt.
+- **Current evidence:** the active Next app now has a skip-to-content path, broad focus-visible treatment, minimum 44px navigation/button targets, explicit browser text scaling, existing reduced-motion and forced-colors handling, and polite/assertive live-region semantics for key async library/share/session states. Source regression coverage exists; real browser, screen-reader, axe, mobile, Lighthouse/performance and assistive-technology receipts are still absent.
 - **Scope:** Playwright journeys, axe checks, mobile/tablet viewports, cross-browser, reduced motion, Lighthouse budgets, dependency/code scanning, upload limits when introduced.
 - **Areas:** tests/workflows/CSS/components.
 - **Dependencies:** stable V1 journeys.

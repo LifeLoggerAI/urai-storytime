@@ -112,7 +112,13 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
     <section className="storytime-card storytime-stack">
       <p className="storytime-pill">Cloud Session</p>
       <h1>{state.status === "loading" ? "Loading story session" : "Story session unavailable"}</h1>
-      <p className={state.status === "error" ? "storytime-error" : undefined}>{state.message}</p>
+      <p
+        className={state.status === "error" ? "storytime-error" : undefined}
+        role={state.status === "error" ? "alert" : "status"}
+        aria-live={state.status === "error" ? "assertive" : "polite"}
+      >
+        {state.message}
+      </p>
       <a className="storytime-button secondary" href="/storytime">Back to Storytime</a>
     </section>
   );
