@@ -47,5 +47,5 @@ export const generateWeeklyStoryScroll = onCall(async (request) => {
 
   await db.collection("weeklyStoryScrolls").doc(weeklyStoryScrollId).set(scroll);
 
-  return { status: "queued", weeklyStoryScrollId, sessionCount: ownedSessionIds.length };
+  return { status: "completed", weeklyStoryScrollId, sessionCount: ownedSessionIds.length };
 });

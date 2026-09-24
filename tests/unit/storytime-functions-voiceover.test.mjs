@@ -13,25 +13,20 @@ test('prepareVoiceoverJob validates request shape and auth-owned session access'
   assert.match(source, /permission-denied/);
 });
 
-test('prepareVoiceoverJob requires voiceover consent and a narrator script before queueing', () => {
+test('prepareVoiceoverJob requires explicit voiceover consent and a narrator script', () => {
   assert.match(source, /consentSnapshot\?\.voiceover !== true/);
   assert.match(source, /Voiceover consent is required/);
   assert.match(source, /const narratorScriptId = input\.narratorScriptId \|\| session\.data\.narratorScriptIds\?\.\[0\]/);
-  assert.match(source, /A narrator script is required before voiceover can be queued/);
+  assert.match(source, /A narrator script is required before voiceover can be prepared/);
 });
 
-test('prepareVoiceoverJob persists voiceoverJobs, storyExports, and timelineReplayEvents atomically', () => {
-  assert.match(source, /const batch = db\.batch\(\)/);
-  assert.match(source, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
-  assert.match(source, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
-  assert.match(source, /db\.collection\("timelineReplayEvents"\)\.doc\(timelineEventId\)/);
-  assert.match(source, /await batch\.commit\(\)/);
-});
-
-test('prepareVoiceoverJob records export and provider metadata without calling external media providers', () => {
-  assert.match(source, /exportType: input\.provider === "asset_factory" \? "asset_factory_zip" : "voiceover"/);
-  assert.match(source, /assetFactoryJobId: input\.provider === "asset_factory" \? voiceoverJobId : null/);
-  assert.match(source, /eventType: "exported"/);
-  assert.match(source, /label: "Voiceover export queued"/);
+test('prepareVoiceoverJob fails closed while no governed media worker exists', () => {
+  assert.match(source, /voiceover_execution_blocked/);
+  assert.match(source, /media_worker_not_implemented/);
+  assert.match(source, /Storytime voiceover\/media execution is disabled until a governed worker/);
+  assert.match(source, /provider receipts, cancellation\/retry, private storage, and deletion lifecycle/);
+  assert.doesNotMatch(source, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
+  assert.doesNotMatch(source, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
+  assert.doesNotMatch(source, /Voiceover export queued/);
   assert.doesNotMatch(source, /fetch\(/);
 });
