@@ -243,3 +243,24 @@ export interface StoryVersion extends StorytimeBase {
     emotionalArc: { id: string; arcLabel: string; summary: string };
   };
 }
+
+
+export interface StoryDraft extends StorytimeBase {
+  schemaVersion: "story-draft-v1";
+  revision: number;
+  status: "draft";
+  title: string;
+  theme: string;
+  sourceText: string;
+  emotionalTone: "gentle" | "reflective" | "playful" | "brave" | "calm";
+  audienceAgeBand: "family" | "preschool_3_5" | "early_reader_6_8" | "middle_grade_9_12";
+  locale: "en-US";
+  storageConsent: {
+    privateDraftStorage: true;
+    consentVersion: "story-draft-storage-v1";
+  };
+  generationConsentStored: false;
+  providerProcessingAuthorized: false;
+  retentionClass: "storytime_private_draft";
+  retentionReviewAt: string;
+}
