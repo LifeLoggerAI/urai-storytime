@@ -60,6 +60,7 @@ Implemented or source-wired in code:
 - Runtime readiness gates that default production status to blocked
 - CI validation workflow
 - Production-boundary regression tests
+- Active Next skip navigation, visible keyboard focus, reduced-motion/forced-colors source handling, and async status announcements
 - Emulator behavior proof spec and validator
 - Isolated Storytime Firebase production config gate
 - Public-share default expiration using `STORYTIME_PUBLIC_SHARE_TTL_DAYS`
