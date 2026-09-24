@@ -21,12 +21,14 @@ test('Storytime export execution is owner-verified, private, portable, idempoten
     'getSignedUrl',
     'exportPath',
     'exportPackageSha256',
+    'Storytime export requires privacy review before download can be authorized',
     'reused: true'
   ]) assert.ok(execution.includes(marker), `missing export marker: ${marker}`);
 
   assert.match(index, /processStorytimeExportRequest/);
   assert.match(index, /getStorytimeExportDownloadUrl/);
   assert.match(controls, /Download private Storytime export/);
+  assert.match(controls, /blockers.length === 0/);
 });
 
 test('Storytime destructive deletion follows dry-run hash, legal-hold, admin-only, isolation, and verification gates', () => {
