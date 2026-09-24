@@ -63,6 +63,8 @@ function providerPricingConfig() {
     inputUsdPerMillionTokens: positiveNumber("STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS"),
     outputUsdPerMillionTokens: positiveNumber("STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS"),
     maxGenerationCostUsd: positiveNumber("STORYTIME_MAX_GENERATION_COST_USD"),
+    globalDailyBudgetUsd: positiveNumber("STORYTIME_PROVIDER_DAILY_BUDGET_USD"),
+    userDailyBudgetUsd: positiveNumber("STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD"),
     maxOutputTokens: boundedOutputTokens()
   };
 }
@@ -74,6 +76,8 @@ function missingOpenAIEnv() {
   if (pricing.inputUsdPerMillionTokens === null) missing.push("STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS>0");
   if (pricing.outputUsdPerMillionTokens === null) missing.push("STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS>0");
   if (pricing.maxGenerationCostUsd === null) missing.push("STORYTIME_MAX_GENERATION_COST_USD>0");
+  if (pricing.globalDailyBudgetUsd === null) missing.push("STORYTIME_PROVIDER_DAILY_BUDGET_USD>0");
+  if (pricing.userDailyBudgetUsd === null) missing.push("STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD>0");
   return missing;
 }
 
@@ -127,12 +131,7 @@ function readString(record: Record<string, unknown>, key: keyof StoryProviderOut
   return (typeof value === "string" && value.trim() ? value.trim() : fallback).slice(0, maxLength);
 }
 
-export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderResult> {
-  const readiness = getStoryProviderReadiness();
-  if (!readiness.ready) {
-    throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
-  }
-
+function buildProviderMessages(input: StoryProviderInput) {
   const systemPrompt = "You write safe, gentle, private-by-default story session records for a family-facing product. Output strict JSON only.";
   const prompt = [
     "Create a family-safe private reflective Storytime session.",
@@ -145,17 +144,27 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
     `Motifs: ${input.symbolicMotifs.join(", ") || "soft light"}`,
     `Source: ${input.sourceText || "No source text provided."}`
   ].join("\n");
+  return { systemPrompt, prompt };
+}
+
+export function getStoryProviderCostPreflight(input: StoryProviderInput) {
+  const readiness = getStoryProviderReadiness();
+  if (!readiness.ready) {
+    throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
+  }
 
   const pricing = providerPricingConfig();
   if (
     pricing.inputUsdPerMillionTokens === null
     || pricing.outputUsdPerMillionTokens === null
     || pricing.maxGenerationCostUsd === null
+    || pricing.globalDailyBudgetUsd === null
+    || pricing.userDailyBudgetUsd === null
   ) {
     throw new Error("Story provider pricing/budget configuration is incomplete.");
   }
 
-  // UTF-8 bytes are used as a deliberately conservative ceiling for input-token budgeting.
+  const { systemPrompt, prompt } = buildProviderMessages(input);
   const conservativeInputTokenCeiling = Buffer.byteLength(`${systemPrompt}\n${prompt}`, "utf8");
   const estimatedMaxCostUsd =
     (conservativeInputTokenCeiling / 1_000_000) * pricing.inputUsdPerMillionTokens
@@ -164,6 +173,33 @@ export async function generateStoryWithProvider(input: StoryProviderInput): Prom
   if (estimatedMaxCostUsd > pricing.maxGenerationCostUsd) {
     throw new Error("Story provider request exceeds the configured per-request cost ceiling.");
   }
+
+  return {
+    estimatedMaxCostUsd,
+    maxGenerationCostUsd: pricing.maxGenerationCostUsd,
+    globalDailyBudgetUsd: pricing.globalDailyBudgetUsd,
+    userDailyBudgetUsd: pricing.userDailyBudgetUsd,
+    maxOutputTokens: pricing.maxOutputTokens
+  };
+}
+
+export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderResult> {
+  const readiness = getStoryProviderReadiness();
+  if (!readiness.ready) {
+    throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
+  }
+
+  const { systemPrompt, prompt } = buildProviderMessages(input);
+  const pricing = providerPricingConfig();
+  const preflight = getStoryProviderCostPreflight(input);
+  if (
+    pricing.inputUsdPerMillionTokens === null
+    || pricing.outputUsdPerMillionTokens === null
+    || pricing.maxGenerationCostUsd === null
+  ) {
+    throw new Error("Story provider pricing/budget configuration is incomplete.");
+  }
+  const estimatedMaxCostUsd = preflight.estimatedMaxCostUsd;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
