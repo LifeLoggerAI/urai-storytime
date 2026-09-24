@@ -50,8 +50,9 @@ export function PrivacyRequestControls() {
   const [signedIn, setSignedIn] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [confirmation, setConfirmation] = useState(false);
-  const [working, setWorking] = useState<PrivacyRequestType | null>(null);
+  const [working, setWorking] = useState<PrivacyRequestType | "download" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [exportRequestId, setExportRequestId] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadExpiresAt, setDownloadExpiresAt] = useState<string | null>(null);
 
@@ -133,6 +134,26 @@ export function PrivacyRequestControls() {
       setConfirmation(false);
     } catch {
       setMessage("The privacy operation could not be completed safely. No export or deletion has been represented as complete.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function downloadExport() {
+    if (!exportRequestId) return;
+    setWorking("download");
+    setMessage(null);
+    try {
+      const getDownload = httpsCallable<Record<string, unknown>, { url?: string; expiresAt?: string; completeness?: string }>(
+        getFirebaseFunctions(),
+        "getStorytimeExportDownloadUrl"
+      );
+      const result = await getDownload({ privacyRequestId: exportRequestId });
+      if (!result.data.url) throw new Error("Export URL is unavailable.");
+      window.location.assign(result.data.url);
+      setMessage(`A short-lived private export link was created for request ${exportRequestId}. It expires at ${result.data.expiresAt || "the server-recorded expiry"}.`);
+    } catch {
+      setMessage("The private export download could not be prepared. The export request remains unchanged.");
     } finally {
       setWorking(null);
     }
