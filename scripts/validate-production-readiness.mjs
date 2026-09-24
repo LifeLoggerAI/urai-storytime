@@ -43,6 +43,7 @@ const requiredSourceFiles = [
   'src/components/storytime/CloudSession.tsx',
   'src/components/storytime/ShareStory.tsx',
   'src/components/storytime/ShareControls.tsx',
+  'src/lib/storytime/media-job-contract.ts',
   'functions/package.json',
   'functions/src/index.ts',
   'functions/src/storytime.ts',
@@ -106,6 +107,21 @@ if (exists('functions/src/index.ts')) {
   }
 }
 
+
+if (exists('src/lib/storytime/media-job-contract.ts')) {
+  const media = read('src/lib/storytime/media-job-contract.ts');
+  for (const marker of [
+    'storytime-media-job-v1',
+    'state: "hard_off"',
+    'providerSpendAuthorized: false',
+    'publicReleaseAuthorized: false',
+    'maxAuthorizedCost: 0',
+    'STORYTIME_MEDIA_EXECUTION'
+  ]) {
+    if (!media.includes(marker)) failures.push(`Missing hard-off media marker: ${marker}`);
+  }
+}
+
 if (exists('functions/src/storytime.ts')) {
   const functions = read('functions/src/storytime.ts');
   for (const marker of [
@@ -115,9 +131,7 @@ if (exists('functions/src/storytime.ts')) {
     'Story input requires safety review before generation',
     'generation_blocked_output_safety',
     'claimGenerationRequest',
-    'enforceGenerationQuota',
-    'prepareVoiceoverJob',
-    'Voiceover consent is required'
+    'enforceGenerationQuota'
   ]) {
     if (!functions.includes(marker)) failures.push(`Missing callable safety marker: ${marker}`);
   }
