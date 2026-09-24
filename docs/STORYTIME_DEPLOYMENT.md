@@ -29,6 +29,15 @@ NEXT_PUBLIC_FIREBASE_APP_ID
 FIREBASE_PROJECT_ID
 STORYTIME_CLOUD_MODE
 STORYTIME_PUBLIC_SHARING
+STORYTIME_GENERATION_PROVIDER
+STORYTIME_PROVIDER_SPEND_AUTHORIZED
+STORYTIME_OPENAI_MODEL
+STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS
+STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS
+STORYTIME_MAX_GENERATION_COST_USD
+STORYTIME_PROVIDER_DAILY_BUDGET_USD
+STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD
+STORYTIME_OPENAI_MAX_OUTPUT_TOKENS
 ASSET_FACTORY_BASE_URL
 ```
 
@@ -98,7 +107,7 @@ Google-managed runtime identity must use attached ADC/managed identity with the 
 
 ## Public sharing and provider execution
 
-Keep `STORYTIME_PUBLIC_SHARING` fail closed until current legal/privacy/child-safety, retention/export/deletion, consent, moderation, voice/likeness, and publication approvals are proven. Provider generation must remain bounded by the repository's explicit spend and approval controls.
+Keep `STORYTIME_PUBLIC_SHARING` fail closed until current legal/privacy/child-safety, retention/export/deletion, consent, moderation, voice/likeness, and publication approvals are proven. Provider generation must remain bounded by the repository's explicit spend and approval controls. OpenAI mode is not technically ready unless spend authorization, current operator-supplied input/output token rates, per-request ceiling, global daily budget, per-user daily budget, and output-token ceiling are all configured. A paid request must reserve its conservative maximum cost before provider invocation and settle that reservation to the returned usage receipt after success; uncertain failures remain conservatively held for that UTC day.
 
 Do not use real family/private production material merely to demonstrate readiness.
 
