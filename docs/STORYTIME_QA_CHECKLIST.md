@@ -81,6 +81,8 @@ Do not claim complete narration accessibility while voiceover/media execution is
 - [ ] Moderation records contain reason codes/fingerprints rather than raw story bodies.
 - [ ] Storytime-generated narrative is labeled as creative derivative, not source memory evidence.
 - [ ] User-facing errors do not expose raw provider/callable response text.
+- [ ] Uncertain paid-provider failures retain the conservative budget reservation and a server-only reconciliation dead letter.
+- [ ] Provider dead letters retain no raw story content and never authorize automatic retry or budget release.
 - [ ] UI does not claim therapy, diagnosis, child-account readiness, multilingual certification, emergency monitoring, or media/provider readiness without evidence.
 - [ ] Generated Storytime copy avoids diagnosis and does not present creative narrative as clinical judgment, treatment, or source-memory evidence.
 - [ ] Owner category-only safety reporting creates a server-owned report and sanitized `user_report` moderation case.
