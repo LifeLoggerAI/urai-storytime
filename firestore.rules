@@ -125,7 +125,14 @@ service cloud.firestore {
       allow create: if canManageFamily(request.resource.data.familyId);
       allow update, delete: if false;
     }
-    match /moderation/{moderationId} { allow read, write: if isAdmin(); }
+    match /moderation/{moderationId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    match /moderationAuditLogs/{id} {
+      allow read: if isAdmin();
+      allow create, update, delete: if false;
+    }
     match /auditLogs/{auditLogId} {
       allow read: if isAdmin();
       allow create: if signedIn();
