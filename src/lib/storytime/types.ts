@@ -33,6 +33,10 @@ export interface StorySession extends StorytimeBase {
     role: "adult_or_guardian";
     affirmed: true;
   };
+  requestReview?: {
+    reviewed: true;
+    reviewVersion: "story-request-review-v1";
+  };
   provenance?: {
     schemaVersion: "storytime-provenance-v1";
     sourceType: "direct_storytime_input" | "memory_snapshot" | "story_version" | "finite_time_canon";
