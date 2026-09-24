@@ -13,6 +13,8 @@ test('private draft persistence requires verified ownership and explicit storage
   for (const marker of [
     'DRAFT_STORAGE_CONSENT_VERSION = "story-draft-storage-v1"',
     'privateDraftStorage: z.literal(true)',
+    'role: z.literal("adult_or_guardian")',
+    'affirmed: z.literal(true)',
     'requireVerifiedOwner',
     'expectedRevision',
     'currentRevision !== input.expectedRevision',
@@ -48,6 +50,7 @@ test('draft library is owner-scoped and does not display stored source text', ()
 test('autosave is opt-in and resume restores no generation/provider consent or request review', () => {
   for (const marker of [
     'draftStorageConsent',
+    '!adultGuardianAffirmed',
     'Save this form as a private Storytime draft while I work',
     'Draft storage is separate from story-generation and provider consent',
     'saveStoryDraft',
