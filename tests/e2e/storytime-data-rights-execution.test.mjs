@@ -54,8 +54,8 @@ test('Storytime destructive deletion follows dry-run hash, legal-hold, admin-onl
 });
 
 test('deletion plans and completion receipts are server-only and completion cannot be claimed from a request alone', () => {
-  assert.match(rules, /match \/privacyDeletionPlans\/\{planId\}/);
-  assert.match(rules, /match \/privacyCompletionReceipts\/\{receiptId\}/);
+  assert.match(rules, /match \/privacyDeletionPlans\/\{id\}/);
+  assert.match(rules, /match \/privacyCompletionReceipts\/\{id\}/);
   assert.match(rules, /allow read, write: if false/);
   assert.match(execution, /completionReceiptId: null/);
   assert.match(execution, /deletionCompletionVerified: false/);
