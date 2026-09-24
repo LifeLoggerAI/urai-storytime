@@ -12,9 +12,9 @@ export function buildWeeklyStoryScrollRecord(args: {
     weekStart: args.weekStart,
     weekEnd: args.weekEnd,
     title: "Weekly Story Scroll",
-    summary: `Queued weekly scroll from ${args.sessionIds.length} Storytime session(s).`,
+    summary: `Compiled weekly scroll from ${args.sessionIds.length} Storytime session(s).`,
     sessionIds: args.sessionIds,
-    providerStatus: "queued",
+    providerStatus: "local_compiled",
     createdAt: args.createdAt,
     updatedAt: args.createdAt
   };
