@@ -43,11 +43,13 @@ const requiredSourceFiles = [
   'src/components/storytime/CloudSession.tsx',
   'src/components/storytime/ShareStory.tsx',
   'src/components/storytime/ShareControls.tsx',
+  'src/components/storytime/DraftLibrary.tsx',
   'functions/package.json',
   'functions/src/index.ts',
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
   'functions/src/story-version.ts',
+  'functions/src/story-drafts.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
   'functions/src/refresh-story-timeline.ts',
@@ -141,6 +143,25 @@ if (exists('functions/src/story-version.ts')) {
   }
 }
 
+if (exists('functions/src/story-drafts.ts')) {
+  const drafts = read('functions/src/story-drafts.ts');
+  for (const marker of [
+    'story-draft-storage-v1',
+    'privateDraftStorage: z.literal(true)',
+    'role: z.literal("adult_or_guardian")',
+    'affirmed: z.literal(true)',
+    'currentRevision !== input.expectedRevision',
+    'generationConsentStored: false',
+    'providerProcessingAuthorized: false',
+    'storytime_private_draft'
+  ]) {
+    if (!drafts.includes(marker)) failures.push(`Missing private Storytime draft marker: ${marker}`);
+  }
+  if (/generateStoryWithProvider|OPENAI_API_KEY/.test(drafts)) {
+    failures.push('Storytime draft persistence must not execute or configure a generation provider.');
+  }
+}
+
 if (exists('functions/src/public-story-share-lifecycle.ts')) {
   const sharing = read('functions/src/public-story-share-lifecycle.ts');
   for (const marker of [
@@ -183,6 +204,7 @@ if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
   for (const marker of [
     'match /storySessions/{id}',
+    'match /storyDrafts/{id}',
     'match /storyVersions/{id}',
     'allow create, update, delete: if false',
     'match /publicStoryShares/{id}',

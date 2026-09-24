@@ -1,15 +1,19 @@
 "use client";
 
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { FormEvent, useMemo, useState } from "react";
-import { getFirebaseAuth, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { getFirebaseAuth, getFirebaseDb, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
 import { AuthPanel } from "./AuthPanel";
+import { DraftLibrary } from "./DraftLibrary";
 import { SessionLibrary } from "./SessionLibrary";
 
 const MAX_SOURCE_CHARS = 1200;
 const AUDIENCE_AGE_BANDS = ["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"] as const;
 const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
 const STORY_REQUEST_REVIEW_VERSION = "story-request-review-v1";
+const DRAFT_STORAGE_CONSENT_VERSION = "story-draft-storage-v1";
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
 const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
@@ -17,6 +21,13 @@ type GenerateStoryResponse = {
   sessionId?: string;
   status?: string;
   safetyStatus?: string;
+};
+
+type SaveDraftResponse = {
+  draftId?: string;
+  revision?: number;
+  updatedAt?: string;
+  retentionReviewAt?: string;
 };
 
 function firstUnsafeTerm(values: string[]) {
@@ -35,6 +46,34 @@ function createRequestId() {
   return `story-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
+function createDraftId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `draft-${crypto.randomUUID()}`;
+  }
+  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function validDraftId(value: string) {
+  return /^[A-Za-z0-9._-]{8,128}$/.test(value);
+}
+
+function draftFingerprint(input: {
+  title: string;
+  theme: string;
+  audienceAgeBand: string;
+  mood: string;
+  sourceText: string;
+}) {
+  return JSON.stringify({
+    title: input.title.trim(),
+    theme: input.theme.trim(),
+    audienceAgeBand: input.audienceAgeBand,
+    mood: input.mood,
+    sourceText: input.sourceText.trim(),
+    locale: "en-US"
+  });
+}
+
 export function StorytimeHome() {
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("");
@@ -45,9 +84,143 @@ export function StorytimeHome() {
   const [generationConsent, setGenerationConsent] = useState(false);
   const [providerProcessingConsent, setProviderProcessingConsent] = useState(false);
   const [reviewedFingerprint, setReviewedFingerprint] = useState<string | null>(null);
+  const [draftStorageConsent, setDraftStorageConsent] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftRevision, setDraftRevision] = useState(0);
+  const [lastSavedDraftFingerprint, setLastSavedDraftFingerprint] = useState<string | null>(null);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
+
+  const currentDraftFingerprint = useMemo(() => draftFingerprint({
+    title,
+    theme,
+    audienceAgeBand,
+    mood,
+    sourceText
+  }), [audienceAgeBand, mood, sourceText, theme, title]);
+
+  useEffect(() => {
+    if (!cloudReady || typeof window === "undefined") return undefined;
+    const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
+    if (!requestedDraftId) return undefined;
+    if (!validDraftId(requestedDraftId)) {
+      setDraftStatus("The requested private draft id is invalid.");
+      return undefined;
+    }
+
+    let active = true;
+    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
+      if (!active || !user) return;
+      try {
+        const snapshot = await getDoc(doc(getFirebaseDb(), "storyDrafts", requestedDraftId));
+        if (!active) return;
+        if (!snapshot.exists()) {
+          setDraftStatus("That private draft is unavailable.");
+          return;
+        }
+        const data = snapshot.data();
+        setTitle(typeof data.title === "string" ? data.title : "");
+        setTheme(typeof data.theme === "string" ? data.theme : "");
+        setAudienceAgeBand(AUDIENCE_AGE_BANDS.includes(data.audienceAgeBand) ? data.audienceAgeBand : "family");
+        setMood(MOODS.includes(data.emotionalTone) ? data.emotionalTone : "reflective");
+        setSourceText(typeof data.sourceText === "string" ? data.sourceText.slice(0, MAX_SOURCE_CHARS) : "");
+        setAdultGuardianAffirmed(false);
+        setGenerationConsent(false);
+        setProviderProcessingConsent(false);
+        setReviewedFingerprint(null);
+        setDraftStorageConsent(true);
+        setDraftId(snapshot.id);
+        setDraftRevision(Number(data.revision || 0));
+        setLastSavedDraftFingerprint(draftFingerprint({
+          title: typeof data.title === "string" ? data.title : "",
+          theme: typeof data.theme === "string" ? data.theme : "",
+          audienceAgeBand: AUDIENCE_AGE_BANDS.includes(data.audienceAgeBand) ? data.audienceAgeBand : "family",
+          mood: MOODS.includes(data.emotionalTone) ? data.emotionalTone : "reflective",
+          sourceText: typeof data.sourceText === "string" ? data.sourceText.slice(0, MAX_SOURCE_CHARS) : ""
+        }));
+        setDraftStatus("Private draft resumed. Generation and provider consent were not restored.");
+      } catch {
+        if (active) setDraftStatus("That private draft could not be loaded.");
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [cloudReady]);
+
+  useEffect(() => {
+    if (!cloudReady || !draftStorageConsent || !adultGuardianAffirmed || draftSaving) return undefined;
+    if (currentDraftFingerprint === lastSavedDraftFingerprint) return undefined;
+    if (!title.trim() && !theme.trim() && !sourceText.trim()) return undefined;
+
+    const user = getFirebaseAuth().currentUser;
+    if (!user || !user.emailVerified) return undefined;
+
+    const fingerprintAtSave = currentDraftFingerprint;
+    const idAtSave = draftId || createDraftId();
+    const expectedRevision = draftId ? draftRevision : 0;
+
+    const timer = window.setTimeout(async () => {
+      setDraftSaving(true);
+      setDraftStatus("Saving private draft…");
+      try {
+        const saveDraft = httpsCallable<Record<string, unknown>, SaveDraftResponse>(
+          getFirebaseFunctions(),
+          "saveStoryDraft"
+        );
+        const result = await saveDraft({
+          draftId: idAtSave,
+          expectedRevision,
+          title: title.slice(0, 120),
+          theme: theme.slice(0, 80),
+          sourceText: sourceText.slice(0, MAX_SOURCE_CHARS),
+          emotionalTone: mood,
+          audienceAgeBand,
+          locale: "en-US",
+          operator: {
+            role: "adult_or_guardian",
+            affirmed: adultGuardianAffirmed
+          },
+          storageConsent: {
+            privateDraftStorage: true,
+            consentVersion: DRAFT_STORAGE_CONSENT_VERSION
+          }
+        });
+        if (!result.data.draftId || typeof result.data.revision !== "number") {
+          throw new Error("Draft save did not return a revision.");
+        }
+        setDraftId(result.data.draftId);
+        setDraftRevision(result.data.revision);
+        setLastSavedDraftFingerprint(fingerprintAtSave);
+        setDraftStatus(`Private draft saved · revision ${result.data.revision}. Generation/provider consent is not stored.`);
+      } catch {
+        setDraftStatus("Private draft autosave paused. No provider request was made.");
+      } finally {
+        setDraftSaving(false);
+      }
+    }, 750);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    adultGuardianAffirmed,
+    audienceAgeBand,
+    cloudReady,
+    currentDraftFingerprint,
+    draftId,
+    draftRevision,
+    draftSaving,
+    draftStorageConsent,
+    lastSavedDraftFingerprint,
+    mood,
+    sourceText,
+    theme,
+    title
+  ]);
 
   const requestReviewFingerprint = useMemo(() => JSON.stringify({
     title: title.trim(),
@@ -70,6 +243,25 @@ export function StorytimeHome() {
     title
   ]);
   const requestReviewed = reviewedFingerprint === requestReviewFingerprint;
+
+  async function handleDeleteDraft() {
+    if (!draftId) return;
+    setDraftStatus("Deleting private draft…");
+    try {
+      const deleteDraft = httpsCallable<Record<string, unknown>, { deleted?: boolean }>(
+        getFirebaseFunctions(),
+        "deleteStoryDraft"
+      );
+      await deleteDraft({ draftId });
+      setDraftId(null);
+      setDraftRevision(0);
+      setLastSavedDraftFingerprint(null);
+      setDraftStorageConsent(false);
+      setDraftStatus("Private draft deleted.");
+    } catch {
+      setDraftStatus("Private draft could not be deleted. No generation/provider request was made.");
+    }
+  }
 
   const validationError = useMemo(() => {
     if (!title.trim()) return "Add a title to continue.";
@@ -140,6 +332,17 @@ export function StorytimeHome() {
       });
 
       if (!result.data.sessionId) throw new Error("Story creation did not complete.");
+      if (draftId) {
+        try {
+          const deleteDraft = httpsCallable<Record<string, unknown>, { deleted?: boolean }>(
+            getFirebaseFunctions(),
+            "deleteStoryDraft"
+          );
+          await deleteDraft({ draftId });
+        } catch {
+          // Story generation succeeded. A stale private draft can still be deleted later by the owner.
+        }
+      }
       window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
     } catch (error) {
       setSubmitError(errorMessage(error));
@@ -175,6 +378,7 @@ export function StorytimeHome() {
         <section className="storytime-grid compact" aria-label="Account and story library">
           <AuthPanel />
           <SessionLibrary />
+          <DraftLibrary />
         </section>
 
         <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
@@ -217,6 +421,39 @@ export function StorytimeHome() {
             Memory or source text <span className="storytime-helper">Optional</span>
             <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
           </label>
+
+          <section className="storytime-card storytime-stack" aria-label="Private draft storage">
+            <p className="storytime-pill">Private draft</p>
+            <label className="storytime-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={draftStorageConsent}
+                  onChange={(event) => {
+                    setDraftStorageConsent(event.target.checked);
+                    setDraftStatus(event.target.checked
+                      ? adultGuardianAffirmed
+                        ? "Private draft autosave enabled. This does not authorize generation or provider processing."
+                        : "Draft storage selected. Autosave begins only after you affirm that you are the adult or guardian operating Storytime."
+                      : "Private draft autosave stopped. Any existing saved draft remains until you delete it.");
+                  }}
+                  disabled={!cloudReady}
+                />{" "}
+                Save this form as a private Storytime draft while I work.
+              </span>
+            </label>
+            <p className="storytime-helper">
+              Draft storage is separate from story-generation and provider consent. Drafts never store those approvals.
+            </p>
+            {draftStatus ? <p role="status">{draftStatus}</p> : null}
+            {draftId ? (
+              <div className="storytime-actions">
+                <button className="storytime-button secondary" type="button" onClick={handleDeleteDraft} disabled={draftSaving}>
+                  Delete saved draft
+                </button>
+              </div>
+            ) : null}
+          </section>
 
           <label className="storytime-field">
             <span>
@@ -282,8 +519,8 @@ export function StorytimeHome() {
           {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
 
           <div className="storytime-actions">
-            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting}>
-              {isSubmitting ? "Creating story…" : "Create story"}
+            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
+              {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create story"}
             </button>
           </div>
           <p className="storytime-helper">

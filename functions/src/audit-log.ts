@@ -12,7 +12,9 @@ export type StorytimeAuditEvent =
   | "public_share_created"
   | "public_share_revoked"
   | "voiceover_export_queued"
-  | "privacy_request_created";
+  | "privacy_request_created"
+  | "story_draft_saved"
+  | "story_draft_deleted";
 
 export type StorytimeAuditPayload = {
   event: StorytimeAuditEvent;
