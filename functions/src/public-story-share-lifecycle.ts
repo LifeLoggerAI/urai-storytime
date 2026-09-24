@@ -18,14 +18,14 @@ const revokeShareSchema = z.object({
   shareId: z.string().min(1)
 });
 
-function requireAuth(request: { auth?: { uid: string; token?: Record<string, unknown> } | null }) {
+function requireAuth(request: { auth?: { uid: string } | null }) {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication is required.");
   }
   return request.auth.uid;
 }
 
-function requireVerifiedAccount(request: { auth?: { token?: Record<string, unknown> } | null }) {
+function requireVerifiedAccount(request: { auth?: { token?: { email_verified?: unknown } } | null }) {
   if (request.auth?.token?.email_verified !== true) {
     throw new HttpsError("failed-precondition", "Verify the adult/guardian account email before creating a public Storytime share.");
   }
