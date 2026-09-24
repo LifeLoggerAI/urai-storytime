@@ -145,11 +145,11 @@ export function AuthPanel() {
       <form className="storytime-stack" onSubmit={handleSubmit}>
         <label className="storytime-field">
           Email
-          <input className="storytime-input" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+          <input className="storytime-input" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required aria-invalid={Boolean(error)} />
         </label>
         <label className="storytime-field">
           Password
-          <input className="storytime-input" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input className="storytime-input" type="password" autoComplete={mode === "create" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} aria-invalid={Boolean(error)} />
         </label>
         {notice ? <p role="status">{notice}</p> : null}
         {error ? <p className="storytime-error" role="alert">{error}</p> : null}
