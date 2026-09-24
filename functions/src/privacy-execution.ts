@@ -299,6 +299,25 @@ function externalArtifactPointers(rows: Array<{ collection: string; id: string; 
   return blockers;
 }
 
+async function authAccountMetadata(userId: string) {
+  try {
+    const user = await auth.getUser(userId);
+    return {
+      uid: user.uid,
+      email: user.email ?? null,
+      emailVerified: user.emailVerified,
+      disabled: user.disabled,
+      createdAt: user.metadata.creationTime ?? null,
+      lastSignInAt: user.metadata.lastSignInTime ?? null,
+      providerIds: user.providerData.map((provider) => provider.providerId).sort()
+    };
+  } catch (error) {
+    const code = (error as { code?: unknown })?.code;
+    if (code === "auth/user-not-found") return null;
+    throw error;
+  }
+}
+
 async function collectAccountRows(userId: string) {
   const collections: Record<string, Array<{ id: string; data: DocumentData }>> = {};
 
@@ -566,6 +585,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
   ];
 
   const generatedAt = nowIso();
+  const authAccount = scope === "account" ? await authAccountMetadata(userId) : null;
   const exportPackage = {
     schemaVersion: STORYTIME_EXPORT_SCHEMA_VERSION,
     policyVersion: STORYTIME_PRIVACY_POLICY_VERSION,
@@ -577,6 +597,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     generatedAt,
     dataClassesIncluded: Object.keys(collections).sort(),
     familyMembershipSummary: family.memberships,
+    authAccount,
     blockers,
     collections: serializeCollections(collections)
   };
@@ -745,40 +766,53 @@ export const executeStorytimeDeletion = onCall(async (request) => {
     updatedAt: nowIso()
   });
 
-  const deletedCounts = await deleteTargets(currentPlan);
-  const receiptId = await writeReceipt({
-    userId: currentPlan.userId,
-    privacyRequestId: input.privacyRequestId,
-    type: "deletion_mutation",
-    metadata: {
-      planHash: input.expectedPlanHash,
+  try {
+    const deletedCounts = await deleteTargets(currentPlan);
+    const receiptId = await writeReceipt({
+      userId: currentPlan.userId,
+      privacyRequestId: input.privacyRequestId,
+      type: "deletion_mutation",
+      metadata: {
+        planHash: input.expectedPlanHash,
+        deletedCounts,
+        completionBlockers: currentPlan.completionBlockers
+      }
+    });
+
+    await privacyRequest.ref.update({
+      status: "processing",
+      executionState: "verification_required",
+      primaryStoreDeletionReceiptId: receiptId,
       deletedCounts,
+      primaryStoreDeletedAt: nowIso(),
+      deletionCompletionVerificationRequired: true,
+      deletionCompletionVerified: false,
+      completionReceiptId: null,
+      updatedAt: nowIso()
+    });
+
+    auditLog({ event: "privacy_deletion_executed", userId: currentPlan.userId, errorCode: "verification_required" });
+
+    return {
+      privacyRequestId: input.privacyRequestId,
+      status: "processing",
+      executionState: "verification_required",
+      deletedCounts,
+      verificationRequired: true,
       completionBlockers: currentPlan.completionBlockers
-    }
-  });
-
-  await privacyRequest.ref.update({
-    status: "processing",
-    executionState: "verification_required",
-    primaryStoreDeletionReceiptId: receiptId,
-    deletedCounts,
-    primaryStoreDeletedAt: nowIso(),
-    deletionCompletionVerificationRequired: true,
-    deletionCompletionVerified: false,
-    completionReceiptId: null,
-    updatedAt: nowIso()
-  });
-
-  auditLog({ event: "privacy_deletion_executed", userId: currentPlan.userId, errorCode: "verification_required" });
-
-  return {
-    privacyRequestId: input.privacyRequestId,
-    status: "processing",
-    executionState: "verification_required",
-    deletedCounts,
-    verificationRequired: true,
-    completionBlockers: currentPlan.completionBlockers
-  };
+    };
+  } catch (error) {
+    await privacyRequest.ref.update({
+      status: "processing",
+      executionState: "retry_required",
+      deletionCompletionVerified: false,
+      completionReceiptId: null,
+      deletionFailureCode: error instanceof Error ? error.name : "unknown",
+      updatedAt: nowIso()
+    });
+    auditLog({ event: "privacy_deletion_blocked", userId: currentPlan.userId, errorCode: "retry_required" });
+    throw new HttpsError("internal", "Storytime deletion did not complete. The request remains open for governed recovery.");
+  }
 });
 
 export const verifyStorytimeDeletion = onCall(async (request) => {
