@@ -12,16 +12,24 @@ const now = () => new Date().toISOString();
 const id = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const MAX_GENERATIONS_PER_HOUR = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_HOUR || 6);
 const MAX_GENERATIONS_PER_DAY = Number(process.env.STORYTIME_MAX_GENERATIONS_PER_DAY || 24);
-const PUBLIC_SHARE_TTL_DAYS = Number(process.env.STORYTIME_PUBLIC_SHARE_TTL_DAYS || 30);
+const STORY_GENERATION_CONSENT_VERSION = "story-generation-consent-v1";
 
 const GenerateStorySchema = z.object({
+  requestId: z.string().min(8).max(128).regex(/^[A-Za-z0-9._-]+$/),
   title: z.string().min(1).max(120),
   sourceText: z.string().max(12000).optional(),
   emotionalTone: z.string().max(80).default("reflective"),
   symbolicMotifs: z.array(z.string().max(60)).max(12).default([]),
   sourceSignals: z.array(z.string().max(80)).max(20).default([]),
+  audienceAgeBand: z.enum(["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"]),
+  operator: z.object({
+    role: z.literal("adult_or_guardian"),
+    affirmed: z.literal(true)
+  }),
   consentSnapshot: z.object({
-    storyGeneration: z.boolean(),
+    storyGeneration: z.literal(true),
+    providerProcessing: z.literal(true),
+    consentVersion: z.literal(STORY_GENERATION_CONSENT_VERSION),
     voiceover: z.boolean(),
     publicSharing: z.boolean(),
     memoryUse: z.boolean()
@@ -65,9 +73,41 @@ function quotaWindowId(date: Date, scope: "hour" | "day") {
   return scope === "hour" ? `${year}${month}${day}${hour}` : `${year}${month}${day}`;
 }
 
-function daysFromNow(days: number) {
-  const safeDays = Number.isFinite(days) && days > 0 ? days : 30;
-  return new Date(Date.now() + safeDays * 24 * 60 * 60 * 1000).toISOString();
+function generationRequestId(userId: string, requestId: string) {
+  return `${userId}_${requestId}`;
+}
+
+async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
+  const requestRef = db.collection("storyGenerationRequests").doc(generationRequestId(userId, input.requestId));
+  const result = await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(requestRef);
+    if (snapshot.exists) {
+      const data = snapshot.data() || {};
+      if (data.userId !== userId) {
+        throw new HttpsError("permission-denied", "Story generation request is unavailable.");
+      }
+      if (data.status === "succeeded" && typeof data.sessionId === "string") {
+        return { requestRef, reusedSessionId: data.sessionId as string };
+      }
+      if (data.status === "processing") {
+        throw new HttpsError("already-exists", "This Storytime request is already being processed.");
+      }
+    }
+
+    const timestamp = now();
+    transaction.set(requestRef, {
+      userId,
+      requestId: input.requestId,
+      status: "processing",
+      audienceAgeBand: input.audienceAgeBand,
+      operatorRole: input.operator.role,
+      consentVersion: input.consentSnapshot.consentVersion,
+      createdAt: snapshot.data()?.createdAt || timestamp,
+      updatedAt: timestamp
+    }, { merge: true });
+    return { requestRef, reusedSessionId: null };
+  });
+  return result;
 }
 
 async function enforceGenerationQuota(userId: string) {
@@ -117,12 +157,17 @@ function moderate(text: string) {
   return { safetyStatus: hits.length ? "needs_review" : "approved", hits };
 }
 
-function redact(text: string) {
-  return text
-    .replace(/\b[A-Z][a-z]+ [A-Z][a-z]+\b/g, "someone important")
-    .replace(/\b\d{1,5}\s+[A-Za-z0-9 .'-]+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln)\b/gi, "a private place")
-    .replace(/\b\d{3}[-.)\s]?\d{3}[-.\s]?\d{4}\b/g, "a private number")
-    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "a private email");
+function providerOutputText(output: StoryProviderOutput) {
+  return [
+    output.chapterTitle,
+    output.chapterSummary,
+    output.momentTitle,
+    output.momentBody,
+    output.narratorText,
+    output.scenePrompt,
+    output.arcLabel,
+    output.arcSummary
+  ].join(" ");
 }
 
 async function readOwnedStorySession(sessionId: string, userId: string) {
@@ -139,10 +184,15 @@ export const generateStorySession = onCall(async (request) => {
   const userId = request.auth!.uid;
   auditLog({ event: "generation_requested", userId });
   const input = GenerateStorySchema.parse(request.data);
-
-  if (!input.consentSnapshot.storyGeneration) {
-    auditLog({ event: "generation_blocked_consent", userId, errorCode: "story_generation_consent_missing" });
-    throw new HttpsError("failed-precondition", "Story generation consent is required.");
+  const generationRequest = await claimGenerationRequest(userId, input);
+  if (generationRequest.reusedSessionId) {
+    auditLog({ event: "generation_reused", userId, sessionId: generationRequest.reusedSessionId });
+    return {
+      sessionId: generationRequest.reusedSessionId,
+      status: "ready",
+      safetyStatus: "approved",
+      reused: true
+    };
   }
 
   const source = input.sourceText || "A quiet signal became a private URAI story.";
@@ -157,11 +207,33 @@ export const generateStorySession = onCall(async (request) => {
   let generated: StoryProviderOutput;
   try {
     generated = readiness.ready
-      ? await generateStoryWithProvider({ title: input.title, sourceText: source, emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs })
+      ? await generateStoryWithProvider({
+          title: input.title,
+          sourceText: source,
+          emotionalTone: input.emotionalTone,
+          symbolicMotifs: input.symbolicMotifs,
+          audienceAgeBand: input.audienceAgeBand
+        })
       : fallbackProviderOutput(input, source);
   } catch (error) {
+    await generationRequest.requestRef.set({
+      status: "failed",
+      errorCode: error instanceof Error ? error.name : "unknown",
+      updatedAt: now()
+    }, { merge: true });
     auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
-    throw new HttpsError("internal", error instanceof Error ? error.message : "Story provider failed.");
+    throw new HttpsError("internal", "Story generation could not be completed safely. Please try again.");
+  }
+
+  const outputModeration = moderate(providerOutputText(generated));
+  if (outputModeration.hits.length) {
+    await generationRequest.requestRef.set({
+      status: "needs_review",
+      safetyStatus: outputModeration.safetyStatus,
+      updatedAt: now()
+    }, { merge: true });
+    auditLog({ event: "generation_blocked_output_safety", userId, provider: readiness.provider, safetyStatus: outputModeration.safetyStatus, errorCode: "unsafe_output" });
+    throw new HttpsError("failed-precondition", "Generated story output requires safety review before it can be saved or displayed.");
   }
 
   const createdAt = now();
@@ -186,6 +258,9 @@ export const generateStorySession = onCall(async (request) => {
     narratorScriptIds: [scriptId],
     emotionalArcSummaryId: arcId,
     provider: readiness.ready ? readiness.provider : "local_builder",
+    requestId: input.requestId,
+    audienceAgeBand: input.audienceAgeBand,
+    operator: input.operator,
     whyGenerated: input.sourceSignals.length
       ? `Generated from opted-in signals: ${input.sourceSignals.join(", ")}.`
       : "Generated from your direct Storytime input.",
@@ -274,57 +349,23 @@ export const generateStorySession = onCall(async (request) => {
   batch.set(db.collection("memoryScenes").doc(sceneId), scene);
   batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
   batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+  batch.set(generationRequest.requestRef, {
+    status: "succeeded",
+    sessionId,
+    safetyStatus: outputModeration.safetyStatus,
+    provider: session.provider,
+    updatedAt: createdAt
+  }, { merge: true });
   await batch.commit();
 
-  auditLog({ event: "story_persisted", userId, sessionId, provider: session.provider, safetyStatus: mod.safetyStatus });
-  return { sessionId, status: session.status, safetyStatus: mod.safetyStatus, provider: session.provider };
-});
-
-export const createPublicStoryShare = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  const userId = request.auth!.uid;
-  const input = z.object({ sessionId: z.string().min(1), consent: z.boolean() }).parse(request.data);
-
-  if (!input.consent) throw new HttpsError("failed-precondition", "Public sharing requires explicit consent.");
-
-  const session = await readOwnedStorySession(input.sessionId, userId);
-  const shareId = id("publicStoryShare");
-  const slug = `${String(session.data.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${shareId.slice(-6)}`;
-  const createdAt = now();
-  const expiresAt = daysFromNow(PUBLIC_SHARE_TTL_DAYS);
-
-  await db.collection("publicStoryShares").doc(shareId).set({
-    id: shareId,
-    userId,
-    sessionId: input.sessionId,
-    slug,
-    title: redact(String(session.data.title)),
-    safeSummary: redact(String(session.data.subtitle || session.data.title)),
-    safeBody: "A private URAI story was transformed into a public-safe reflection.",
-    revoked: false,
-    createdAt,
-    updatedAt: createdAt,
-    expiresAt
-  });
-
-  await session.ref.update({ publicShareId: shareId, visibility: "public_safe", updatedAt: now() });
-  auditLog({ event: "public_share_created", userId, sessionId: input.sessionId, shareId });
-  return { shareId, slug, expiresAt };
-});
-
-export const generateNarratorScript = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Narrator script generation hook ready." };
-});
-
-export const generateEmotionalArcSummary = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Emotional arc summary hook ready." };
-});
-
-export const generateWeeklyStoryScroll = onCall(async (request) => {
-  requireAuth(request.auth?.uid);
-  return { status: "queued", message: "Weekly Story Scroll hook ready." };
+  auditLog({ event: "story_persisted", userId, sessionId, provider: session.provider, safetyStatus: outputModeration.safetyStatus });
+  return {
+    sessionId,
+    status: session.status,
+    safetyStatus: outputModeration.safetyStatus,
+    provider: session.provider,
+    reused: false
+  };
 });
 
 export const prepareVoiceoverJob = onCall(async (request) => {
