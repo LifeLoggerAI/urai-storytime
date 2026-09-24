@@ -25,6 +25,7 @@ export interface StorySession extends StorytimeBase {
   whyGenerated: string;
   safetyStatus: SafetyStatus;
   requestId?: string;
+  locale?: string;
   audienceAgeBand?: "family" | "preschool_3_5" | "early_reader_6_8" | "middle_grade_9_12";
   operator?: {
     role: "adult_or_guardian";
