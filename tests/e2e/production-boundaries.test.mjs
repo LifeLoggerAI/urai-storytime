@@ -179,6 +179,7 @@ test('rules keep Storytime private by default and enforce server-time public-sha
     'allow read: if activePublicShare()',
     'match /publicStoryShareControls/{id}',
     'match /storytimeUsageCounters/{id}',
+    'match /storyGenerationRequests/{id}',
     'allow read, write: if false'
   ]);
 
