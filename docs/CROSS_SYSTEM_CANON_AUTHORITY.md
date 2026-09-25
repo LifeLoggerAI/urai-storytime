@@ -8,12 +8,12 @@ Repository role: **story and Life Movies adjacent system**
 
 Cross-system canon candidate:
 - Repository: `LifeLoggerAI/urai-labs-llc`
-- PR: `#107`
+- PR: `#102`
 - Canon path: `docs/canon/`
 
 Labs #102 targets `main` and is the current downstream mainline canon candidate. Labs #107 is a sibling rebase onto the Labs convergence branch and does not replace #102 as downstream authority.
 
-Until that PR is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
+Until PR #102 is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
 
 ## Local invariants
 
