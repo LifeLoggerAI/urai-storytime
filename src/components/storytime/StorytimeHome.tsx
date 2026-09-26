@@ -120,7 +120,9 @@ export function StorytimeHome() {
   }
 
   return (
-    <main className="storytime-shell">
+    <>
+      <a className="storytime-skip-link" href="#storytime-main">Skip to Storytime content</a>
+      <main id="storytime-main" tabIndex={-1} className="storytime-shell">
       <div className="storytime-wrap">
         <nav className="storytime-nav" aria-label="Storytime">
           <a className="storytime-brand" href="/storytime">URAI Storytime</a>
@@ -240,6 +242,7 @@ export function StorytimeHome() {
           </p>
         </form>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

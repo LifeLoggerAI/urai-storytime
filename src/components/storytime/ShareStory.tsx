@@ -121,7 +121,14 @@ export function ShareStory({ shareId }: { shareId: string }) {
     <article className="storytime-card storytime-stack">
       <p className="storytime-pill">Public Share</p>
       <h1>{state.status === "loading" ? "Loading share" : "Share unavailable"}</h1>
-      <p className={state.status === "error" ? "storytime-error" : undefined}>{state.message}</p>
+      <p
+        className={state.status === "error" ? "storytime-error" : undefined}
+        role={state.status === "error" ? "alert" : "status"}
+        aria-live={state.status === "error" ? "assertive" : "polite"}
+        aria-busy={state.status === "loading" ? true : undefined}
+      >
+        {state.message}
+      </p>
       <a className="storytime-button secondary" href="/storytime">Create private story</a>
     </article>
   );
