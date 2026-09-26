@@ -7,7 +7,7 @@ const source = fs.readFileSync('functions/src/storytime-scroll-builders.ts', 'ut
 test('weekly scroll builder creates truthful local deterministic scroll records', () => {
   assert.match(source, /export function buildWeeklyStoryScrollRecord/);
   assert.match(source, /title: "Weekly Story Scroll"/);
-  assert.match(source, /providerStatus: "completed"/);
+  assert.match(source, /providerStatus: "local_compiled"/);
   assert.match(source, /sessionIds: args\.sessionIds/);
   assert.match(source, /weekStart: args\.weekStart/);
   assert.match(source, /weekEnd: args\.weekEnd/);
