@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('functions/src/storytime-scroll-builders.ts', 'utf8');
 
-test('weekly scroll builder creates completed deterministic scroll records', () => {
+test('weekly scroll builder creates truthful local deterministic scroll records', () => {
   assert.match(source, /export function buildWeeklyStoryScrollRecord/);
   assert.match(source, /title: "Weekly Story Scroll"/);
   assert.match(source, /providerStatus: "completed"/);
