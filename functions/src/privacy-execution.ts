@@ -52,7 +52,17 @@ const redactedFields = new Set([
   "sessioncookie"
 ]);
 
+// Retain safety/spend ledgers until governed reconciliation and retention authority exist.
+// Include owner-scoped rows in exports; never erase budget or abuse controls implicitly.
+const accountRetainedLedgerCollections = [
+  "storytimeSafetyReportCounters",
+  "storytimeProviderBudgetCounters",
+  "storytimeProviderBudgetReservations",
+  "storytimeProviderDeadLetters"
+] as const;
+
 const accountUserCollections = [
+  ...accountRetainedLedgerCollections,
   "storySessions",
   "storyChapters",
   "storyMoments",
@@ -476,13 +486,19 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
     "privacyRequests",
     "privacyDeletionPlans",
     "privacyOperationReceipts",
-    "legalHoldRecords"
+    "legalHoldRecords",
+    ...accountRetainedLedgerCollections
   ];
 
   const targets: Record<string, string[]> = {};
   const executionBlockers: string[] = [];
   for (const [name, rows] of Object.entries(collections)) {
-    if (retainedData.includes(name)) continue;
+    if (retainedData.includes(name)) {
+      if (rows.length > 0 && accountRetainedLedgerCollections.some((collection) => collection === name)) {
+        executionBlockers.push(`account_ledger_retention_review_required:${name}`);
+      }
+      continue;
+    }
 
     if (scope === "story_session" && sessionArrayCollections.includes(name as (typeof sessionArrayCollections)[number])) {
       const deletable: string[] = [];
