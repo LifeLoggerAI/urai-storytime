@@ -2,7 +2,7 @@
 
 This directory contains historical Storytime prototype code retained only for regression/history purposes.
 
-It is **not** a production or launch runtime.
+It is not a production or launch runtime.
 
 Canonical Storytime runtime authority is:
 
