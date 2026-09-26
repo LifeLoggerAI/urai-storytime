@@ -363,7 +363,9 @@ async function collectSessionRows(userId: string, sessionId: string) {
   }
 
   const requestId = typeof session.data.requestId === "string" ? session.data.requestId : null;
-  collections.moderation = requestId ? await listByField("moderation", "requestId", requestId) : [];
+  collections.moderation = requestId
+    ? (await listByField("moderation", "requestId", requestId)).filter((row) => row.data.userId === userId)
+    : [];
 
   const publicShareIds = (collections.publicStoryShareControls ?? []).map((row) => row.id);
   const publicShares: Array<{ id: string; data: DocumentData }> = [];
@@ -945,3 +947,4 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     completionReceiptId: receiptId
   };
 });
+
