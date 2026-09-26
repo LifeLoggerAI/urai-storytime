@@ -1,6 +1,6 @@
 # UrAi Cross-System Canon Authority
 
-Status: ADOPTION CANDIDATE — becomes binding cross-system authority only after the upstream Labs canon PR is legitimately merged.
+Status: ADOPTION CANDIDATE — becomes binding cross-system authority only after the current Labs canon successor is legitimately merged.
 
 Repository role: **story and Life Movies adjacent system**
 
@@ -8,10 +8,12 @@ Repository role: **story and Life Movies adjacent system**
 
 Cross-system canon candidate:
 - Repository: `LifeLoggerAI/urai-labs-llc`
-- PR: `#107`
+- PR: `#102`
 - Canon path: `docs/canon/`
 
-Until that PR is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
+Labs #102 targets `main` and is the current downstream mainline canon candidate. Labs #107 is a sibling rebase onto the Labs convergence branch and does not replace #102 as downstream authority.
+
+Until PR #102 is merged, this repository's current merged runtime/release contracts remain authoritative for implementation facts. This adoption file does not transfer certification, review, deployment, provider or exact-head evidence between repositories.
 
 ## Local invariants
 
@@ -42,4 +44,4 @@ If runtime conflicts with product canon because runtime is defective, record a d
 
 ## Required adoption action
 
-After upstream PR #107 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
+After upstream PR #102 merges, reconcile this repository's local docs/contracts against the merged canon and classify every conflict as RESOLVED, DEFERRED with an external blocker, or SUPERSEDED with preserved historical provenance.
