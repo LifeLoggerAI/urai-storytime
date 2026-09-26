@@ -24,6 +24,7 @@ const DELETE_BATCH_LIMIT = 400;
 const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 const STORYTIME_PRIVACY_POLICY_VERSION = "urai-privacy-0.2.0-staging-scaffold";
 const STORYTIME_EXPORT_SCHEMA_VERSION = "storytime-export-v1";
+const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v2";
 const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v1";
 const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-operation-receipt-v1";
 
@@ -52,7 +53,17 @@ const redactedFields = new Set([
   "sessioncookie"
 ]);
 
+// Retain safety/spend ledgers until governed reconciliation and retention authority exist.
+// Include owner-scoped rows in exports; never erase budget or abuse controls implicitly.
+const accountRetainedLedgerCollections = [
+  "storytimeSafetyReportCounters",
+  "storytimeProviderBudgetCounters",
+  "storytimeProviderBudgetReservations",
+  "storytimeProviderDeadLetters"
+] as const;
+
 const accountUserCollections = [
+  ...accountRetainedLedgerCollections,
   "storySessions",
   "storyChapters",
   "storyMoments",
@@ -118,6 +129,7 @@ type StoredPrivacyRequest = {
   exportManifestPath?: string | null;
   exportPackageSha256?: string | null;
   exportCompleteness?: string | null;
+  exportInventoryVersion?: string | null;
   exportBlockers?: string[];
   exportManifestSha256?: string | null;
   deletionPlanHash?: string | null;
@@ -363,7 +375,9 @@ async function collectSessionRows(userId: string, sessionId: string) {
   }
 
   const requestId = typeof session.data.requestId === "string" ? session.data.requestId : null;
-  collections.moderation = requestId ? await listByField("moderation", "requestId", requestId) : [];
+  collections.moderation = requestId
+    ? (await listByField("moderation", "requestId", requestId)).filter((row) => row.data.userId === userId)
+    : [];
 
   const publicShareIds = (collections.publicStoryShareControls ?? []).map((row) => row.id);
   const publicShares: Array<{ id: string; data: DocumentData }> = [];
@@ -474,13 +488,19 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
     "privacyRequests",
     "privacyDeletionPlans",
     "privacyOperationReceipts",
-    "legalHoldRecords"
+    "legalHoldRecords",
+    ...accountRetainedLedgerCollections
   ];
 
   const targets: Record<string, string[]> = {};
   const executionBlockers: string[] = [];
   for (const [name, rows] of Object.entries(collections)) {
-    if (retainedData.includes(name)) continue;
+    if (retainedData.includes(name)) {
+      if (rows.length > 0 && accountRetainedLedgerCollections.some((collection) => collection === name)) {
+        executionBlockers.push(`account_ledger_retention_review_required:${name}`);
+      }
+      continue;
+    }
 
     if (scope === "story_session" && sessionArrayCollections.includes(name as (typeof sessionArrayCollections)[number])) {
       const deletable: string[] = [];
@@ -594,6 +614,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
 
   if (
     privacyRequest.data.executionState === "completed"
+    && privacyRequest.data.exportInventoryVersion === STORYTIME_EXPORT_INVENTORY_VERSION
     && privacyRequest.data.exportPath
     && privacyRequest.data.exportManifestPath
     && privacyRequest.data.exportPackageSha256
@@ -625,6 +646,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
   const authAccount = scope === "account" ? await authAccountMetadata(userId) : null;
   const exportPackage = {
     schemaVersion: STORYTIME_EXPORT_SCHEMA_VERSION,
+    inventoryVersion: STORYTIME_EXPORT_INVENTORY_VERSION,
     policyVersion: STORYTIME_PRIVACY_POLICY_VERSION,
     sourceRepo: "LifeLoggerAI/urai-storytime",
     privacyRequestId: input.privacyRequestId,
@@ -675,6 +697,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     exportPackageSha256: packageDigest,
     exportManifestSha256: manifestFile.sha256,
     exportCompleteness: manifest.completeness,
+    exportInventoryVersion: STORYTIME_EXPORT_INVENTORY_VERSION,
     exportBlockers: blockers,
     completionReceiptId: blockers.length === 0 ? receiptId : null,
     updatedAt: generatedAt
@@ -703,6 +726,9 @@ export const getStorytimeExportDownloadUrl = onCall(async (request) => {
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export");
   const path = String(privacyRequest.data.exportPath ?? "");
   if (!path) throw new HttpsError("failed-precondition", "Storytime export package is not ready.");
+  if (privacyRequest.data.exportInventoryVersion !== STORYTIME_EXPORT_INVENTORY_VERSION) {
+    throw new HttpsError("failed-precondition", "Regenerate the Storytime export using the current privacy inventory before download.");
+  }
   if (privacyRequest.data.exportCompleteness !== "complete_for_storytime_owned_data") {
     throw new HttpsError("failed-precondition", "Storytime export requires privacy review before download can be authorized.");
   }
@@ -945,3 +971,4 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     completionReceiptId: receiptId
   };
 });
+
