@@ -221,6 +221,7 @@ input[type="radio"] {
 }
 
 .storytime-button:focus-visible,
+.storytime-input:focus-visible,
 .storytime-links a:focus-visible,
 .storytime-list a:focus-visible,
 .storytime-card a:focus-visible,
@@ -380,6 +381,7 @@ input[type="radio"] {
   }
 
   .storytime-button:focus-visible,
+  .storytime-input:focus-visible,
   .storytime-links a:focus-visible,
   .storytime-list a:focus-visible,
   .storytime-card a:focus-visible,
