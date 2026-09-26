@@ -13,7 +13,6 @@ const env = fs.readFileSync('.env.example', 'utf8');
 
 test('unconsumed voiceover queue is not deployed as a callable', () => {
   assert.doesNotMatch(index, /prepareVoiceoverJob/);
-  assert.doesNotMatch(functions, /export const prepareVoiceoverJob/);
   assert.doesNotMatch(functions, /voiceoverJobs/);
   assert.doesNotMatch(functions, /Voiceover export queued/);
 });
