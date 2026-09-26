@@ -17,7 +17,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.1 Reproducible current-head CI
 
 - **User value:** users receive a build whose exact source and checks are known.
-- **Current evidence:** historical PR run `26130875564` passed app and Functions jobs; audited `main` has no attached run/status. Root and Functions lockfiles are absent.
+- **Current evidence:** root and Functions lockfiles are present, release workflows bind exact heads, and the current Storytime hardening child PR runs CI/Verify/Visual Proof on every successor head. Only terminal-success evidence from the unchanged live head counts.
 - **Problem:** current code cannot be promoted from historical CI evidence, and `npm install` is nondeterministic.
 - **Scope:** commit lockfiles; standardize Node/npm versions; switch CI to `npm ci`; run app, Functions, validators, dependency audit, and artifact receipt on every PR/main SHA.
 - **Repository areas:** `package*.json`, `functions/package*.json`, `.github/workflows/**`.
@@ -51,7 +51,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.3 Executable Auth/Firestore/Storage authorization proof
 
 - **User value:** one family cannot read or alter another family’s stories, voices, media, or settings.
-- **Current evidence:** rules and behavior spec exist; no current emulator execution receipt.
+- **Current evidence:** Firestore/Storage rules and behavior specs exist; the public-share rules emulator has exact-head proof on its predecessor authority. New generation-request/privacy-request rule changes still require fresh unchanged-head emulator/runtime proof before promotion.
 - **Problem:** static regex validation does not prove authorization behavior.
 - **Scope:** implement emulator tests for signed-out, owner, non-owner, guardian, viewer, admin, revoked share, expired share, usage counters, Storage claims, and malicious field mutation.
 - **Repository areas:** `firestore.rules`, `storage.rules`, `tests/emulator/**`, `firebase.json`.
@@ -68,7 +68,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.4 Adult/guardian, age-band, and explicit generation consent enforcement
 
 - **User value:** generated content follows the intended audience policy and uses personal material only with informed permission.
-- **Current evidence:** UI collects `ageRange`; server schema/prompt ignore it. Client submits `storyGeneration: true` automatically.
+- **Current evidence:** current hardening source uses canonical server-validated audience age bands, explicit adult/guardian operator affirmation, verified-account gating, and separate explicit generation/provider-processing consent with a versioned consent marker. Fresh exact-head and staging proof remain required.
 - **Problem:** child/family positioning is not backed by server-enforced age/guardian/consent controls.
 - **Scope:** define adult account and guardian model; add explicit consent UI; add server schema for age band, source type, subjects, and consent version; reject unsupported child-directed use; persist policy snapshot; incorporate age policy in pre/post moderation.
 - **Repository areas:** `StorytimeHome.tsx`, domain types, Functions schemas/provider prompt, Firestore rules.
@@ -85,9 +85,10 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.5 Production-safe generation orchestration
 
 - **User value:** story requests complete reliably, cannot double-charge, and fail without losing or exposing private content.
-- **Current evidence:** direct OpenAI call, quota counters, JSON parsing, no timeout/retry/idempotency/output moderation/job state.
+- **Current evidence:** provider execution is fail-closed behind verified account, explicit consent, request idempotency, request-count quota, audience/locale policy, timeout, output validation and post-generation moderation. OpenAI readiness additionally requires explicit spend authorization, operator-configured input/output token rates, bounded output tokens, a positive per-request dollar ceiling, and positive global/per-user daily dollar budgets. Before a paid call, Storytime transactionally reserves the request's conservative maximum cost against both daily ledgers; over-budget requests fail before provider execution. Successful usage settles the reservation to the priced provider receipt's actual cost. Failed or uncertain calls retain the conservative reservation for the day rather than undercounting spend and now create a server-only dead-letter reconciliation record containing identifiers, failure code, held cost, and timestamps only—never raw story content. Automatic retry remains unauthorized on that record until provider receipt reconciliation exists. Deterministic fallback carries an explicit zero-spend receipt. The provider path remains synchronous and still lacks cancellation, bounded retry/backoff, operator reconciliation execution/monitoring, and controlled real-provider staging proof.
 - **Problem:** synchronous provider call is not operationally safe or auditable.
 - **Scope:** durable job record; idempotency key; abort timeout; bounded retries with backoff; structured Zod output schema; input/output moderation; PII scan; model/version/token/cost receipt; cancellation; partial failure state; safe error mapping.
+- **Current hardening:** owner-authenticated cancellation now prevents cancelled output persistence; provider failures retain server-only reconciliation dead letters and held-budget truth; automatic provider retry remains intentionally disabled until a provider-idempotency contract can prove duplicate-spend safety.
 - **Repository areas:** `functions/src/story-provider.ts`, `functions/src/storytime.ts`, new job/provider modules and tests.
 - **Dependencies:** provider access and approved safety policy.
 - **Risks:** cost amplification, duplicate writes, unsafe output.
@@ -102,7 +103,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.6 Public-share server boundary
 
 - **User value:** a revoked or expired share becomes unreadable and private story records never leak.
-- **Current evidence:** create/revoke callables exist; audit branch aligns reader query with `revoked == false`; expiry is client-only ISO-string logic.
+- **Current evidence:** the canonical public-share lifecycle uses server-owned public/control records, explicit consent, server Timestamp expiry, revocation, safety-approved source checks, server feature gating, and rules-emulator coverage. Share creation now also requires a verified adult/guardian account; revocation intentionally remains available independently.
 - **Problem:** rules do not enforce expiration and redaction is heuristic.
 - **Scope:** store server timestamp expiry; rules or server endpoint enforce active state; improve PII/redaction pipeline; make share creation idempotent; define cache/robots policy; test create/read/revoke/expire.
 - **Repository areas:** Functions share modules, `ShareStory.tsx`, rules/indexes, types/tests.
@@ -119,7 +120,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P0.7 Data rights and deletion
 
 - **User value:** users can see, export, revoke, and delete their private information.
-- **Current evidence:** no active account/story export/delete flows; multiple rules deny delete.
+- **Current evidence:** the privacy child lane now packages Storytime-owned exports to private Storage with integrity manifests, exposes owner-only short-lived download only for complete Storytime-owned scope, creates deletion dry-run plans/hashes, checks legal hold/family/provider/isolation blockers, requires admin-only exact-plan destructive execution, deletes bounded Storytime-owned Firestore/Storage/Auth targets, and performs post-delete verification with retained receipts. Whole-URAI/family/provider deletion remains outside Storytime authority, and final completion remains blocked until backup-retention certification and runtime proof.
 - **Problem:** privacy promises are incomplete and data can become effectively undeletable.
 - **Scope:** inventory data; retention classes; account export; story/session delete; account deletion orchestration; media/provider deletion; share revocation; tombstones/audit strategy; backup retention disclosure.
 - **Repository areas:** Functions, rules, settings UI, `urai-privacy` contract, operations docs.
@@ -168,7 +169,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.3 Account lifecycle and support
 
 - **User value:** reliable sign-in, recovery, verification, help, feedback, and abuse reporting.
-- **Current evidence:** basic email/password create/sign-in/sign-out only.
+- **Current evidence:** email/password create/sign-in/sign-out remains, with source-level email verification, resend-verification, password-reset, verified-email cloud-generation gating, and verified-email public-share creation. Provider/runtime delivery and abuse-protection proof remain open.
 - **Scope:** email verification, password reset, recovery messaging, session/device management, account deletion entry, support/report forms, rate limiting/App Check.
 - **Areas:** `AuthPanel`, Firebase Auth, Functions, support integration.
 - **Dependencies:** P0 data rights and policy.
@@ -183,7 +184,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.4 Real moderation and administrative operations
 
 - **User value:** unsafe requests and outputs are handled consistently, with accountable human review when required.
-- **Current evidence:** substring blocklist, console audit events, rules/docs scaffolding.
+- **Current evidence:** current hardening replaces the broad substring gate with reason-coded patterns, pre/post-generation checks, SHA-256 fingerprints, server-only pending moderation records without raw story content, and typed audit events. A governed moderator/admin review UI, approved policy engine/provider, escalation/appeal process, and live operational proof remain open.
 - **Scope:** policy engine, moderation provider adapter, review states, admin queue in `urai-admin`, server-only audit log, reason codes, appeals/reporting.
 - **Areas:** Functions safety modules, admin contract, Firestore rules.
 - **Dependencies:** approved safety policy and role provisioning.
@@ -198,7 +199,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P1.5 Narration, captions, and accessible playback
 
 - **User value:** stories can be listened to and used by people with visual, reading, motor, or attention needs.
-- **Current evidence:** narrator text only; queue scaffold.
+- **Current evidence:** narrator scripts, emotional-arc summaries, weekly story scrolls, timeline refresh, and archive rebuild now complete deterministic repository-owned work synchronously and report `completed`. Voiceover/media execution is explicitly fail-closed and creates no queue/export records until a governed worker with provider receipts, cancellation/retry, private storage, and deletion lifecycle exists.
 - **Scope:** browser speech fallback, provider TTS behind consent/cost gate, audio player, captions/transcript, playback speed, scene timing, keyboard controls, reduced motion.
 - **Areas:** player/narrator components, media job system, Storage.
 - **Dependencies:** P0 job/data controls.
@@ -260,7 +261,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P2.2 Export platform and physical-book-ready artifacts
 
 - **User value:** users can keep, print, and privately share their stories.
-- **Current evidence:** queued export records and Asset-Factory adapter.
+- **Current evidence:** the old unconsumed Storytime voiceover/export queue path is now fail-closed instead of writing immortal queued jobs. The Asset Factory adapter remains behind a versioned provenance-bound integration envelope, a separate default-off `STORYTIME_ASSET_FACTORY_EXECUTION` gate, and bounded network timeout; no worker dispatch, paid generation, media artifact, signed media download, or final artifact lifecycle is claimed.
 - **Scope:** PDF, EPUB, audio, image package, print-ready PDF; signed expiring downloads; job progress/cancel/retry; provenance manifest.
 - **Areas:** Asset Factory contract, jobs, Storage, export UI.
 - **Dependencies:** P0 data rights/jobs and media ownership policy.
@@ -290,7 +291,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P2.4 Multilingual production quality
 
 - **User value:** families can create and consume stories in their preferred language.
-- **Current evidence:** no language selector or quality evaluation.
+- **Current evidence:** the governed 20-language launch authority is encoded as a Storytime locale registry. English (`en-US`) is the only enabled source locale; the other 19 locales remain hard-off pending native language, safety, accessibility, RTL where applicable, and regional/legal review. No multilingual runtime-support claim is made.
 - **Scope:** locale model, translated UI, provider locale control, narration voices, safety evaluation, fallback, RTL.
 - **Areas:** i18n, prompts, TTS, tests.
 - **Dependencies:** format engine and safety evaluation.
@@ -335,7 +336,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P3.3 URAI memory and relationship graph integration
 
 - **User value:** opted-in memories, places, and relationships can become stories without re-entering them.
-- **Current evidence:** copy/types/plans; no live contract.
+- **Current evidence:** current hardening adds versioned provenance records that mark generated stories as `creative_derivative_not_source_evidence` and a hard-off Storytime integration envelope for memory/future-system handoffs. No live Memory Star/Replay/private-memory ingestion is activated.
 - **Scope:** versioned consent-scoped snapshot API, redaction, source attribution, revocation, subject consent, provenance in Passport.
 - **Dependencies:** `urai-privacy`, Life Map, relationship graph, Passport contracts.
 - **Risks:** secondary use of sensitive memories and third-party data.
@@ -351,7 +352,7 @@ Complexity uses XS/S/M/L/XL. No calendar estimates are asserted.
 ## P4.1 Replay/spatial story manifest
 
 - **User value:** a completed story can become a private scene or memory replay in `urai-spatial`.
-- **Current evidence:** memory-scene fields and Asset-Factory adapter; no spatial contract.
+- **Current evidence:** memory-scene fields and Asset-Factory adapter remain; current hardening adds a versioned hard-off Spatial Replay manifest envelope with required text, captions, and reduced-motion fallback. No Spatial/XR runtime activation or public-release authority is enabled.
 - **Scope:** versioned manifest for scenes, narration, captions, assets, interactions, privacy class, device fallback; signed asset access.
 - **Dependencies:** P2 exports, Spatial runtime, Passport provenance.
 - **Risks:** exposing private assets through immersive clients.

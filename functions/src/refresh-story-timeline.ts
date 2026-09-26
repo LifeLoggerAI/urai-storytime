@@ -42,5 +42,5 @@ export const refreshStoryTimeline = onCall(async (request) => {
 
   await db.collection("timelineReplayEvents").doc(timelineEventId).set(event);
 
-  return { status: "queued", timelineEventId };
+  return { status: "completed", timelineEventId };
 });

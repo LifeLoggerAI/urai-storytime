@@ -4,10 +4,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "URAI Storytime",
-  description: "Private URAI story replays, narrator scripts, emotional arcs, and public-safe storycards.",
+  description: "Private UrAi story replays, narrator scripts, emotional arcs, and public-safe storycards.",
   openGraph: {
     title: "URAI Storytime",
-    description: "Turn opted-in URAI memories and emotional signals into private story replays.",
+    description: "Turn opted-in UrAi memories and emotional signals into private story replays.",
     type: "website"
   }
 };

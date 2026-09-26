@@ -1,9 +1,10 @@
+import { PrivacyRequestControls } from "./PrivacyRequestControls";
 import type { UserStoryPreferences } from "@/lib/storytime/types";
 
 const settingRows = [
-  ["Memory use", "allowMemoryUse", "Off by default", "Requires explicit opt-in before URAI memories can shape a story."],
+  ["Memory use", "allowMemoryUse", "Off by default", "Requires explicit opt-in before UrAi memories can shape a story."],
   ["Relationship threads", "allowRelationshipThreads", "Off by default", "Requires explicit opt-in before relationship context can be used."],
-  ["Voiceover jobs", "allowVoiceoverJobs", "Off by default", "Queued voiceover generation stays disabled until provider and consent checks are live."],
+  ["Voiceover / media", "allowVoiceoverJobs", "Hard-off", "Voiceover and media execution stay disabled until a governed worker, provider/cost receipts, accessibility outputs, and deletion lifecycle are proven."],
   ["Public sharing", "allowPublicSharing", "Requires explicit consent", "Public-safe shares require consent, redaction, and safety review."]
 ] as const;
 
@@ -36,9 +37,10 @@ export function StorySettings({ preferences }: { preferences?: Partial<UserStory
         })}
       </div>
       <p>
-        This page is intentionally read-only in the demo build. Do not treat these settings as live account controls until
-        Firebase auth, Firestore persistence, security rules, and privacy/legal review are verified.
+        Story preferences remain read-only in the demo build until their persisted policy and consent semantics are verified.
+        Privacy requests below are a separate server-owned lifecycle and remain truthful about requested versus completed state.
       </p>
+      <PrivacyRequestControls />
     </section>
   );
 }

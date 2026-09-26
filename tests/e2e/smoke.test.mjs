@@ -21,9 +21,14 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const auditLog = read('functions/src/audit-log.ts');
 const functionsIndex = read('functions/src/index.ts');
-const revokeShareFunction = read('functions/src/revoke-public-story-share.ts');
+const narratorFunction = read('functions/src/generate-narrator-script.ts');
+const arcFunction = read('functions/src/generate-emotional-arc-summary.ts');
+const weeklyFunction = read('functions/src/generate-weekly-story-scroll.ts');
+const timelineFunction = read('functions/src/refresh-story-timeline.ts');
+const archiveFunction = read('functions/src/rebuild-user-story-archive.ts');
 const storyProvider = read('functions/src/story-provider.ts');
 const deploymentDoc = read('docs/STORYTIME_DEPLOYMENT.md');
 const qaDoc = read('docs/STORYTIME_QA_CHECKLIST.md');
@@ -96,30 +101,34 @@ test('Storytime builder normalizes bounded user input', () => {
 test('Storytime settings preserve consent and launch boundaries', () => {
   assert.match(storySettings, /private by default/i);
   assert.match(storySettings, /read-only in the demo build/i);
-  assert.match(storySettings, /Firebase auth, Firestore persistence, security rules/);
+  assert.match(storySettings, /persisted policy and consent semantics are verified/);
+  assert.match(storySettings, /PrivacyRequestControls/);
   assert.match(storySettings, /Public-safe shares require consent, redaction, and safety review/);
   assert.match(globals, /\.storytime-button:disabled/);
 });
 
-test('Public share route has real fetch states and demo safety boundaries', () => {
+test('Public share route uses direct reads and one generic unavailable boundary', () => {
   assert.match(shareRoute, /MAX_SHARE_ID_CHARS/);
   assert.match(shareRoute, /normalizeShareId/);
   assert.match(shareRoute, /safeShareId === "demo"/);
-  assert.match(shareStory, /publicStoryShares/);
-  assert.match(shareStory, /revoked/);
-  assert.match(shareStory, /expired/);
+  assert.match(shareStory, /getDoc\(doc\(db, "publicStoryShares", shareId\)\)/);
+  assert.match(shareStory, /data\.revoked !== false/);
+  assert.match(shareStory, /Date\.parse\(expiresAt\) <= Date\.now\(\)/);
+  assert.match(shareStory, /No active public-safe Storytime share was found/);
   assert.match(shareStory, /Public sharing is gated/);
+  assert.doesNotMatch(shareStory, /collection\(|getDocs\(|where\(/);
 });
 
-test('Public share owner controls create and revoke through callables', () => {
+test('Public share owner controls create and revoke through server callables', () => {
   assert.match(cloudSession, /ShareControls/);
   assert.match(shareControls, /createPublicStoryShare/);
   assert.match(shareControls, /revokePublicStoryShare/);
   assert.match(shareControls, /Explicit public-sharing consent is required/);
-  assert.match(functionsIndex, /revokePublicStoryShare/);
-  assert.match(revokeShareFunction, /Public share not found/);
-  assert.match(revokeShareFunction, /revoked: true/);
-  assert.match(revokeShareFunction, /visibility: "private"/);
+  assert.match(functionsIndex, /createPublicStoryShare, revokePublicStoryShare/);
+  assert.match(functionsIndex, /public-story-share-lifecycle\.js/);
+  assert.match(shareLifecycle, /You do not own this Storytime share/);
+  assert.match(shareLifecycle, /revoked: true/);
+  assert.match(shareLifecycle, /visibility: "private"/);
 });
 
 test('Runtime config gates cloud, provider, and public sharing', () => {
@@ -130,23 +139,27 @@ test('Runtime config gates cloud, provider, and public sharing', () => {
   assert.match(sessionLibrary, /NEXT_PUBLIC_STORYTIME_CLOUD_MODE=true/);
 });
 
-test('Firestore rules enforce owner, public-share, and quota-counter boundaries', () => {
+test('Firestore rules enforce owner, server-time public-share, and quota-counter boundaries', () => {
   assert.match(rules, /function isOwner/);
-  assert.match(rules, /match \/storySessions\/{id}/);
-  assert.match(rules, /match \/publicStoryShares\/{id}/);
-  assert.match(rules, /revoked == false/);
-  assert.match(rules, /match \/storytimeUsageCounters\/{id}/);
+  assert.match(rules, /match \/storySessions\/\{id\}/);
+  assert.match(rules, /function activePublicShare/);
+  assert.match(rules, /resource\.data\.schemaVersion == 'public-story-share-v2'/);
+  assert.match(rules, /request\.time < resource\.data\.expiresAt/);
+  assert.match(rules, /match \/publicStoryShares\/\{id\}/);
+  assert.match(rules, /allow read: if activePublicShare\(\)/);
+  assert.match(rules, /match \/publicStoryShareControls\/\{id\}/);
+  assert.match(rules, /match \/storytimeUsageCounters\/\{id\}/);
   assert.match(rules, /allow read, write: if false/);
   assert.match(rules, /allow update, delete: if false/);
 });
 
-test('Firestore indexes include core Storytime queries', () => {
+test('Firestore indexes include core private Storytime queries only', () => {
   const parsed = JSON.parse(indexes);
   const collectionGroups = parsed.indexes.map((index) => index.collectionGroup);
   assert.ok(collectionGroups.includes('storySessions'));
   assert.ok(collectionGroups.includes('storyChapters'));
   assert.ok(collectionGroups.includes('storyMoments'));
-  assert.ok(collectionGroups.includes('publicStoryShares'));
+  assert.ok(!collectionGroups.includes('publicStoryShares'));
 });
 
 test('Firebase hosting and functions config are present', () => {
@@ -157,20 +170,35 @@ test('Firebase hosting and functions config are present', () => {
   assert.match(firebaseConfig, /npm --prefix functions run build/);
 });
 
-test('Callable functions cover Storytime lifecycle hooks, provider wiring, and quota gate', () => {
-  for (const name of [
-    'generateStorySession',
-    'createPublicStoryShare',
-    'generateNarratorScript',
-    'generateEmotionalArcSummary',
-    'generateWeeklyStoryScroll',
-    'prepareVoiceoverJob',
-    'refreshStoryTimeline',
-    'rebuildUserStoryArchive'
+test('Callable functions cover private Storytime lifecycle, provider wiring, quota, and real per-callable modules', () => {
+  assert.match(functions, /export const generateStorySession/);
+  assert.match(functions, /export const prepareVoiceoverJob/);
+  assert.match(narratorFunction, /export const generateNarratorScript/);
+  assert.match(arcFunction, /export const generateEmotionalArcSummary/);
+  assert.match(weeklyFunction, /export const generateWeeklyStoryScroll/);
+  assert.match(timelineFunction, /export const refreshStoryTimeline/);
+  assert.match(archiveFunction, /export const rebuildUserStoryArchive/);
+  assert.match(archiveFunction, /storyArchiveSnapshots/);
+  assert.match(archiveFunction, /status: "completed"/);
+  assert.match(narratorFunction, /status: "completed"/);
+  assert.match(arcFunction, /status: "completed"/);
+  assert.match(weeklyFunction, /status: "completed"/);
+  assert.match(functions, /voiceover_execution_blocked/);
+  assert.match(functions, /Storytime voiceover\/media execution is disabled until a governed worker/);
+  for (const moduleName of [
+    'generate-narrator-script.js',
+    'generate-emotional-arc-summary.js',
+    'generate-weekly-story-scroll.js',
+    'refresh-story-timeline.js',
+    'rebuild-user-story-archive.js'
   ]) {
-    assert.match(functions, new RegExp(`export const ${name}`));
+    assert.ok(functionsIndex.includes(moduleName), `index must export real callable module ${moduleName}`);
   }
-  assert.match(functions, /Story generation consent is required/);
+  assert.match(functionsIndex, /createPublicStoryShare, revokePublicStoryShare/);
+  assert.match(shareLifecycle, /Public sharing consent is required/);
+  assert.match(shareLifecycle, /Only safety-approved stories can be shared/);
+  assert.match(functions, /storyGeneration: z\.literal\(true\)/);
+  assert.match(functions, /providerProcessing: z\.literal\(true\)/);
   assert.match(functions, /requireConfiguredStoryProvider/);
   assert.match(functions, /generateStoryWithProvider/);
   assert.match(functions, /MAX_GENERATIONS_PER_HOUR/);
@@ -180,7 +208,6 @@ test('Callable functions cover Storytime lifecycle hooks, provider wiring, and q
   assert.match(functions, /resource-exhausted/);
   assert.match(storyProvider, /response_format/);
   assert.match(storyProvider, /Do not diagnose/);
-  assert.match(functions, /Public sharing requires explicit consent/);
 });
 
 test('Storytime Functions emit privacy-safe audit log events', () => {
@@ -192,18 +219,20 @@ test('Storytime Functions emit privacy-safe audit log events', () => {
   assert.match(auditLog, /story_persisted/);
   assert.match(auditLog, /public_share_created/);
   assert.match(auditLog, /public_share_revoked/);
-  assert.match(auditLog, /voiceover_export_queued/);
+  assert.match(auditLog, /voiceover_execution_blocked/);
   assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
   assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
-  assert.match(functions, /auditLog\(\{ event: "public_share_created"/);
-  assert.match(functions, /auditLog\(\{ event: "voiceover_export_queued"/);
-  assert.match(revokeShareFunction, /auditLog\(\{ event: "public_share_revoked"/);
+  assert.match(functions, /auditLog\(\{[\s\S]*event: "voiceover_execution_blocked"/);
+  assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_created"/);
+  assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_revoked"/);
   assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
 });
 
 test('Deployment and QA docs preserve launch boundaries', () => {
   assert.match(deploymentDoc, /Known launch boundary/);
-  assert.match(deploymentDoc, /firebase deploy --only firestore:rules,firestore:indexes/);
+  assert.match(deploymentDoc, /Actions -> URAI Storytime Protected Deployment -> Run workflow/);
+  assert.doesNotMatch(deploymentDoc, /firebase deploy --only firestore:rules,firestore:indexes/);
   assert.match(qaDoc, /Story sessions default to `visibility: private`/);
   assert.match(qaDoc, /avoids diagnosis|no diagnosis/i);
 });
+

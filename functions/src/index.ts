@@ -1,12 +1,38 @@
 export {
   generateStorySession,
-  createPublicStoryShare,
-  prepareVoiceoverJob,
-  refreshStoryTimeline,
-  rebuildUserStoryArchive
+  cancelStoryGeneration,
+  listStorytimeProviderReconciliationQueue,
+  prepareVoiceoverJob
 } from "./storytime.js";
 
+export { createPublicStoryShare, revokePublicStoryShare } from "./public-story-share-lifecycle.js";
 export { generateNarratorScript } from "./generate-narrator-script.js";
 export { generateEmotionalArcSummary } from "./generate-emotional-arc-summary.js";
 export { generateWeeklyStoryScroll } from "./generate-weekly-story-scroll.js";
-export { revokePublicStoryShare } from "./revoke-public-story-share.js";
+export { refreshStoryTimeline } from "./refresh-story-timeline.js";
+export { rebuildUserStoryArchive } from "./rebuild-user-story-archive.js";
+export {
+  upsertFiniteTimeCanonRegistry,
+  upsertFiniteTimeShotGraph,
+  getFiniteTimeProductionReadiness
+} from "./finite-time-registry.js";
+export { health, readiness } from "./readiness.js";
+
+export { requestPrivacyOperation } from "./privacy-requests.js";
+
+export {
+  processStorytimeExportRequest,
+  getStorytimeExportDownloadUrl,
+  planStorytimeDeletion,
+  executeStorytimeDeletion,
+  verifyStorytimeDeletion
+} from "./privacy-execution.js";
+
+
+export {
+  listStorytimeModerationCases,
+  getStorytimeModerationCase,
+  transitionStorytimeModerationCase
+} from "./moderation-operations.js";
+
+export { reportStorytimeSafetyConcern } from "./safety-reports.js";
