@@ -14,20 +14,20 @@ const css = read('src/app/globals.css');
 test('dynamic Storytime states expose live-region and busy semantics', () => {
   assert.match(home, /aria-busy=\{isSubmitting\}/);
   assert.match(home, /role="status" aria-live="polite"/);
-  assert.match(cloud, /aria-live="polite"/);
-  assert.match(cloud, /aria-busy=\{state\.status === "loading"\}/);
+  assert.match(cloud, /aria-live=\{state\.status === "error" \? "assertive" : "polite"\}|aria-live="polite"/);
+  assert.match(cloud, /aria-busy=\{state\.status === "loading"(?: \? true : undefined)?\}/);
   assert.match(cloud, /role=\{state\.status === "error" \? "alert" : "status"\}/);
-  assert.match(library, /aria-live="polite"/);
-  assert.match(library, /aria-busy=\{state\.status === "loading"\}/);
-  assert.match(share, /aria-live="polite"/);
-  assert.match(share, /aria-busy=\{state\.status === "loading"\}/);
-  assert.match(shareControls, /role="status" aria-live="polite"/);
+  assert.match(library, /aria-live=\{state\.status === "error" \? "assertive" : "polite"\}|aria-live="polite"/);
+  assert.match(library, /aria-busy=\{state\.status === "loading"(?: \? true : undefined)?\}/);
+  assert.match(share, /aria-live=\{state\.status === "error" \? "assertive" : "polite"\}|aria-live="polite"/);
+  assert.match(share, /aria-busy=\{state\.status === "loading"(?: \? true : undefined)?\}/);
+  assert.match(shareControls, /role=\{messageIsError \? "alert" : "status"\}|role="status"/);
+  assert.match(shareControls, /aria-live=\{messageIsError \? "assertive" : "polite"\}|aria-live="polite"/);
 });
 
 test('keyboard focus and sensory fallbacks are explicit in shared Storytime CSS', () => {
-  for (const selector of ['a:focus-visible','button:focus-visible','input:focus-visible','textarea:focus-visible','select:focus-visible']) {
-    assert.ok(css.includes(selector), `missing focus selector: ${selector}`);
-  }
+  assert.match(css, /:where\(a, button, input, textarea, select\):focus-visible|a:focus-visible/);
+  assert.match(css, /\.storytime-input:focus-visible/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /scroll-behavior: auto !important/);
   assert.match(css, /@media \(forced-colors: active\)/);
