@@ -14,7 +14,7 @@ export function buildWeeklyStoryScrollRecord(args: {
     title: "Weekly Story Scroll",
     summary: `Weekly Storytime scroll assembled from ${args.sessionIds.length} private session(s).`,
     sessionIds: args.sessionIds,
-    providerStatus: "completed",
+    providerStatus: "local_compiled",
     createdAt: args.createdAt,
     updatedAt: args.createdAt
   };
