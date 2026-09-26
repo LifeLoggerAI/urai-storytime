@@ -14,6 +14,16 @@ The emulator suite uses **synthetic identities and synthetic records only**. It 
 
 ## Current Firestore authority matrix
 
+## Covered Firestore collections
+
+The executable matrix explicitly covers these canonical private Storytime collections and must preserve their exact collection identifiers in this specification:
+
+- `storySessions`
+- `storyChapters`
+- `storyMoments`
+- `memoryScenes`
+- `narratorScripts`
+
 ### Required allow cases
 
 1. Owner can create private Storytime records with their own `userId` where client creation is intentionally permitted.
