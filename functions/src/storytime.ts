@@ -4,6 +4,7 @@ import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { reconcileStoryPersistence } from "./story-persistence.js";
 import {
   generateStoryWithProvider,
   getStoryProviderCostPreflight,
@@ -334,6 +335,9 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       }
       if (data.status === "processing") {
         throw new HttpsError("already-exists", "This Storytime request is already being processed.");
+      }
+      if (data.status === "requires_reconciliation") {
+        throw new HttpsError("failed-precondition", "This Storytime request requires reconciliation before any further generation.");
       }
     }
 
@@ -757,7 +761,34 @@ export const generateStorySession = onCall(async (request) => {
     providerReceipt,
     updatedAt: createdAt
   }, { merge: true });
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch {
+    let persisted = false;
+    try {
+      persisted = await reconcileStoryPersistence({
+        db,
+        requestRef: generationRequest.requestRef,
+        sessionRef: db.collection("storySessions").doc(sessionId),
+        deadLetterRef: db.collection("storytimeProviderDeadLetters").doc(generationRequestId(userId, input.requestId)),
+        userId,
+        requestId: input.requestId,
+        sessionId,
+        reservationId: budgetReservation?.reservationId ?? null,
+        dayId: budgetReservation?.dayId ?? null,
+        timestamp: now()
+      });
+    } catch {
+      // If Firestore itself is unavailable, the existing processing claim
+      // remains a retry barrier. Never retry the provider or release its budget.
+      auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "persistence_reconciliation_unavailable" });
+      throw new HttpsError("unavailable", "Story persistence could not be confirmed. This request remains held; do not start a replacement generation.");
+    }
+    if (!persisted) {
+      auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "story_persistence_failed" });
+      throw new HttpsError("internal", "Story persistence requires reconciliation. This request cannot be regenerated automatically.");
+    }
+  }
 
   auditLog({ event: "story_persisted", userId, sessionId, provider: session.provider, safetyStatus: outputModeration.safetyStatus });
   return {
