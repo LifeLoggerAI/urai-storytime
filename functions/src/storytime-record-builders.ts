@@ -23,8 +23,8 @@ export function buildNarratorScriptRecord(args: {
     chapterId: args.chapterId || args.session.chapterIds?.[0],
     scriptType: args.scriptType || "memory_replay",
     voiceTone: args.voiceTone || "warm",
-    text: args.text || "Narrator script queued.",
-    providerStatus: "queued",
+    text: args.text || `This private Storytime chapter, ${args.session.title || "your story"}, can be revisited in a ${args.voiceTone || "warm"} voice while preserving its ${args.session.emotionalTone || "reflective"} tone.`,
+    providerStatus: "completed",
     createdAt: args.createdAt,
     updatedAt: args.createdAt
   };
@@ -44,9 +44,9 @@ export function buildEmotionalArcRecord(args: {
     startTone: args.session.emotionalTone || "reflective",
     peakTone: "noticed",
     resolutionTone: "settled",
-    summary: "Emotional arc queued.",
+    summary: `This private story moves from ${args.session.emotionalTone || "reflective"} attention toward a gentler, more settled return.`,
     caution: "Reflective storytelling only.",
-    providerStatus: "queued",
+    providerStatus: "completed",
     createdAt: args.createdAt,
     updatedAt: args.createdAt
   };

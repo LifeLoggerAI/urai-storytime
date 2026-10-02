@@ -48,7 +48,7 @@ export const generateNarratorScript = onCall(async (request) => {
     id: timelineEventId,
     userId,
     sessionId: input.sessionId,
-    label: "Narrator script queued",
+    label: "Narrator script generated",
     action: "generateNarratorScript",
     createdAt
   });
@@ -58,5 +58,5 @@ export const generateNarratorScript = onCall(async (request) => {
   batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), timelineEvent);
   await batch.commit();
 
-  return { status: "queued", narratorScriptId, timelineEventId };
+  return { status: "completed", narratorScriptId, timelineEventId };
 });

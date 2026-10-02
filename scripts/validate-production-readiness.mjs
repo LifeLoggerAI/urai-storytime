@@ -47,7 +47,12 @@ const requiredSourceFiles = [
   'functions/src/index.ts',
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
-  'functions/src/revoke-public-story-share.ts',
+  'functions/src/public-story-share-lifecycle.ts',
+  'functions/src/privacy-requests.ts',
+  'functions/src/privacy-execution.ts',
+  'functions/src/refresh-story-timeline.ts',
+  'functions/src/rebuild-user-story-archive.ts',
+  'functions/src/readiness.ts',
   'tests/e2e/smoke.test.mjs'
 ];
 
@@ -71,19 +76,61 @@ if (exists('README.md')) {
 
 if (exists('functions/src/story-provider.ts')) {
   const provider = read('functions/src/story-provider.ts');
-  if (!provider.includes('STORYTIME_GENERATION_PROVIDER') || !provider.includes('OPENAI_API_KEY') || !provider.includes('STORYTIME_OPENAI_MODEL')) {
-    failures.push('Story provider readiness gates must require provider, API key, and model config.');
+  for (const marker of [
+    'STORYTIME_GENERATION_PROVIDER',
+    'OPENAI_API_KEY',
+    'STORYTIME_OPENAI_MODEL',
+    'STORYTIME_PROVIDER_SPEND_AUTHORIZED',
+    'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS',
+    'STORYTIME_MAX_GENERATION_COST_USD',
+    'STORYTIME_PROVIDER_DAILY_BUDGET_USD',
+    'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD',
+    'STORYTIME_OPENAI_MAX_OUTPUT_TOKENS',
+    'storytime-provider-receipt-v1',
+    'estimatedMaxCostUsd',
+    'actualCostUsd'
+  ]) {
+    if (!provider.includes(marker)) failures.push(`Story provider readiness/receipt gate missing: ${marker}`);
+  }
+}
+
+if (exists('functions/src/readiness.ts')) {
+  const readinessSource = read('functions/src/readiness.ts');
+  for (const marker of [
+    "process.env.STORYTIME_FIREBASE_ISOLATED === 'true'",
+    "process.env.STORYTIME_CLOUD_MODE === 'true'",
+    'provider.ready === true',
+    "process.env.STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER !== 'true'",
+    'publicShareTtlBounded',
+    "claimBoundary: 'technical_runtime_only'",
+    'result.ready ? 200 : 503',
+    "Cache-Control', 'no-store'"
+  ]) {
+    if (!readinessSource.includes(marker)) failures.push(`Missing technical readiness marker: ${marker}`);
+  }
+  if (/OPENAI_API_KEY\s*[:=]\s*process\.env\.OPENAI_API_KEY/.test(readinessSource)) {
+    failures.push('Storytime readiness must not emit provider secret values.');
+  }
+}
+
+if (exists('functions/src/index.ts')) {
+  const functionsIndex = read('functions/src/index.ts');
+  if (!functionsIndex.includes('health, readiness') || !functionsIndex.includes('./readiness.js')) {
+    failures.push('Storytime Functions entrypoint must export health and readiness.');
   }
 }
 
 if (exists('functions/src/storytime.ts')) {
   const functions = read('functions/src/storytime.ts');
   for (const marker of [
-    'Story generation consent is required',
+    'storyGeneration: z.literal(true)',
+    'providerProcessing: z.literal(true)',
+    'role: z.literal("adult_or_guardian")',
     'Story input requires safety review before generation',
+    'generation_blocked_output_safety',
+    'claimGenerationRequest',
     'enforceGenerationQuota',
-    'createPublicStoryShare',
-    'Public sharing requires explicit consent',
     'prepareVoiceoverJob',
     'Voiceover consent is required'
   ]) {
@@ -91,10 +138,77 @@ if (exists('functions/src/storytime.ts')) {
   }
 }
 
+if (exists('functions/src/public-story-share-lifecycle.ts')) {
+  const sharing = read('functions/src/public-story-share-lifecycle.ts');
+  for (const marker of [
+    'createPublicStoryShare',
+    'revokePublicStoryShare',
+    'Public sharing consent is required',
+    'Only safety-approved stories can be shared',
+    'requireVerifiedAccount(request)'
+  ]) {
+    if (!sharing.includes(marker)) failures.push(`Missing public-share safety marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/privacy-requests.ts')) {
+  const privacy = read('functions/src/privacy-requests.ts');
+  for (const marker of [
+    'requestPrivacyOperation',
+    'confirmation: z.literal(true)',
+    'executionState: "not_started"',
+    'completionReceiptId: null'
+  ]) {
+    if (!privacy.includes(marker)) failures.push(`Missing privacy lifecycle marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/privacy-execution.ts')) {
+  const privacyExecution = read('functions/src/privacy-execution.ts');
+  for (const marker of [
+    'processStorytimeExportRequest',
+    'getStorytimeExportDownloadUrl',
+    'planStorytimeDeletion',
+    'executeStorytimeDeletion',
+    'verifyStorytimeDeletion',
+    'active_legal_hold',
+    'storytime_firebase_isolation_not_certified',
+    'story_media_storage_cleanup_not_certified',
+    'backup_expiry_pending',
+    'DELETE_STORYTIME_DATA'
+  ]) {
+    if (!privacyExecution.includes(marker)) failures.push(`Missing Storytime data-rights execution marker: ${marker}`);
+  }
+}
+
+if (exists('functions/src/index.ts')) {
+  const functionsIndex = read('functions/src/index.ts');
+  for (const marker of [
+    './generate-narrator-script.js',
+    './generate-emotional-arc-summary.js',
+    './generate-weekly-story-scroll.js',
+    './refresh-story-timeline.js',
+    './rebuild-user-story-archive.js'
+  ]) {
+    if (!functionsIndex.includes(marker)) failures.push(`Missing real callable export: ${marker}`);
+  }
+}
+
 if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
-  for (const marker of ['match /storySessions/{id}', 'match /publicStoryShares/{id}', 'revoked == false', 'match /storytimeUsageCounters/{id}', 'allow read, write: if false']) {
+  for (const marker of [
+    'match /storySessions/{id}',
+    'match /publicStoryShares/{id}',
+    'revoked == false',
+    'match /storytimeUsageCounters/{id}',
+    'match /privacyDeletionPlans/{planId}',
+    'match /privacyOperationReceipts/{receiptId}',
+    'allow read, write: if false'
+  ]) {
     if (!rules.includes(marker)) failures.push(`Missing Firestore rule marker: ${marker}`);
+  }
+  if (rules.includes('privacyCompletionReceipts')) {
+    failures.push('Obsolete privacyCompletionReceipts rule must not remain; privacyOperationReceipts is canonical.');
   }
 }
 

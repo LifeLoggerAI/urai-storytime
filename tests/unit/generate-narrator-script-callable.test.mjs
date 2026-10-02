@@ -25,4 +25,5 @@ test('narrator script callable writes narrator script and timeline event in a ba
   assert.match(source, /db\.collection\("narratorScripts"\)/);
   assert.match(source, /db\.collection\("timelineReplayEvents"\)/);
   assert.match(source, /await batch\.commit\(\)/);
+  assert.match(source, /status: "completed"/);
 });

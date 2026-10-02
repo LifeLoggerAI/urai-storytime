@@ -3,13 +3,29 @@ export type StorytimeAuditEvent =
   | "generation_blocked_auth"
   | "generation_blocked_consent"
   | "generation_blocked_safety"
+  | "generation_blocked_output_safety"
   | "generation_blocked_quota"
+  | "generation_blocked_budget"
+  | "generation_reused"
+  | "generation_cancellation_requested"
+  | "generation_cancelled"
   | "provider_unavailable"
   | "provider_failed"
+  | "provider_reconciliation_viewed"
   | "story_persisted"
   | "public_share_created"
   | "public_share_revoked"
-  | "voiceover_export_queued";
+  | "voiceover_execution_blocked"
+  | "privacy_request_created"
+  | "privacy_export_packaged"
+  | "privacy_export_download_url_created"
+  | "privacy_deletion_planned"
+  | "privacy_deletion_blocked"
+  | "privacy_deletion_executed"
+  | "privacy_deletion_verified"
+  | "moderation_case_escalated"
+  | "moderation_case_closed_blocked"
+  | "safety_report_created";
 
 export type StorytimeAuditPayload = {
   event: StorytimeAuditEvent;

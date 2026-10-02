@@ -47,7 +47,7 @@ Firebase callable functions include:
 - `rebuildUserStoryArchive`
 - `revokePublicStoryShare`
 
-These functions enforce auth boundaries, consent checks, private-by-default story sessions, public sharing consent, redaction scaffolds, queued-only export/voiceover status, default public-share expiration, and owner revoke support. They still require Firebase environment configuration and staging/production verification before public launch claims.
+These functions enforce auth boundaries, consent checks, private-by-default story sessions, public-sharing consent, bounded privacy/data-rights operations, deterministic narrator/arc/weekly/timeline/archive record generation, default public-share expiration, and owner revoke support. Voiceover/media execution is intentionally disabled rather than writing unconsumed queue/export records; it remains hard-off until a governed worker, provider/cost receipts, cancellation/retry, private storage, and deletion lifecycle are proven. Firebase environment configuration and staging/production verification are still required before public launch claims.
 
 ## Current production boundary
 
