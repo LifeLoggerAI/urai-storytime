@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
@@ -53,8 +54,70 @@ const CancelStoryGenerationSchema = z.object({
 const PrepareVoiceoverJobSchema = z.object({
   sessionId: z.string().min(1),
   narratorScriptId: z.string().min(1).optional(),
-  provider: z.enum(["web_speech_fallback", "asset_factory", "tts_provider"]).default("asset_factory")
+  provider: z.enum(["tts_provider", "elevenlabs"]).default("tts_provider"),
+  locale: z.string().trim().min(2).max(35).default("en-US"),
+  voice: z.string().trim().min(1).max(160).optional(),
+  voiceId: z.string().trim().min(1).max(160).optional()
 });
+
+const ManageVoiceoverJobSchema = z.object({
+  voiceoverJobId: z.string().min(1),
+  action: z.enum(["status", "cancel", "playback", "delete-output"])
+});
+
+const STORYTIME_VOICEOVER_CONSENT_VERSION = "storytime-voiceover-consent-v1";
+const storytimeJobsBridgeTokenSecret = defineSecret("URAI_STORYTIME_JOBS_BRIDGE_TOKEN");
+
+function storytimeJobsBridgeUrl() {
+  const value = String(process.env.URAI_STORYTIME_JOBS_BRIDGE_URL || "").trim();
+  if (!value) throw new HttpsError("failed-precondition", "Storytime narrator worker bridge is not configured.");
+  if (process.env.NODE_ENV === "production" && !value.startsWith("https://")) {
+    throw new HttpsError("failed-precondition", "Storytime narrator worker bridge must use HTTPS in production.");
+  }
+  return value.replace(/\/$/, "");
+}
+
+function storytimeJobsBridgeToken() {
+  try {
+    return storytimeJobsBridgeTokenSecret.value() || process.env.URAI_STORYTIME_JOBS_BRIDGE_TOKEN || "";
+  } catch {
+    return process.env.URAI_STORYTIME_JOBS_BRIDGE_TOKEN || "";
+  }
+}
+
+async function storytimeJobsBridgeRequest(body: Record<string, unknown>) {
+  const token = storytimeJobsBridgeToken();
+  if (!token) throw new HttpsError("failed-precondition", "Storytime narrator worker bridge authorization is not configured.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  try {
+    const response = await fetch(storytimeJobsBridgeUrl(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    if (!response.ok || payload.ok !== true) {
+      const code = typeof payload.error === "string" ? payload.error : `bridge_http_${response.status}`;
+      throw new HttpsError(
+        response.status === 401 || response.status === 403 ? "permission-denied" :
+          response.status === 404 ? "not-found" :
+            response.status === 409 ? "failed-precondition" : "unavailable",
+        `Storytime narrator worker bridge rejected the request: ${code}`
+      );
+    }
+    return payload;
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("unavailable", "Storytime narrator worker bridge is unavailable.");
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 const safetyPatterns = [
   { code: "self_harm", pattern: /\b(?:suicide|self[- ]?harm|kill myself|kill yourself)\b/i },
@@ -862,7 +925,9 @@ export const listStorytimeProviderReconciliationQueue = onCall(async (request) =
   };
 });
 
-export const prepareVoiceoverJob = onCall(async (request) => {
+export const prepareVoiceoverJob = onCall({
+  secrets: [storytimeJobsBridgeTokenSecret]
+}, async (request) => {
   requireAuth(request.auth?.uid);
   const userId = request.auth!.uid;
   const input = PrepareVoiceoverJobSchema.parse(request.data);
@@ -877,15 +942,165 @@ export const prepareVoiceoverJob = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "A narrator script is required before voiceover can be prepared.");
   }
 
-  auditLog({
-    event: "voiceover_execution_blocked",
+  const scriptSnapshot = await db.collection("narratorScripts").doc(narratorScriptId).get();
+  const script = scriptSnapshot.data() || {};
+  if (!scriptSnapshot.exists || script.userId !== userId || script.sessionId !== input.sessionId) {
+    throw new HttpsError("permission-denied", "Narrator script is unavailable.");
+  }
+  const narratorText = typeof script.text === "string" ? script.text.trim() : "";
+  if (!narratorText) {
+    throw new HttpsError("failed-precondition", "Narrator script text is required before voiceover can be prepared.");
+  }
+
+  const consentReceiptId = `stvc_${contentFingerprint([
+    userId,
+    input.sessionId,
+    narratorScriptId,
+    STORYTIME_VOICEOVER_CONSENT_VERSION,
+    String(session.data.consentSnapshot?.consentVersion || "")
+  ].join("|")).slice(0, 48)}`;
+  const consentRef = db.collection("consentDecisionReceipts").doc(consentReceiptId);
+  const idempotencyKey = `storytime-voiceover-${contentFingerprint([
+    userId, input.sessionId, narratorScriptId, input.provider, input.voiceId || input.voice || "default"
+  ].join("|")).slice(0, 32)}`;
+
+  const provider = input.provider === "elevenlabs" ? "elevenlabs" : "google";
+  const bridge = await storytimeJobsBridgeRequest({
+    action: "create",
     userId,
     sessionId: input.sessionId,
-    provider: input.provider,
-    errorCode: "media_worker_not_implemented"
+    narratorScriptId,
+    idempotencyKey,
+    consent: {
+      purpose: "storytime.voiceover",
+      policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
+      decisionReceiptId: consentReceiptId
+    },
+    payload: {
+      text: narratorText,
+      locale: input.locale,
+      provider,
+      ...(input.voice ? { voice: input.voice } : {}),
+      ...(input.voiceId ? { voiceId: input.voiceId } : {}),
+      format: "MP3"
+    }
   });
-  throw new HttpsError(
-    "failed-precondition",
-    "Storytime voiceover/media execution is disabled until a governed worker, provider receipts, cancellation/retry, private storage, and deletion lifecycle are implemented."
-  );
+
+  const externalJobId = typeof bridge.jobId === "string" ? bridge.jobId : "";
+  if (!externalJobId) {
+    throw new HttpsError("unavailable", "Narrator worker did not return a job identifier.");
+  }
+
+  const createdAt = now();
+  const voiceoverJobId = `voiceoverJob_${externalJobId}`;
+  const exportId = `storyExport_${externalJobId}`;
+  const timelineEventId = id("timelineReplayEvent");
+  const batch = db.batch();
+  batch.set(consentRef, {
+    schemaVersion: "storytime-consent-decision-receipt-v1",
+    id: consentReceiptId,
+    userId,
+    purpose: "storytime.voiceover",
+    policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
+    decision: "authorized",
+    sourceSessionId: input.sessionId,
+    narratorScriptId,
+    sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
+    createdAt,
+    updatedAt: createdAt
+  }, { merge: true });
+  batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), {
+    id: voiceoverJobId,
+    userId,
+    sessionId: input.sessionId,
+    narratorScriptId,
+    provider,
+    externalSystem: "urai-jobs",
+    externalJobId,
+    consentReceiptId,
+    status: "queued",
+    createdAt,
+    updatedAt: createdAt
+  });
+  batch.set(db.collection("storyExports").doc(exportId), {
+    id: exportId,
+    userId,
+    sessionId: input.sessionId,
+    voiceoverJobId,
+    externalJobId,
+    exportType: "voiceover",
+    status: "queued",
+    private: true,
+    createdAt,
+    updatedAt: createdAt
+  });
+  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
+    id: timelineEventId,
+    userId,
+    sessionId: input.sessionId,
+    eventType: "voiceover_queued",
+    voiceoverJobId,
+    externalJobId,
+    createdAt
+  });
+  await batch.commit();
+
+  auditLog({ event: "voiceover_job_queued", userId, sessionId: input.sessionId, provider });
+  return {
+    status: "queued",
+    voiceoverJobId,
+    exportId,
+    externalJobId,
+    provider,
+    deduplicated: bridge.deduplicated === true
+  };
 });
+
+export const manageVoiceoverJob = onCall({
+  secrets: [storytimeJobsBridgeTokenSecret]
+}, async (request) => {
+  requireAuth(request.auth?.uid);
+  const userId = request.auth!.uid;
+  const input = ManageVoiceoverJobSchema.parse(request.data);
+  const voiceoverRef = db.collection("voiceoverJobs").doc(input.voiceoverJobId);
+  const snapshot = await voiceoverRef.get();
+  if (!snapshot.exists || snapshot.data()?.userId !== userId) {
+    throw new HttpsError("permission-denied", "Voiceover job is unavailable.");
+  }
+  const record = snapshot.data() || {};
+  const externalJobId = typeof record.externalJobId === "string" ? record.externalJobId : "";
+  const sessionId = typeof record.sessionId === "string" ? record.sessionId : "";
+  const narratorScriptId = typeof record.narratorScriptId === "string" ? record.narratorScriptId : "";
+  if (!externalJobId || !sessionId || !narratorScriptId) {
+    throw new HttpsError("failed-precondition", "Voiceover job is missing governed worker binding.");
+  }
+
+  const bridge = await storytimeJobsBridgeRequest({
+    action: input.action,
+    userId,
+    sessionId,
+    narratorScriptId,
+    jobId: externalJobId
+  });
+
+  if (input.action === "status" || input.action === "cancel") {
+    const job = bridge.job && typeof bridge.job === "object" ? bridge.job as Record<string, unknown> : {};
+    const status = typeof job.status === "string" ? job.status : "unknown";
+    await voiceoverRef.set({
+      status: status.toLowerCase(),
+      safeOutput: job.output && typeof job.output === "object" ? job.output : null,
+      updatedAt: now()
+    }, { merge: true });
+  } else if (input.action === "delete-output") {
+    await voiceoverRef.set({
+      status: "output_deleted",
+      safeOutput: null,
+      outputDeletedAt: now(),
+      updatedAt: now()
+    }, { merge: true });
+  }
+
+  auditLog({ event: `voiceover_${input.action}`, userId, sessionId });
+  return bridge;
+});
+
