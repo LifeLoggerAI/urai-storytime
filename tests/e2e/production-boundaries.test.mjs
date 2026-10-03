@@ -153,22 +153,29 @@ test('public sharing uses content-neutral expiring derivatives and private owner
   ]);
 });
 
-test('voiceover and media execution fail closed until a governed worker exists', () => {
+test('voiceover media execution stays fail-closed behind the governed Jobs bridge and private lifecycle', () => {
   includesAll(functions, [
     'prepareVoiceoverJob',
+    'manageVoiceoverJob',
     'Voiceover consent is required',
-    'voiceover_execution_blocked',
-    'media_worker_not_implemented',
-    'Storytime voiceover/media execution is disabled until a governed worker'
+    'URAI_STORYTIME_JOBS_BRIDGE_TOKEN',
+    'URAI_STORYTIME_JOBS_BRIDGE_URL',
+    'storytime.voiceover',
+    'consentDecisionReceipts',
+    'externalSystem: "urai-jobs"',
+    'voiceoverJobs',
+    'storyExports',
+    'delete-output'
   ]);
 
-  assert.doesNotMatch(functions, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
-  assert.doesNotMatch(functions, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
-  assert.doesNotMatch(functions, /Voiceover export queued/);
-  assert.doesNotMatch(functions, /downloadURL|signedUrl|completedUrl|artifactUrl/);
+  assert.match(functions, /if \(!token\) throw new HttpsError\("failed-precondition"/);
+  assert.match(functions, /NODE_ENV === "production" && !value\.startsWith\("https:\/\/"\)/);
+  assert.match(functions, /private: true/);
+  assert.doesNotMatch(functions, /media_worker_not_implemented/);
+  assert.doesNotMatch(functions, /voiceover_execution_blocked/);
+  assert.doesNotMatch(functions, /ELEVENLABS_API_KEY|GOOGLE_TTS_CREDENTIAL|providerApiKey/);
   assert.match(proofReadme, /export artifact pipeline proof was available/);
 });
-
 test('rules keep Storytime private by default and enforce server-time public-share expiry', () => {
   includesAll(rules, [
     'function ownerOnlyCreate()',
