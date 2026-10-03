@@ -1,7 +1,9 @@
 export {
   generateStorySession,
   cancelStoryGeneration,
-  listStorytimeProviderReconciliationQueue
+  listStorytimeProviderReconciliationQueue,
+  prepareVoiceoverJob,
+  manageVoiceoverJob
 } from "./storytime.js";
 
 export { createPublicStoryShare, revokePublicStoryShare } from "./public-story-share-lifecycle.js";
