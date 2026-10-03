@@ -183,8 +183,13 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(narratorFunction, /status: "completed"/);
   assert.match(arcFunction, /status: "completed"/);
   assert.match(weeklyFunction, /status: "completed"/);
-  assert.match(functions, /voiceover_execution_blocked/);
-  assert.match(functions, /Storytime voiceover\/media execution is disabled until a governed worker/);
+  assert.match(functions, /URAI_STORYTIME_JOBS_BRIDGE_TOKEN/);
+  assert.match(functions, /storytimeJobsBridgeRequest/);
+  assert.match(functions, /consentDecisionReceipts/);
+  assert.match(functions, /externalSystem: "urai-jobs"/);
+  assert.match(functions, /export const manageVoiceoverJob/);
+  assert.match(functionsIndex, /prepareVoiceoverJob/);
+  assert.match(functionsIndex, /manageVoiceoverJob/);
   for (const moduleName of [
     'generate-narrator-script.js',
     'generate-emotional-arc-summary.js',
@@ -219,10 +224,15 @@ test('Storytime Functions emit privacy-safe audit log events', () => {
   assert.match(auditLog, /story_persisted/);
   assert.match(auditLog, /public_share_created/);
   assert.match(auditLog, /public_share_revoked/);
-  assert.match(auditLog, /voiceover_execution_blocked/);
+  assert.match(auditLog, /voiceover_job_queued/);
+  assert.match(auditLog, /voiceover_status/);
+  assert.match(auditLog, /voiceover_cancel/);
+  assert.match(auditLog, /voiceover_playback/);
+  assert.match(auditLog, /voiceover_delete-output/);
   assert.match(functions, /auditLog\(\{ event: "generation_requested"/);
   assert.match(functions, /auditLog\(\{ event: "story_persisted"/);
-  assert.match(functions, /auditLog\(\{[\s\S]*event: "voiceover_execution_blocked"/);
+  assert.match(functions, /auditLog\(\{ event: "voiceover_job_queued"/);
+  assert.match(functions, /auditLog\(\{ event: \`voiceover_\$\{input\.action\}\`/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_created"/);
   assert.match(shareLifecycle, /auditLog\(\{ event: "public_share_revoked"/);
   assert.doesNotMatch(auditLog, /sourceText|generated story body|raw provider/i);
