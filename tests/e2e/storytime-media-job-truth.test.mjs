@@ -11,10 +11,16 @@ const scrollBuilders = fs.readFileSync('functions/src/storytime-scroll-builders.
 const contract = fs.readFileSync('src/lib/storytime/media-job-contract.ts', 'utf8');
 const env = fs.readFileSync('.env.example', 'utf8');
 
-test('unconsumed voiceover queue is not deployed as a callable', () => {
-  assert.doesNotMatch(index, /prepareVoiceoverJob/);
-  assert.doesNotMatch(functions, /voiceoverJobs/);
-  assert.doesNotMatch(functions, /Voiceover export queued/);
+test('voiceover queue is consumed by the governed Jobs bridge and exported as a private lifecycle', () => {
+  assert.match(index, /prepareVoiceoverJob/);
+  assert.match(index, /manageVoiceoverJob/);
+  assert.match(functions, /storytimeJobsBridgeRequest/);
+  assert.match(functions, /externalSystem: "urai-jobs"/);
+  assert.match(functions, /voiceoverJobs/);
+  assert.match(functions, /storyExports/);
+  assert.match(functions, /private: true/);
+  assert.match(functions, /delete-output/);
+  assert.doesNotMatch(functions, /media_worker_not_implemented/);
 });
 
 test('synchronous Storytime-derived records report completed after persistence', () => {
