@@ -1,7 +1,7 @@
 # URAI Storytime architecture
 
-Last reconciled: 2026-07-06  
-Evidence baseline: `main@af3b97166b23c55618ae3cdd91a96bb035fd40f2`
+Last reconciled: 2026-10-03  
+Evidence baseline: current Storytime successor branch; exact-head release evidence must come from CI for the final SHA
 
 ## Current classification
 
@@ -25,9 +25,12 @@ flowchart TB
 
   FS --> Sessions[Story sessions/chapters/moments/scenes/scripts/arcs]
   FS --> Shares[Public-safe shares]
-  FS --> Jobs[Voiceover/export queue records]
+  FS --> Voiceover[Private Storytime voiceover/export records]
+  Fn --> Bridge[Authenticated URAI Jobs narrator bridge]
+  Bridge --> Jobs[urai-jobs narrator.tts]
+  Jobs --> Media[Private media artifact lifecycle]
 
-  Adapter[Asset-Factory TypeScript adapter] -. not dispatched by worker .-> AssetFactory[asset-factory API]
+  Adapter[Asset-Factory TypeScript adapter] -. separately governed media path .-> AssetFactory[asset-factory API]
 ```
 
 ## Active frontend surfaces
@@ -44,22 +47,20 @@ There are no active Next API routes. Backend operations are Firebase callable Fu
 
 ## Callable boundary
 
-### Implemented but not live-verified
+### Implemented but not live-production-verified
 
 - `generateStorySession`
 - `createPublicStoryShare`
 - `revokePublicStoryShare`
-- `prepareVoiceoverJob` (queue records only)
+- `generateNarratorScript` — persists an owned narrator script and timeline event
+- `generateEmotionalArcSummary` — persists an owned emotional-arc record and binds it to the session
+- `generateWeeklyStoryScroll` — verifies session ownership and persists a bounded weekly scroll
+- `refreshStoryTimeline` — persists an owned timeline event
+- `rebuildUserStoryArchive` — persists a bounded server-owned archive snapshot
+- `prepareVoiceoverJob` — records explicit voiceover consent and creates an idempotent governed URAI Jobs `narrator.tts` handoff
+- `manageVoiceoverJob` — provides bounded status, cancel, private playback, and output-deletion lifecycle against the governed Jobs bridge
 
-### Placeholder hooks
-
-- `generateNarratorScript`
-- `generateEmotionalArcSummary`
-- `generateWeeklyStoryScroll`
-- `refreshStoryTimeline`
-- `rebuildUserStoryArchive`
-
-A callable name existing is not evidence that its business process exists.
+A callable name alone is not launch proof. Exact-head CI, deployed bridge configuration, provider/runtime evidence, private artifact readback, and environment-specific authorization remain separate gates.
 
 ## Current data ownership
 

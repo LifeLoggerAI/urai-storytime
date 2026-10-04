@@ -37,7 +37,7 @@ export function buildStorySession(input: {
   emotionalTone?: string;
   symbolicMotifs?: string[];
   sourceSignals?: string[];
-  consentSnapshot?: StorySession["consentSnapshot"];
+  consentSnapshot: StorySession["consentSnapshot"];
 }): {
   session: StorySession;
   chapters: StoryChapter[];
@@ -58,6 +58,9 @@ export function buildStorySession(input: {
   const emotionalTone = normalizeText(input.emotionalTone, "reflective", MAX_TONE_CHARS);
   const symbolicMotifs = normalizeList(input.symbolicMotifs, DEFAULT_SYMBOLIC_MOTIFS, MAX_MOTIFS, MAX_MOTIF_CHARS);
   const sourceSignals = normalizeList(input.sourceSignals, [], MAX_SOURCE_SIGNALS, MAX_SOURCE_SIGNAL_CHARS);
+  if (input.consentSnapshot.storyGeneration !== true) {
+    throw new Error("Explicit story-generation consent is required.");
+  }
   const moderation = moderateStoryText(source);
 
   const moment: StoryMoment = {
@@ -147,13 +150,7 @@ export function buildStorySession(input: {
     emotionalArcSummaryId: arcId,
     whyGenerated: explainWhyGenerated(sourceSignals),
     safetyStatus: moderation.status,
-    consentSnapshot:
-      input.consentSnapshot || {
-        storyGeneration: true,
-        voiceover: false,
-        publicSharing: false,
-        memoryUse: false
-      },
+    consentSnapshot: input.consentSnapshot,
     createdAt,
     updatedAt: createdAt
   };

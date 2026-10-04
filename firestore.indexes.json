@@ -15,6 +15,20 @@
       ]
     },
     {
+      "collectionGroup": "storySessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "storyChapters",
       "queryScope": "COLLECTION",
       "fields": [
@@ -38,20 +52,6 @@
         },
         {
           "fieldPath": "order",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "publicStoryShares",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "slug",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "revoked",
           "order": "ASCENDING"
         }
       ]

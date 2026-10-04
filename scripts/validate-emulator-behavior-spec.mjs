@@ -17,18 +17,22 @@ if (!fs.existsSync(specPath)) {
     'storyMoments',
     'memoryScenes',
     'narratorScripts',
-    'emotionalArcSummaries',
-    'publicStoryShares',
-    'voiceoverJobs',
-    'storyExports',
-    'Required allow cases',
-    'Required deny cases',
-    'Client cannot read or write `storytimeUsageCounters`',
-    'Public/signed-out users cannot read a revoked public share',
-    'Storage paths must deny by default',
-    'emulator-behavior.log',
-    'no secrets',
-    'no real personal data'
+    'emotional arcs',
+    'public-story-share-v2',
+    'storytimeUsageCounters',
+    'storyGenerationRequests',
+    'storyArchiveSnapshots',
+    'privacyDeletionPlans',
+    'server-created',
+    'Append-only analytics',
+    'Family story assets',
+    'Moderation storage is admin-only',
+    'Every unspecified Storage path is denied by default',
+    'including stacked PRs',
+    'exact candidate SHA',
+    'no production credentials',
+    'no real personal data',
+    'does **not** prove'
   ]) {
     if (!spec.includes(marker)) failures.push('Emulator behavior spec missing marker: ' + marker);
   }
@@ -41,4 +45,5 @@ if (failures.length > 0) {
 }
 
 console.log('Emulator behavior proof spec validation passed.');
-console.log('Behavioral emulator execution is still required before production readiness can be claimed.');
+console.log('Executable Firestore/Storage emulator evidence is required on the exact candidate SHA before runtime authorization claims.');
+

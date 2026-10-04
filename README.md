@@ -47,7 +47,7 @@ Firebase callable functions include:
 - `rebuildUserStoryArchive`
 - `revokePublicStoryShare`
 
-These functions enforce auth boundaries, consent checks, private-by-default story sessions, public sharing consent, redaction scaffolds, queued-only export/voiceover status, default public-share expiration, and owner revoke support. They still require Firebase environment configuration and staging/production verification before public launch claims.
+These functions enforce auth boundaries, consent checks, private-by-default story sessions, public-sharing consent, bounded privacy/data-rights operations, deterministic narrator/arc/weekly/timeline/archive record generation, default public-share expiration, and owner revoke support. Voiceover jobs now hand off to the governed URAI Jobs `narrator.tts` bridge with explicit `storytime.voiceover` consent receipts, idempotent external-job binding, private Storytime export metadata, and bounded status/cancel/playback/delete-output lifecycle. Production provider execution, deployed bridge configuration, protected storage readback, and staging/production evidence remain required before public launch claims.
 
 ## Current production boundary
 
@@ -64,7 +64,7 @@ Implemented or source-wired in code:
 - Isolated Storytime Firebase production config gate
 - Public-share default expiration using `STORYTIME_PUBLIC_SHARE_TTL_DAYS`
 - Deployment and QA checklists
-- Asset-Factory adapter path documented for future media jobs
+- Governed URAI Jobs narrator bridge for Storytime voiceover media jobs
 
 Not verified as live production:
 
@@ -112,6 +112,8 @@ STORYTIME_PUBLIC_SHARING=false
 STORYTIME_GENERATION_PROVIDER=disabled
 STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER=false
 STORYTIME_PUBLIC_SHARE_TTL_DAYS=30
+URAI_STORYTIME_JOBS_BRIDGE_URL=
+URAI_STORYTIME_JOBS_BRIDGE_TOKEN=
 ASSET_FACTORY_BASE_URL=
 ASSET_FACTORY_API_KEY=
 OPENAI_API_KEY=
