@@ -24,7 +24,7 @@ const DELETE_BATCH_LIMIT = 400;
 const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 const STORYTIME_PRIVACY_POLICY_VERSION = "urai-privacy-0.2.0-staging-scaffold";
 const STORYTIME_EXPORT_SCHEMA_VERSION = "storytime-export-v1";
-const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v2";
+const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v3";
 const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v1";
 const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-operation-receipt-v1";
 
