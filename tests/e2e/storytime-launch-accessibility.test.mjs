@@ -20,7 +20,7 @@ test('Storytime exposes a keyboard skip target without changing route ownership'
 test('Storytime preserves browser text scaling, visible focus, touch targets, and motion alternatives', () => {
   assert.match(css, /text-size-adjust: 100%/);
   assert.match(css, /:where\(a, button, input, textarea, select\):focus-visible/);
-  assert.match(css, /min-height: 44px/);
+  assert.match(css, /min-height: 48px/);
   assert.match(css, /input\[type="checkbox"\]/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /@media \(forced-colors: active\)/);
