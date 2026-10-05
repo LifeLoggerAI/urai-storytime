@@ -219,7 +219,8 @@ export function StorytimeHome() {
         setLastSavedDraftFingerprint(fingerprintAtSave);
         setDraftStatus(`Private draft saved · revision ${result.data.revision}. Generation/provider consent is not stored.`);
       } catch {
-        setDraftStatus("Private draft autosave paused. No provider request was made.");
+        setLastSavedDraftFingerprint(fingerprintAtSave);
+        setDraftStatus("Private draft autosave paused after a save failure. Edit the draft to retry. No provider request was made.");
       } finally {
         setDraftSaving(false);
       }
