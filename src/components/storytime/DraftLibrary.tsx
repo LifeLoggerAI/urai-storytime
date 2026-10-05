@@ -54,11 +54,13 @@ export function DraftLibrary() {
     <section className="storytime-card storytime-stack" aria-label="Private Storytime drafts">
       <p className="storytime-pill">Private drafts</p>
       <h2>Continue where you left off</h2>
-      {!cloudReady ? <p>Draft loading stays off until the verified cloud runtime is enabled.</p> : null}
-      {state.status === "signedOut" ? <p>Sign in to see your private drafts.</p> : null}
-      {state.status === "loading" ? <p>Loading private drafts…</p> : null}
-      {state.status === "error" ? <p>Private drafts are temporarily unavailable.</p> : null}
-      {state.status === "ready" && state.drafts.length === 0 ? <p>No saved private drafts.</p> : null}
+      <div role="status" aria-live="polite" aria-busy={state.status === "loading"}>
+        {!cloudReady ? <p>Draft loading stays off until the verified cloud runtime is enabled.</p> : null}
+        {state.status === "signedOut" ? <p>Sign in to see your private drafts.</p> : null}
+        {state.status === "loading" ? <p>Loading private drafts…</p> : null}
+        {state.status === "error" ? <p>Private drafts are temporarily unavailable.</p> : null}
+        {state.status === "ready" && state.drafts.length === 0 ? <p>No saved private drafts.</p> : null}
+      </div>
       {state.status === "ready" ? state.drafts.map((draft) => (
         <article className="storytime-card" key={draft.id}>
           <h3>{draft.title || "Untitled private draft"}</h3>
