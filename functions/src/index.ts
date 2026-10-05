@@ -39,3 +39,5 @@ export {
 export { reportStorytimeSafetyConcern } from "./safety-reports.js";
 
 export { saveStoryDraft, deleteStoryDraft } from "./story-drafts.js";
+
+export { saveStoryRevision, restoreStoryVersion, listStoryVersions } from "./story-versioning.js";
