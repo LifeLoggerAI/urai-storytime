@@ -17,6 +17,8 @@ const DRAFT_STORAGE_CONSENT_VERSION = "story-draft-storage-v1";
 const MOODS = ["gentle", "reflective", "playful", "brave", "calm"] as const;
 const SAFETY_TERMS = ["self harm", "weapon", "explicit abuse"];
 
+type StoryStep = "details" | "review";
+
 type GenerateStoryResponse = {
   sessionId?: string;
   status?: string;
@@ -75,6 +77,7 @@ function draftFingerprint(input: {
 }
 
 export function StorytimeHome() {
+  const [step, setStep] = useState<StoryStep>("details");
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("");
   const [audienceAgeBand, setAudienceAgeBand] = useState<(typeof AUDIENCE_AGE_BANDS)[number]>("family");
@@ -284,23 +287,43 @@ export function StorytimeHome() {
     }
   }
 
-  const validationError = useMemo(() => {
+  const detailsError = useMemo(() => {
     if (!title.trim()) return "Add a title to continue.";
     if (!theme.trim()) return "Add a theme to continue.";
     if (!AUDIENCE_AGE_BANDS.includes(audienceAgeBand)) return "Choose an audience age band.";
-    if (!adultGuardianAffirmed) return "Storytime is currently adult/guardian-operated. Confirm that you are the adult or guardian operating this story.";
-    if (!generationConsent) return "Explicit story-generation consent is required.";
-    if (!providerProcessingConsent) return "Consent to the configured story-generation provider is required before cloud generation.";
-    if (!requestReviewed) return "Review the exact Storytime request before generation.";
     const unsafeTerm = firstUnsafeTerm([title, theme, mood, sourceText]);
     if (unsafeTerm) return "This story seed includes sensitive content that Storytime cannot process here.";
     if (sourceText.length > MAX_SOURCE_CHARS) return `Keep the source text under ${MAX_SOURCE_CHARS} characters.`;
     return null;
-  }, [adultGuardianAffirmed, audienceAgeBand, generationConsent, mood, providerProcessingConsent, requestReviewed, sourceText, theme, title]);
+  }, [audienceAgeBand, mood, sourceText, theme, title]);
+
+  const consentError = useMemo(() => {
+    if (!adultGuardianAffirmed) return "Storytime is currently adult/guardian-operated. Confirm that you are the adult or guardian operating this story.";
+    if (!generationConsent) return "Explicit story-generation consent is required.";
+    if (!providerProcessingConsent) return "Consent to the configured story-generation provider is required before cloud generation.";
+    if (!requestReviewed) return "Review the exact Storytime request before generation.";
+    return null;
+  }, [adultGuardianAffirmed, generationConsent, providerProcessingConsent, requestReviewed]);
+
+  const validationError = detailsError || consentError;
+
+  function goToReview() {
+    setSubmitError(null);
+    if (detailsError) {
+      setSubmitError(detailsError);
+      return;
+    }
+    setStep("review");
+  }
 
   async function handleCreateStory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitError(null);
+
+    if (step !== "review") {
+      goToReview();
+      return;
+    }
 
     if (!cloudReady) {
       setSubmitError("Story creation is temporarily unavailable. Your text has not been submitted.");
@@ -405,9 +428,11 @@ export function StorytimeHome() {
         </section>
 
         <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined} aria-busy={isSubmitting}>
-          <p className="storytime-pill">Private story</p>
-          <h2>Create a story</h2>
-          <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
+          <p className="storytime-pill">Private story · {step === "details" ? "Step 1 of 2" : "Step 2 of 2"}</p>
+          <h2>{step === "details" ? "Choose the story details" : "Review and consent"}</h2>
+          <p>{step === "details"
+            ? "Choose only the details you want Storytime to hold. A few lines are enough."
+            : "Review the exact request below. Nothing is submitted until you confirm the operator and provider consents and choose Create story."}</p>
 
           {!cloudReady ? (
             <p className="storytime-warning" id="storytime-unavailable" role="status" aria-live="polite">
@@ -415,6 +440,8 @@ export function StorytimeHome() {
             </p>
           ) : null}
 
+          {step === "details" ? (
+            <>
           <label className="storytime-field">
             Title
             <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" required aria-invalid={Boolean(submitError && !title.trim())} />
@@ -479,6 +506,16 @@ export function StorytimeHome() {
             ) : null}
           </section>
 
+          {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
+          {detailsError ? <p className="storytime-helper" id="storytime-details-validation" role="status" aria-live="polite">{detailsError}</p> : null}
+          <div className="storytime-actions">
+            <button className="storytime-button" type="button" onClick={goToReview} disabled={Boolean(detailsError) || draftSaving}>
+              Review story request
+            </button>
+          </div>
+            </>
+          ) : (
+            <>
           <label className="storytime-field">
             <span>
               <input
@@ -540,17 +577,22 @@ export function StorytimeHome() {
           </section>
 
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
-          {cloudReady && validationError ? <p className="storytime-helper" id="storytime-validation" role="status" aria-live="polite">{validationError}</p> : null}
+          {consentError ? <p className="storytime-helper" id="storytime-validation" role="status" aria-live="polite">{consentError}</p> : null}
 
           <div className="storytime-actions">
+            <button className="storytime-button secondary" type="button" onClick={() => setStep("details")} disabled={isSubmitting}>
+              Back to details
+            </button>
             <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
               {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create story"}
             </button>
           </div>
           <p className="storytime-helper">
             Storytime is currently adult/guardian-operated. Audience age bands shape the requested story; they do not create or authorize a child account.
-            Nothing is submitted until you affirm the operator boundary, give the generation/provider consents above, and choose Create story.
+            Nothing is submitted until you affirm the operator boundary, give the generation/provider consents above, review this exact request, and choose Create private story.
           </p>
+            </>
+          )}
         </form>
       </div>
       </main>
