@@ -431,7 +431,7 @@ export function StorytimeHome() {
           <h2>{step === "details" ? "Choose the story details" : "Review and consent"}</h2>
           <p>{step === "details"
             ? "Choose only the details you want Storytime to hold. A few lines are enough."
-            : "Review the exact request below. Nothing is submitted until you confirm the operator and provider consents and choose Create private story."}</p>
+            : "Review the exact request below. Nothing is submitted until you confirm the operator and provider consents and choose Create story."}</p>
 
           {!cloudReady ? (
             <p className="storytime-warning" id="storytime-unavailable" role="status" aria-live="polite">
@@ -583,7 +583,7 @@ export function StorytimeHome() {
               Back to details
             </button>
             <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
-              {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create private story"}
+              {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create story"}
             </button>
           </div>
           <p className="storytime-helper">
