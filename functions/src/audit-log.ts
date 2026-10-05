@@ -24,6 +24,8 @@ export type StorytimeAuditEvent =
   | "privacy_request_created"
   | "story_draft_saved"
   | "story_draft_deleted"
+  | "story_revision_saved"
+  | "story_version_restored"
   | "privacy_export_packaged"
   | "privacy_export_download_url_created"
   | "privacy_deletion_planned"
