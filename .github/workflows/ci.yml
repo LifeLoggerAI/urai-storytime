@@ -78,6 +78,7 @@ jobs:
       - name: Write exact-head reproducibility receipt
         env:
           TARGET_SHA: ${{ env.TARGET_SHA }}
+          STORYTIME_REPRO_RECEIPT: /tmp/storytime-root/storytime-reproducibility.json
         run: node scripts/write-ci-reproducibility-receipt.mjs
 
       - name: Upload exact-head app evidence
@@ -88,7 +89,7 @@ jobs:
           path: |
             /tmp/storytime-root-install.log
             /tmp/storytime-root/**
-            ci-receipts/storytime-reproducibility.json
+            /tmp/storytime-root/storytime-reproducibility.json
           if-no-files-found: error
           retention-days: 90
 
