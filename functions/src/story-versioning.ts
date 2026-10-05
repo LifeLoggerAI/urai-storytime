@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, type WriteBatch } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
@@ -165,7 +165,7 @@ function versionRecord(args: {
   };
 }
 
-function writeSnapshot(batch: FirebaseFirestore.WriteBatch, snapshot: VersionSnapshot, updatedAt: string) {
+function writeSnapshot(batch: WriteBatch, snapshot: VersionSnapshot, updatedAt: string) {
   batch.update(db.collection("storyChapters").doc(snapshot.chapter.id), {
     summary: snapshot.chapter.summary,
     updatedAt
