@@ -383,7 +383,7 @@ export function StorytimeHome() {
           <DraftLibrary />
         </section>
 
-        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined}>
+        <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined} aria-busy={isSubmitting}>
           <p className="storytime-pill">Private story</p>
           <h2>Create a story</h2>
           <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
