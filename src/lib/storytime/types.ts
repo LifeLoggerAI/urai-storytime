@@ -31,6 +31,11 @@ export interface StorySession extends StorytimeBase {
     role: "adult_or_guardian";
     affirmed: true;
   };
+  requestReview?: {
+    reviewed: true;
+    reviewVersion: "story-request-review-v1";
+    processedRequestSha256?: string;
+  };
   provenance?: {
     schemaVersion: "storytime-provenance-v1";
     sourceType: "direct_storytime_input" | "memory_snapshot" | "story_version" | "finite_time_canon";
@@ -209,4 +214,30 @@ export interface StoryAnalyticsEvent extends StorytimeBase {
     | "export_completed";
   sessionId?: string;
   metadata?: Record<string, string | number | boolean>;
+}
+
+
+export interface StoryVersion extends StorytimeBase {
+  schemaVersion: "story-version-v1";
+  sessionId: string;
+  versionNumber: number;
+  parentVersionId: string | null;
+  reason: "initial_generation" | "user_edit" | "section_regeneration" | "restored_version";
+  status: "committed";
+  immutable: true;
+  contentSha256: string;
+  snapshot: {
+    title: string;
+    provider: string;
+    locale: string;
+    audienceAgeBand: string;
+    consentVersion: string;
+    reviewVersion: string;
+    reviewedRequestSha256: string;
+    provenance: Record<string, unknown>;
+    chapter: { id: string; title: string; summary: string };
+    moment: { id: string; title: string; body: string };
+    narrator: { id: string; text: string };
+    emotionalArc: { id: string; arcLabel: string; summary: string };
+  };
 }
