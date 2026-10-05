@@ -4,7 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
-import type { EmotionalArcSummary, MemoryScene, NarratorScript, StoryChapter, StorySession, StoryVersion } from "@/lib/storytime/types";
+import type { EmotionalArcSummary, MemoryScene, NarratorScript, StoryChapter, StoryMoment, StorySession, StoryVersion } from "@/lib/storytime/types";
 import { ChapterTimeline } from "./ChapterTimeline";
 import { EmotionalArcViewer } from "./EmotionalArcViewer";
 import { MemorySceneCard } from "./MemorySceneCard";
@@ -12,10 +12,12 @@ import { SafetyReportControls } from "./SafetyReportControls";
 import { ShareControls } from "./ShareControls";
 import { StoryPlayer } from "./StoryPlayer";
 import { StoryVersionHistory } from "./StoryVersionHistory";
+import { StoryRevisionEditor } from "./StoryRevisionEditor";
 
 type Bundle = {
   session: StorySession;
   chapters: StoryChapter[];
+  moments: StoryMoment[];
   scenes: MemoryScene[];
   scripts: NarratorScript[];
   versions: StoryVersion[];
@@ -40,8 +42,9 @@ async function loadBundle(sessionId: string, userId: string): Promise<Bundle | n
   if (!snapshot.exists()) return null;
 
   const session = { id: snapshot.id, ...snapshot.data() } as StorySession;
-  const [chapterDocs, sceneDocs, scriptDocs, versionDocs] = await Promise.all([
+  const [chapterDocs, momentDocs, sceneDocs, scriptDocs, versionDocs] = await Promise.all([
     getDocs(query(collection(db, "storyChapters"), where("sessionId", "==", sessionId), orderBy("order", "asc"))),
+    getDocs(query(collection(db, "storyMoments"), where("sessionId", "==", sessionId), orderBy("order", "asc"))),
     getDocs(query(collection(db, "memoryScenes"), where("sessionId", "==", sessionId))),
     getDocs(query(collection(db, "narratorScripts"), where("sessionId", "==", sessionId))),
     getDocs(query(
@@ -60,6 +63,7 @@ async function loadBundle(sessionId: string, userId: string): Promise<Bundle | n
   return {
     session,
     chapters: chapterDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryChapter),
+    moments: momentDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryMoment),
     scenes: sceneDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as MemoryScene),
     scripts: scriptDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as NarratorScript),
     versions: versionDocs.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryVersion),
@@ -108,6 +112,13 @@ export function CloudSession({ sessionId }: { sessionId: string }) {
       <section className="storytime-stack" aria-label="Cloud Storytime session">
         <StoryPlayer session={bundle.session} chapters={bundle.chapters} narratorScripts={bundle.scripts} />
         <StoryVersionHistory versions={bundle.versions} />
+        <StoryRevisionEditor
+          session={bundle.session}
+          chapter={bundle.chapters[0] ?? null}
+          moment={bundle.moments[0] ?? null}
+          narrator={bundle.scripts[0] ?? null}
+          versions={bundle.versions}
+        />
         <section className="storytime-grid">
           <ChapterTimeline chapters={bundle.chapters} />
           {bundle.scenes[0] ? <MemorySceneCard scene={bundle.scenes[0]} /> : <article className="storytime-card"><h2>No saved scene</h2><p>This cloud session has no saved memory scene yet.</p></article>}
