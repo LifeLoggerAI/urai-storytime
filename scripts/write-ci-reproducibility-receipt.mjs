@@ -54,7 +54,7 @@ const receipt = {
   productionEvidenceBoundary:'Production-only evidence gates remain separate and fail closed on main when provider/Firebase/legal/safety receipts are absent.',
   secretValuesIncluded:false,
 };
-mkdirSync('ci-receipts',{recursive:true});
-const out=path.join('ci-receipts','storytime-reproducibility.json');
+const out = process.env.STORYTIME_REPRO_RECEIPT || '/tmp/storytime-root/storytime-reproducibility.json';
+mkdirSync(path.dirname(out),{recursive:true});
 writeFileSync(out,JSON.stringify(receipt,null,2)+'\n');
 console.log(JSON.stringify(receipt,null,2));
