@@ -112,8 +112,28 @@ export function StorytimeHome() {
     }
 
     let active = true;
+    const clearResumedDraft = () => {
+      setTitle("");
+      setTheme("");
+      setAudienceAgeBand("family");
+      setMood("reflective");
+      setSourceText("");
+      setAdultGuardianAffirmed(false);
+      setGenerationConsent(false);
+      setProviderProcessingConsent(false);
+      setReviewedFingerprint(null);
+      setDraftStorageConsent(false);
+      setDraftId(null);
+      setDraftRevision(0);
+      setLastSavedDraftFingerprint(null);
+    };
     const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
-      if (!active || !user) return;
+      if (!active) return;
+      clearResumedDraft();
+      if (!user) {
+        setDraftStatus("Sign in to resume this private draft.");
+        return;
+      }
       try {
         const snapshot = await getDoc(doc(getFirebaseDb(), "storyDrafts", requestedDraftId));
         if (!active) return;
