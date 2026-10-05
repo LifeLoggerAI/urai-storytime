@@ -25,15 +25,19 @@ The incomplete static/hash-router files below were removed from the active tree:
 
 Their historical contents remain available through Git history. They are not copied into a deployable archive because the old `app.js` was incomplete and would preserve an ambiguous alternate product surface.
 
-## Retained deterministic modules
+## Archived deterministic demo engine
 
-Some `.mjs` modules under `src/` remain because current unit tests and validators use them as bounded deterministic-demo or readiness adapters. Their presence does not authorize a second frontend. They must not introduce an HTML entrypoint, hash router, independent Hosting root, or deployment command.
+The obsolete direct-child bedtime demo engine has been moved from `src/story-engine.mjs` to `legacy/static-demo/story-engine.mjs`.
+
+It remains only as historical/test evidence. It is not an active domain adapter, provider, safety engine, frontend, build input, Hosting root, or production Storytime capability.
+
+Current launch Storytime generation authority lives in the Next.js/Firebase application and its governed server/provider contracts.
 
 ## Fail-closed authority
 
 `tests/e2e/canonical-app-root.test.mjs` enforces:
 
-1. the three obsolete entrypoint files remain absent;
+1. the obsolete static entrypoint files and `src/story-engine.mjs` remain absent;
 2. root scripts remain Next.js commands;
 3. Firebase Hosting remains the frameworks backend;
 4. no active package script serves or deploys a static `src/` directory;
