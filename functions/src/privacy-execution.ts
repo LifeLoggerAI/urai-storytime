@@ -65,6 +65,7 @@ const accountRetainedLedgerCollections = [
 const accountUserCollections = [
   ...accountRetainedLedgerCollections,
   "storySessions",
+  "storyDrafts",
   "storyChapters",
   "storyMoments",
   "memoryScenes",

@@ -48,6 +48,7 @@ const requiredSourceFiles = [
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
   'functions/src/story-version.ts',
+  'functions/src/story-drafts.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
   'functions/src/privacy-execution.ts',
@@ -143,6 +144,23 @@ if (exists('functions/src/storytime.ts')) {
   }
 }
 
+if (exists('functions/src/story-drafts.ts')) {
+  const drafts = read('functions/src/story-drafts.ts');
+  for (const marker of [
+    'story-draft-storage-v1',
+    'privateDraftStorage: z.literal(true)',
+    'expectedRevision',
+    'generationConsentStored: false',
+    'providerProcessingAuthorized: false',
+    'storytime_private_draft'
+  ]) {
+    if (!drafts.includes(marker)) failures.push(`Missing private-draft safety marker: ${marker}`);
+  }
+  for (const forbidden of ['OPENAI_API_KEY', 'generateStoryWithProvider', 'STORYTIME_GENERATION_PROVIDER']) {
+    if (drafts.includes(forbidden)) failures.push(`Private draft backend must remain provider-free: ${forbidden}`);
+  }
+}
+
 if (exists('functions/src/story-version.ts')) {
   const versions = read('functions/src/story-version.ts');
   for (const marker of [
@@ -216,6 +234,7 @@ if (exists('firestore.rules')) {
   const rules = read('firestore.rules');
   for (const marker of [
     'match /storySessions/{id}',
+    'match /storyDrafts/{id}',
     'match /storyVersions/{id}',
     'allow create, update, delete: if false',
     'match /publicStoryShares/{id}',
