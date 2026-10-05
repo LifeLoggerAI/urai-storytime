@@ -10,6 +10,7 @@ if (getApps().length === 0) initializeApp();
 
 const db = getFirestore();
 const MAX_VERSION_HISTORY = 25;
+// This revision path is provider-free: edits and restores never authorize generation or provider spend.
 
 const SaveRevisionSchema = z.object({
   sessionId: z.string().min(1).max(256),
