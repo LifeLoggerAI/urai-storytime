@@ -441,7 +441,8 @@ export function StorytimeHome() {
           </div>
           <label className="storytime-field">
             Memory or source text <span className="storytime-helper">Optional</span>
-            <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." />
+            <textarea className="storytime-input" rows={6} value={sourceText} maxLength={MAX_SOURCE_CHARS} onChange={(event) => setSourceText(event.target.value)} placeholder="Add the part of the memory you want the story to hold onto." aria-describedby="storytime-source-count" />
+            <span className="storytime-helper" id="storytime-source-count">{sourceText.length} / {MAX_SOURCE_CHARS} characters</span>
           </label>
 
           <section className="storytime-card storytime-stack" aria-label="Private draft storage">
