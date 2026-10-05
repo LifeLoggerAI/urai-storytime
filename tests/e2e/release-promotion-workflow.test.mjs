@@ -7,9 +7,9 @@ const workflowPath = new URL(
   import.meta.url,
 );
 
-const CHECKOUT_SHA = '11bd71901bbe5b1630ceea73d27597364c9af683';
-const SETUP_NODE_SHA = '49933ea5288caeca8642d1e84afbd3f7d6820020';
-const UPLOAD_ARTIFACT_SHA = 'ea165f8d65b6e75b540449e92b4886f43607fa02';
+const CHECKOUT_SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1';
+const SETUP_NODE_SHA = '820762786026740c76f36085b0efc47a31fe5020';
+const UPLOAD_ARTIFACT_SHA = '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
 
 test('release-promotion verification remains exact-head, pinned, and non-deploying', async () => {
   const workflow = await readFile(workflowPath, 'utf8');
