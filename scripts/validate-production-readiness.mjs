@@ -48,6 +48,7 @@ const requiredSourceFiles = [
   'functions/src/storytime.ts',
   'functions/src/story-provider.ts',
   'functions/src/story-version.ts',
+  'functions/src/story-versioning.ts',
   'functions/src/story-drafts.ts',
   'functions/src/public-story-share-lifecycle.ts',
   'functions/src/privacy-requests.ts',
@@ -158,6 +159,26 @@ if (exists('functions/src/story-drafts.ts')) {
   }
   for (const forbidden of ['OPENAI_API_KEY', 'generateStoryWithProvider', 'STORYTIME_GENERATION_PROVIDER']) {
     if (drafts.includes(forbidden)) failures.push(`Private draft backend must remain provider-free: ${forbidden}`);
+  }
+}
+
+if (exists('functions/src/story-versioning.ts')) {
+  const versioning = read('functions/src/story-versioning.ts');
+  for (const marker of [
+    'saveStoryRevision',
+    'restoreStoryVersion',
+    'expectedCurrentVersionId',
+    'reason: "user_edit"',
+    'reason: "restored_version"',
+    'parentVersionId',
+    'immutable: true',
+    'contentSha256: sha256(args.snapshot)',
+    'provider-free'
+  ]) {
+    if (!versioning.includes(marker)) failures.push(`Missing Storytime revision marker: ${marker}`);
+  }
+  for (const forbidden of ['OPENAI_API_KEY', 'generateStoryWithProvider', 'STORYTIME_GENERATION_PROVIDER', 'https://api.openai.com']) {
+    if (versioning.includes(forbidden)) failures.push(`Storytime revision backend must remain provider-free: ${forbidden}`);
   }
 }
 
