@@ -389,18 +389,18 @@ export function StorytimeHome() {
           <p>Choose the details you want Storytime to use. You can keep the source brief—a few lines are enough.</p>
 
           {!cloudReady ? (
-            <p className="storytime-warning" id="storytime-unavailable" role="status">
+            <p className="storytime-warning" id="storytime-unavailable" role="status" aria-live="polite">
               Story creation is temporarily unavailable. You can still review your saved stories and settings.
             </p>
           ) : null}
 
           <label className="storytime-field">
             Title
-            <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" />
+            <input className="storytime-input" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={120} autoComplete="off" required aria-invalid={Boolean(submitError && !title.trim())} />
           </label>
           <label className="storytime-field">
             Theme
-            <input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="A family memory, a quiet turning point, a brave day" autoComplete="off" />
+            <input className="storytime-input" value={theme} onChange={(event) => setTheme(event.target.value)} maxLength={80} placeholder="A family memory, a quiet turning point, a brave day" autoComplete="off" required aria-invalid={Boolean(submitError && !theme.trim())} />
           </label>
           <div className="storytime-grid compact">
             <label className="storytime-field">
@@ -447,7 +447,7 @@ export function StorytimeHome() {
             <p className="storytime-helper">
               Draft storage is separate from story-generation and provider consent. Drafts never store those approvals.
             </p>
-            {draftStatus ? <p role="status">{draftStatus}</p> : null}
+            {draftStatus ? <p role="status" aria-live="polite">{draftStatus}</p> : null}
             {draftId ? (
               <div className="storytime-actions">
                 <button className="storytime-button secondary" type="button" onClick={handleDeleteDraft} disabled={draftSaving}>
@@ -518,7 +518,7 @@ export function StorytimeHome() {
           </section>
 
           {submitError ? <p className="storytime-error" role="alert">{submitError}</p> : null}
-          {cloudReady && validationError ? <p className="storytime-helper">{validationError}</p> : null}
+          {cloudReady && validationError ? <p className="storytime-helper" id="storytime-validation" role="status" aria-live="polite">{validationError}</p> : null}
 
           <div className="storytime-actions">
             <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
