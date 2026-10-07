@@ -212,6 +212,11 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     clearTimeout(timer); controller.abort();
     // An outcome never settles funds. A failed observation also leaves the hold intact.
     const observed = await gateway("record", { attempt_id: attemptId, status: outcome, ...(requestId ? { request_id: requestId.slice(0, 256) } : {}) }).catch(() => null);
-    if (outcome === "succeeded") need(observed && observed.provider_call_authorized === false && observed.execution_performed === false && observed.reconciliation_required === true);
+    if (outcome === "succeeded") {
+      need(observed && observed.provider_call_authorized === false && observed.execution_performed === false && observed.reconciliation_required === true);
+      // Recording may await the gateway. Fence returned output against authority
+      // changes during that final await as well.
+      await verifyCurrent();
+    }
   }
 }

@@ -202,6 +202,10 @@ test('lost outcome observation withholds success and keeps the uncertain reserva
   f.fetchHook = (kind, body) => { if (kind === 'gateway' && body.action === 'record') throw new Error('synthetic observation lost'); };
   await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
 }));
+test('revocation during outcome recording withholds returned story output and retains its hold', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'record') { const result = await f.gateway(body); f.rows.get(f.consentPath).revoked = true; return Response.json(result); } };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
 test('one protected deadline covers a stalled response body and retains its unresolved hold', () => fixture(async f => {
   const originalTimer = globalThis.setTimeout;
   // Advance only the admitted 20-second HTTP lifetime, without waiting in CI.
