@@ -167,21 +167,29 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const verifyCurrent = async () => {
     verifySource();
     const current = await loadAuthority(); need(storySourceJson(current) === storySourceJson(initial));
+    verifySource();
   };
+  let executionDeadline = 0;
+  const withinAdmission = () => need(executionDeadline > 0 && Date.now() < executionDeadline);
   // Only Firestore reads and story writes may repeat on a transaction conflict.
   // Provider dispatch and canonical admission remain outside this transaction.
-  const commitWithAuthority: StoryAuthorityCommit = write => db.runTransaction(async transaction => {
-    verifySource();
-    const current = await readAuthority(transaction); need(storySourceJson(current) === storySourceJson(initial));
-    verifySource();
-    write(transaction);
-  });
+  const commitWithAuthority: StoryAuthorityCommit = async write => {
+    withinAdmission();
+    await db.runTransaction(async transaction => {
+      withinAdmission(); verifySource();
+      const current = await readAuthority(transaction); need(storySourceJson(current) === storySourceJson(initial));
+      withinAdmission(); verifySource();
+      write(transaction);
+    });
+    withinAdmission(); verifySource();
+  };
   const gateway = async (action: string, extra: Json = {}) => {
     // An uncertain reserve or observation is never automatically retried.
     try { return await boundedJson(await fetch(gatewayUrl, { method: "POST", redirect: "error", cache: "no-store", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, ...fields, ...extra }), signal: AbortSignal.timeout(15_000) })); }
     catch { throw new StorySpendRejected(); }
   };
   const prepared = await gateway("preflight"); need(prepared.provider_call_authorized === false && prepared.execution_performed === false);
+  const preparedExpiry = instant(prepared.admission_expires_at); need(Date.now() < preparedExpiry);
   const envelope = record(prepared.envelope), job = record(envelope.job), executor = record(job.executor), jobAuthority = record(job.authority), budget = record(job.budget);
   const bound = { job_id: job.job_id, worker_id: executor.worker_id, executor_repository: executor.repository, executor_source_sha: executor.source_sha, gateway_repository: executor.gateway_repository, gateway_source_sha: executor.gateway_source_sha, consumer: job.consumer, tenant_sha256: executor.tenant_sha256, provider: job.provider, account_id: job.account_id, credential_sha256: executor.credential_sha256, source_input_sha256: executor.source_input_sha256, semantic_headers_sha256: executor.semantic_headers_sha256, content_type: executor.content_type, request_sha256: executor.request_sha256, endpoint: executor.endpoint, model: job.model_version, asset: executor.asset, request_size: executor.request_size };
   need(storySourceJson(bound) === storySourceJson(fields) && executor.binding_version === 2 && job.rights_reviewed === true);
@@ -189,6 +197,10 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const inputs = job.input_sha256; need(Array.isArray(inputs) && [inputSha, requestSha, initial.consentDigest, initial.rightsDigest].every(value => inputs.includes(value)));
   digest(executor.deployment_ref); digest(executor.controls_ref);
   const account = record(envelope.account), controls = record(envelope.protected_controls), price = record(envelope.protected_pricing), rates = record(budget.rates);
+  const approval = record(job.approval), releaseAuthority = record(envelope.authority);
+  fresh(approval, "issued_at"); fresh(releaseAuthority);
+  const proofExpiry = Math.min(preparedExpiry, ...[approval, releaseAuthority, account, controls, price, rates, binding].map(value => instant(value.expires_at)));
+  need(Date.now() < proofExpiry);
   need(account.provider === "openai" && account.account_id === accountId && account.credential_sha256 === credentialSha && account.credential_binding_verified === true && account.trusted_readback === true); text(account.credential_binding_receipt); fresh(account);
   for (const key of ["credential_sha256", "semantic_headers_sha256", "source_input_sha256", "content_type"] as const) need(controls[key] === fields[key] && price[key] === fields[key]);
   need(controls.provider === "openai" && controls.account_id === accountId && controls.enforcement_source_sha === gatewaySha && controls.endpoint === endpoint && controls.request_sha256 === requestSha && controls.trusted_readback === true && controls.hard_stop_supported === true && controls.cost_cap_enforced === true && controls.auto_top_up === false); text(controls.proof_receipt); fresh(controls);
@@ -203,15 +215,23 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   need(integer(rates.usd_micros_per_unit, 1) >= Math.ceil(exact.estimatedMaxCostUsd * 1_000_000) && cap <= Math.floor(exact.maxGenerationCostUsd * 1_000_000) && budget.max_retries === 0 && runtime <= 20);
   const jobDigest = storySpendHash(canonical(Object.fromEntries(Object.entries(job).filter(([key]) => key !== "approval" && key !== "attempts"))));
   await verifyCurrent();
+  // Start the conservative runtime before the reserve round-trip. A delayed
+  // reply cannot renew an approval or add another full provider lifetime.
+  executionDeadline = Math.min(proofExpiry, Date.now() + runtime * 1000);
+  withinAdmission();
   const admitted = await gateway("reserve", { job_digest: jobDigest });
   need(admitted.provider_call_authorized === true && admitted.execution_performed === false && admitted.executor_source_sha === sourceSha && admitted.gateway_source_sha === gatewaySha && admitted.worker_id === workerId && admitted.job_digest === jobDigest && admitted.max_runtime_seconds === runtime);
   for (const key of ["account_id", "credential_sha256", "semantic_headers_sha256", "source_input_sha256", "content_type"] as const) need(admitted[key] === fields[key]);
+  const reservedAt = instant(admitted.reserved_at), admittedExpiry = instant(admitted.admission_expires_at);
+  need(reservedAt <= Date.now() && reservedAt < admittedExpiry && admittedExpiry <= proofExpiry && admittedExpiry <= reservedAt + runtime * 1000);
+  executionDeadline = Math.min(executionDeadline, admittedExpiry);
+  withinAdmission();
   const attemptId = text(admitted.attempt_id), controller = new AbortController();
-  const deadline = Date.now() + runtime * 1000, timer = setTimeout(() => controller.abort(), runtime * 1000);
+  const timer = setTimeout(() => controller.abort(), executionDeadline - Date.now());
   let outcome: "succeeded" | "failed" = "failed", requestId: string | undefined;
-  const current = () => { need(!controller.signal.aborted && Date.now() < deadline); };
+  const current = () => { need(!controller.signal.aborted); withinAdmission(); };
   try {
-    await verifyCurrent(); fresh(account); fresh(controls); fresh(price); fresh(rates, "verified_at"); current();
+    await verifyCurrent(); fresh(approval, "issued_at"); fresh(releaseAuthority); fresh(account); fresh(controls); fresh(price); fresh(rates, "verified_at"); current();
     const run = async () => {
       const response = await fetch(endpoint, { method: "POST", headers, body: bytes, redirect: "error", cache: "no-store", signal: controller.signal });
       current(); requestId = response.headers.get("x-request-id") || undefined;
@@ -233,7 +253,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
       // Recording may await the gateway. Fence returned output against authority
       // changes during that final await as well.
       await verifyCurrent();
-      need(Date.now() < deadline);
+      withinAdmission();
     }
   }
 }

@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
-import * as gate from '../fixtures/canonical-spend-gateway-047c84.ts';
+import * as gate from '../fixtures/canonical-spend-gateway-acea7ea.ts';
 
 const require = createRequire(new URL('../../functions/package.json', import.meta.url));
 const { z } = require('zod');
@@ -26,7 +26,7 @@ const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return 
 const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
 const signed = (record, pair) => ({ ...record, signature: sign(null, Buffer.from(gate.canonical(record)), pair.privateKey).toString('base64') });
 const gatewayUrl = 'https://synthetic-factory.example.invalid/api/worker/production-spend';
-const gatewayHead = '047c8429626300c9896bc8c4b739b5902575ad38';
+const gatewayHead = 'acea7eaf1ccec8ce34bff99ebb8eb527a7b67098';
 
 function storage() {
   const rows = new Map(); let pending = Promise.resolve();
@@ -154,7 +154,7 @@ async function fixture(run) {
 }
 
 test('source fixture pins actual gateway and original provider Git blobs', () => {
-  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-047c84.ts')), '1bdf4e1d6b21cdf95a55984c1d81a83dfcec8021');
+  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-acea7ea.ts')), 'e547456c428c8e9f60e66162286cfb452f5ef89d');
   assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-before-9178b98.ts')), '9178b980a5d4287b5537169bc6fbee933220a567');
 });
 test('actual predecessor dispatches under environment-only authority and mislabels priced usage as actual', () => fixture(async f => {
@@ -252,7 +252,7 @@ test('record and final authority awaits cannot return output after the protected
 test('one protected deadline covers a stalled response body and retains its unresolved hold', () => fixture(async f => {
   const originalTimer = globalThis.setTimeout;
   // Advance only the admitted 20-second HTTP lifetime, without waiting in CI.
-  globalThis.setTimeout = (fn, ms, ...args) => originalTimer(fn, ms === 20_000 ? 25 : ms, ...args);
+  globalThis.setTimeout = (fn, ms, ...args) => originalTimer(fn, ms > 0 && ms <= 20_000 ? 25 : ms, ...args);
   f.fetchHook = kind => kind === 'provider' ? new Response(new ReadableStream({ start(controller) {
     f.providerRequests.at(-1).signal.addEventListener('abort', () => controller.error(new Error('synthetic body abort')), { once: true });
   } }), { headers: { 'x-request-id': 'synthetic-stalled-body' } }) : undefined;
@@ -344,4 +344,40 @@ for (const value of [NaN, -1, '0']) test(`actual daily budget rejects malformed 
   const d = new Date(), day = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
   f.rows.set(`storytimeProviderBudgetCounters/global_${day}`, { reservedCostUsd: value });
   await assert.rejects(f.generateCallable(), error => error.code === 'failed-precondition'); assert.equal(f.providerRequests.length, 0); assert.deepEqual(f.gatewayActions, []);
+}));
+
+for (const [action, field] of [['preflight', 'admission_expires_at'], ['reserve', 'reserved_at'], ['reserve', 'admission_expires_at']]) {
+ test(`missing absolute ${action} ${field} rejects before provider dispatch`, () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === action) { const reply = await f.gateway(body); delete reply[field]; return Response.json(reply); } };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0);
+  if (action === 'reserve') assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+ }));
+}
+test('approval expiry during a delayed reserve reply rejects without dispatch and retains admission hold', () => fixture(async f => {
+ const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+ const { signature, ...approval } = f.rows.get(f.approvalPath);
+ f.rows.set(f.approvalPath, signed({ ...approval, expires_at: new Date(clock + 2_000).toISOString() }, approver));
+ f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { const reply = await f.gateway(body); clock += 6_000; return Response.json(reply); } };
+ try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; }
+ assert.equal(f.providerRequests.length, 0); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('reserve-response latency cannot restart the admitted runtime for decoding', () => fixture(async f => {
+ const originalNow = Date.now; const started = originalNow(); let clock = started; Date.now = () => clock;
+ f.fetchHook = async (kind, body) => {
+  if (kind === 'gateway' && body.action === 'reserve') { const reply = await f.gateway(body); clock += 6_000; return Response.json(reply); }
+  if (kind === 'provider') { clock = started + 21_000; return Response.json(providerPayload()); }
+ };
+ try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; }
+ assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('paid persistence cannot write a story after its absolute admission expires during caller bookkeeping', () => fixture(async f => {
+ const originalNow = Date.now; const started = originalNow(); let clock = started; Date.now = () => clock;
+ const originalCollection = f.db.collection;
+ f.db.collection = name => {
+  const collection = originalCollection(name); if (name !== 'storytimeProviderDeadLetters') return collection;
+  return { ...collection, doc: id => { const ref = collection.doc(id), set = ref.set; return { ...ref, set: async (...args) => { await set(...args); clock = started + 21_000; } }; } };
+ };
+ try { await assert.rejects(f.generateCallable()); } finally { Date.now = originalNow; }
+ assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
+ assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
 }));
