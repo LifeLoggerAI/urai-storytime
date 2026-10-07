@@ -381,3 +381,20 @@ test('paid persistence cannot write a story after its absolute admission expires
  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
 }));
+test('backward wall-clock adjustment cannot extend the protected provider lifetime', () => fixture(async f => {
+ const originalNow = Date.now, originalMonotonic = performance.now; const wall = originalNow(); let elapsed = 1_000;
+ Date.now = () => wall; performance.now = () => elapsed;
+ f.fetchHook = kind => { if (kind === 'provider') { elapsed += 21_000; Date.now = () => wall - 500; return Response.json(providerPayload()); } };
+ try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; performance.now = originalMonotonic; }
+ assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('paid persistence retains the original monotonic lifetime after provider completion', () => fixture(async f => {
+ const originalNow = Date.now, originalMonotonic = performance.now; const wall = originalNow(); let elapsed = 1_000;
+ Date.now = () => wall; performance.now = () => elapsed;
+ const originalCollection = f.db.collection;
+ f.db.collection = name => { const collection = originalCollection(name); if (name !== 'storytimeProviderDeadLetters') return collection;
+  return { ...collection, doc: id => { const ref = collection.doc(id), set = ref.set; return { ...ref, set: async (...args) => { await set(...args); elapsed += 21_000; } }; } };
+ };
+ try { await assert.rejects(f.generateCallable()); } finally { Date.now = originalNow; performance.now = originalMonotonic; }
+ assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0); assert.equal(f.providerRequests.length, 1);
+}));
