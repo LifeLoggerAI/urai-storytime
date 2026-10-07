@@ -38,6 +38,14 @@ function fixture() {
     batch: () => {
       const deletes = [];
       return { delete: item => deletes.push(item.path), commit: async () => deletes.forEach(path => put(path, undefined)) };
+    },
+    runTransaction: async callback => {
+      const writes = [];
+      const result = await callback({ get: item => item.get(),
+        update: (item, value) => writes.push(() => item.update(value)),
+        create: (item, value) => writes.push(() => item.set(value)) });
+      for (const write of writes) await write();
+      return result;
     }
   };
   const bucket = {
@@ -59,11 +67,11 @@ async function callables(f) {
     getApps: () => [{}], initializeApp: () => {}, getFirestore: () => f.db,
     getStorage: () => ({ bucket: () => f.bucket }),
     getAuth: () => ({ getUser: async () => ({ uid: 'owner', emailVerified: true, disabled: false, metadata: {}, providerData: [] }), deleteUser: async () => {} }),
-    HttpsError, Timestamp, FieldPath, onCall: callback => callback, z, auditLog: () => {}
+    HttpsError, Timestamp, FieldPath, onCall: callback => callback, onRequest: (_options, callback) => callback, z, auditLog: () => {}
   };
   const raw = readFileSync('functions/src/privacy-execution.ts', 'utf8');
   const source = raw.replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
-  const prelude = `import { createHash } from 'node:crypto'; const { getApps, initializeApp, getFirestore, getStorage, getAuth, HttpsError, Timestamp, FieldPath, onCall, z, auditLog } = globalThis[${JSON.stringify(key)}];\n`;
+  const prelude = `import { createHash } from 'node:crypto'; const { getApps, initializeApp, getFirestore, getStorage, getAuth, HttpsError, Timestamp, FieldPath, onCall, onRequest, z, auditLog } = globalThis[${JSON.stringify(key)}];\n`;
   try { return await import(`data:text/javascript;base64,${Buffer.from(prelude + stripTypeScriptTypes(source) + '\n//# sourceURL=storytime-private-version-privacy-fixture.mjs').toString('base64')}`); }
   finally { delete globalThis[key]; }
 }
@@ -71,7 +79,10 @@ async function callables(f) {
 const ownerRequest = data => ({ auth: { uid: 'owner', token: { email_verified: true } }, data });
 const adminRequest = data => ({ auth: { uid: 'admin', token: { admin: true } }, data });
 function request(f, type, scope) {
-  f.put('privacyRequests/privacy', { userId: 'owner', type, scope, sessionId: scope === 'story_session' ? 'session' : null });
+  f.put('privacyRequests/privacy', { schemaVersion: 'storytime-privacy-request-v1', confirmation: true,
+    createdAt: new Date(Date.now() - 1000).toISOString(), status: 'requested',
+    exportAuthorizationExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    userId: 'owner', type, scope, sessionId: scope === 'story_session' ? 'session' : null });
 }
 
 for (const scope of ['account', 'story_session']) {

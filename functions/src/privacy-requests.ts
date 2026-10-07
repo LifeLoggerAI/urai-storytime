@@ -53,6 +53,9 @@ export const requestPrivacyOperation = onCall(async (request) => {
     if (existing.exists) {
       const data = existing.data() || {};
       if (data.userId !== userId) throw new HttpsError("permission-denied", "Privacy request is unavailable.");
+      if (data.type !== input.type || data.scope !== input.scope || (data.sessionId ?? null) !== (input.sessionId ?? null)) {
+        throw new HttpsError("failed-precondition", "The confirmed privacy request scope cannot be changed.");
+      }
       return {
         privacyRequestId: existing.id,
         status: String(data.status || "requested"),
@@ -68,6 +71,10 @@ export const requestPrivacyOperation = onCall(async (request) => {
       type: input.type,
       scope: input.scope,
       sessionId: input.sessionId || null,
+      confirmation: true,
+      exportAuthorizationExpiresAt: input.type === "export"
+        ? new Date(Date.parse(createdAt) + 24 * 60 * 60 * 1000).toISOString()
+        : null,
       status: "requested",
       createdAt,
       updatedAt: createdAt,

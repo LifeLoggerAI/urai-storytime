@@ -13,7 +13,7 @@ export type StorySpendReceipt = {
   status: "RECONCILIATION_REQUIRED";
   jobId: string; attemptId: string; accountId: string; workerId: string;
   executorSourceSha: string; gatewaySourceSha: string;
-  requestSha256: string; sourceInputSha256: string;
+  requestSha256: string; sourceInputSha256: string; semanticInputSha256: string;
   credentialSha256: string; semanticHeadersSha256: string;
   consentReceiptSha256: string; rightsReceiptSha256: string;
   pricingReceipt: string; reservedUsdMicros: number;
@@ -102,9 +102,12 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   text(authority?.userId); text(authority?.requestId); digest(authority?.reviewedRequestSha256);
   const endpoint = "https://api.openai.com/v1/chat/completions", gatewayUrl = gatewayEndpoint();
   const sourceSha = storySpendSourceSha(), gatewaySha = digest(process.env.STORYTIME_SPEND_GATEWAY_SOURCE_SHA, 40);
-  const body = exact.body, headers = new Headers(exact.headers), bytes = Buffer.from(body, "utf8");
+  const body = exact.body, bytes = Buffer.from(body, "utf8");
+  let headers: Headers;
+  try { headers = new Headers(exact.headers); } catch { throw new StorySpendRejected(); }
   need(bytes.length > 0 && bytes.length <= 131_072 && headers.get("content-type") === "application/json");
   const parsed = record(JSON.parse(body)); need(parsed.model === text(exact.model));
+  const semanticInputSha = storySpendHash(storySourceJson(parsed));
   const credential = text(headers.get("authorization")); need(/^Bearer\s+\S+$/.test(credential));
   // These owned copies are the bytes and effective headers dispatched after reservation.
   const credentials = { authorization: credential };
@@ -127,7 +130,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     need(claim.reviewedRequestSha256 === authority.reviewedRequestSha256 && claim.providerInputSha256 === providerInputSha && claim.consentVersion === "story-generation-consent-v1");
     need(consentSnapshot.storyGeneration === true && consentSnapshot.providerProcessing === true && consentSnapshot.consentVersion === claim.consentVersion);
     need(binding.user_id === authority.userId && binding.request_id === authority.requestId && binding.generation_request_id === generationId && binding.reviewed_request_sha256 === authority.reviewedRequestSha256);
-    need(binding.provider === "openai" && binding.request_sha256 === requestSha && binding.source_input_sha256 === inputSha && binding.executor_source_sha === sourceSha && binding.gateway_source_sha === gatewaySha && binding.credential_sha256 === credentialSha && binding.semantic_headers_sha256 === semanticSha);
+    need(binding.provider === "openai" && binding.request_sha256 === requestSha && binding.source_input_sha256 === inputSha && binding.semantic_input_sha256 === semanticInputSha && binding.executor_source_sha === sourceSha && binding.gateway_source_sha === gatewaySha && binding.credential_sha256 === credentialSha && binding.semantic_headers_sha256 === semanticSha);
     // A routing environment variable must not redirect worker credentials or
     // admission to a lookalike endpoint that cannot hold the shared account.
     need(binding.gateway_url === gatewayUrl);
@@ -157,7 +160,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     job_id: jobId, worker_id: workerId, executor_repository: REPOSITORY, executor_source_sha: sourceSha,
     gateway_repository: GATEWAY_REPOSITORY, gateway_source_sha: gatewaySha, consumer: "storytime-generation",
     tenant_sha256: tenantSha, provider: "openai", account_id: accountId, credential_sha256: credentialSha,
-    source_input_sha256: inputSha, semantic_headers_sha256: semanticSha, content_type: "application/json",
+    source_input_sha256: inputSha, semantic_input_sha256: semanticInputSha, semantic_headers_sha256: semanticSha, content_type: "application/json",
     request_sha256: requestSha, endpoint, model: exact.model, asset: `storytime/${tenantSha}/${authority.requestId}/session`, request_size: String(bytes.length)
   };
   const verifySource = () => {
@@ -191,18 +194,19 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const prepared = await gateway("preflight"); need(prepared.provider_call_authorized === false && prepared.execution_performed === false);
   const preparedExpiry = instant(prepared.admission_expires_at); need(Date.now() < preparedExpiry);
   const envelope = record(prepared.envelope), job = record(envelope.job), executor = record(job.executor), jobAuthority = record(job.authority), budget = record(job.budget);
-  const bound = { job_id: job.job_id, worker_id: executor.worker_id, executor_repository: executor.repository, executor_source_sha: executor.source_sha, gateway_repository: executor.gateway_repository, gateway_source_sha: executor.gateway_source_sha, consumer: job.consumer, tenant_sha256: executor.tenant_sha256, provider: job.provider, account_id: job.account_id, credential_sha256: executor.credential_sha256, source_input_sha256: executor.source_input_sha256, semantic_headers_sha256: executor.semantic_headers_sha256, content_type: executor.content_type, request_sha256: executor.request_sha256, endpoint: executor.endpoint, model: job.model_version, asset: executor.asset, request_size: executor.request_size };
+  const bound = { job_id: job.job_id, worker_id: executor.worker_id, executor_repository: executor.repository, executor_source_sha: executor.source_sha, gateway_repository: executor.gateway_repository, gateway_source_sha: executor.gateway_source_sha, consumer: job.consumer, tenant_sha256: executor.tenant_sha256, provider: job.provider, account_id: job.account_id, credential_sha256: executor.credential_sha256, source_input_sha256: executor.source_input_sha256, semantic_input_sha256: executor.semantic_input_sha256, semantic_headers_sha256: executor.semantic_headers_sha256, content_type: executor.content_type, request_sha256: executor.request_sha256, endpoint: executor.endpoint, model: job.model_version, asset: executor.asset, request_size: executor.request_size };
   need(storySourceJson(bound) === storySourceJson(fields) && executor.binding_version === 2 && job.rights_reviewed === true);
   need(jobAuthority.repository === REPOSITORY && jobAuthority.sha === sourceSha);
   const inputs = job.input_sha256; need(Array.isArray(inputs) && [inputSha, requestSha, initial.consentDigest, initial.rightsDigest].every(value => inputs.includes(value)));
   digest(executor.deployment_ref); digest(executor.controls_ref);
   const account = record(envelope.account), controls = record(envelope.protected_controls), price = record(envelope.protected_pricing), rates = record(budget.rates);
   const approval = record(job.approval), releaseAuthority = record(envelope.authority);
+  const concurrency = integer(budget.max_concurrency, 1); need(concurrency <= 20 && account.max_concurrency === concurrency && account.frozen === false && approval.max_concurrency === concurrency && controls.max_concurrency === concurrency);
   fresh(approval, "issued_at"); fresh(releaseAuthority);
   const proofExpiry = Math.min(preparedExpiry, ...[approval, releaseAuthority, account, controls, price, rates, binding].map(value => instant(value.expires_at)));
   need(Date.now() < proofExpiry);
   need(account.provider === "openai" && account.account_id === accountId && account.credential_sha256 === credentialSha && account.credential_binding_verified === true && account.trusted_readback === true); text(account.credential_binding_receipt); fresh(account);
-  for (const key of ["credential_sha256", "semantic_headers_sha256", "source_input_sha256", "content_type"] as const) need(controls[key] === fields[key] && price[key] === fields[key]);
+  for (const key of ["credential_sha256", "semantic_headers_sha256", "source_input_sha256", "semantic_input_sha256", "content_type"] as const) need(controls[key] === fields[key] && price[key] === fields[key]);
   need(controls.provider === "openai" && controls.account_id === accountId && controls.enforcement_source_sha === gatewaySha && controls.endpoint === endpoint && controls.request_sha256 === requestSha && controls.trusted_readback === true && controls.hard_stop_supported === true && controls.cost_cap_enforced === true && controls.auto_top_up === false); text(controls.proof_receipt); fresh(controls);
   for (const key of ["max_usd_micros", "max_credits", "max_runtime_seconds"]) need(controls[key] === budget[key]);
   need(price.provider === "openai" && price.account_id === accountId && price.model_version === exact.model && price.request_sha256 === requestSha && price.trusted_readback === true); text(price.receipt); fresh(price); fresh(rates, "verified_at");
@@ -217,12 +221,13 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   await verifyCurrent();
   // Start the conservative runtime before the reserve round-trip. A delayed
   // reply cannot renew an approval or add another full provider lifetime.
-  executionDeadline = Math.min(proofExpiry, Date.now() + runtime * 1000);
-  monotonicDeadline = performance.now() + Math.max(0, executionDeadline - Date.now());
+  const admissionStarted = Date.now(), admissionMonotonic = performance.now();
+  executionDeadline = Math.min(proofExpiry, admissionStarted + runtime * 1000);
+  monotonicDeadline = admissionMonotonic + Math.max(0, Math.min(runtime * 1000, proofExpiry - admissionStarted));
   withinAdmission();
   const admitted = await gateway("reserve", { job_digest: jobDigest });
   need(admitted.provider_call_authorized === true && admitted.execution_performed === false && admitted.executor_source_sha === sourceSha && admitted.gateway_source_sha === gatewaySha && admitted.worker_id === workerId && admitted.job_digest === jobDigest && admitted.max_runtime_seconds === runtime);
-  for (const key of ["account_id", "credential_sha256", "semantic_headers_sha256", "source_input_sha256", "content_type"] as const) need(admitted[key] === fields[key]);
+  for (const key of ["account_id", "credential_sha256", "semantic_headers_sha256", "source_input_sha256", "semantic_input_sha256", "content_type"] as const) need(admitted[key] === fields[key]);
   const reservedAt = instant(admitted.reserved_at), admittedExpiry = instant(admitted.admission_expires_at);
   need(reservedAt <= Date.now() && reservedAt < admittedExpiry && admittedExpiry <= proofExpiry && admittedExpiry <= reservedAt + runtime * 1000);
   executionDeadline = Math.min(executionDeadline, admittedExpiry);
@@ -245,7 +250,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
       run().then(resolve, reject).finally(() => controller.signal.removeEventListener("abort", abort));
     });
     current(); outcome = "succeeded";
-    return { result, commitWithAuthority, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
+    return { result, commitWithAuthority, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, semanticInputSha256: semanticInputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
   } finally {
     clearTimeout(timer); controller.abort();
     // An outcome never settles funds. A failed observation also leaves the hold intact.

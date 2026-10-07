@@ -5,6 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
 import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit } from "./story-provider-spend.js";
@@ -73,18 +74,24 @@ const ManageVoiceoverJobSchema = z.object({
 });
 
 const STORYTIME_VOICEOVER_CONSENT_VERSION = "storytime-voiceover-consent-v1";
-const storytimeJobsBridgeTokenSecret = defineSecret("URAI_STORYTIME_JOBS_BRIDGE_TOKEN");
+export const storytimeJobsBridgeTokenSecret = defineSecret("URAI_STORYTIME_JOBS_BRIDGE_TOKEN");
 
-function storytimeJobsBridgeUrl() {
+export function storytimeJobsBridgeUrl() {
   const value = String(process.env.URAI_STORYTIME_JOBS_BRIDGE_URL || "").trim();
   if (!value) throw new HttpsError("failed-precondition", "Storytime narrator worker bridge is not configured.");
   if (process.env.NODE_ENV === "production" && !value.startsWith("https://")) {
     throw new HttpsError("failed-precondition", "Storytime narrator worker bridge must use HTTPS in production.");
   }
+  const endpoint = new URL(value);
+  if (endpoint.username || endpoint.password || endpoint.hash || endpoint.search
+    || (endpoint.protocol !== "https:" && !(process.env.NODE_ENV !== "production"
+      && endpoint.protocol === "http:" && ["localhost", "127.0.0.1"].includes(endpoint.hostname)))) {
+    throw new HttpsError("failed-precondition", "Storytime narrator worker bridge endpoint is invalid.");
+  }
   return value.replace(/\/$/, "");
 }
 
-function storytimeJobsBridgeToken() {
+export function storytimeJobsBridgeToken() {
   try {
     return storytimeJobsBridgeTokenSecret.value() || process.env.URAI_STORYTIME_JOBS_BRIDGE_TOKEN || "";
   } catch {
@@ -105,6 +112,8 @@ async function storytimeJobsBridgeRequest(body: Record<string, unknown>) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify(body),
+      redirect: "error",
+      cache: "no-store",
       signal: controller.signal
     });
     const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -1150,6 +1159,17 @@ export const manageVoiceoverJob = onCall({
     narratorScriptId,
     jobId: externalJobId
   });
+
+  if (input.action === "playback") {
+    const playback = bridge.playback as Record<string, unknown> | undefined;
+    const delivery = StorytimeNarratorDeliverySchema.parse(playback?.delivery);
+    if (delivery.jobId !== externalJobId || delivery.sessionId !== sessionId
+      || delivery.narratorScriptId !== narratorScriptId || delivery.expiresAt <= Date.now()) {
+      throw new HttpsError("failed-precondition", "Narrator playback descriptor does not match the current private job.");
+    }
+    auditLog({ event: "voiceover_playback", userId, sessionId });
+    return { ok: true, playback: { delivery } };
+  }
 
   if (input.action === "status" || input.action === "cancel") {
     const job = bridge.job && typeof bridge.job === "object" ? bridge.job as Record<string, unknown> : {};
