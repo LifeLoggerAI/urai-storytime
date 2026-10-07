@@ -128,6 +128,9 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     need(consentSnapshot.storyGeneration === true && consentSnapshot.providerProcessing === true && consentSnapshot.consentVersion === claim.consentVersion);
     need(binding.user_id === authority.userId && binding.request_id === authority.requestId && binding.generation_request_id === generationId && binding.reviewed_request_sha256 === authority.reviewedRequestSha256);
     need(binding.provider === "openai" && binding.request_sha256 === requestSha && binding.source_input_sha256 === inputSha && binding.executor_source_sha === sourceSha && binding.gateway_source_sha === gatewaySha && binding.credential_sha256 === credentialSha && binding.semantic_headers_sha256 === semanticSha);
+    // A routing environment variable must not redirect worker credentials or
+    // admission to a lookalike endpoint that cannot hold the shared account.
+    need(binding.gateway_url === gatewayUrl);
     need(binding.trusted_readback === true && binding.revoked !== true); text(binding.receipt); fresh(binding);
     const consentDigest = digest(binding.consent_receipt_sha256), rightsDigest = digest(binding.rights_receipt_sha256);
     const [consentProof, rightsProof] = await Promise.all([

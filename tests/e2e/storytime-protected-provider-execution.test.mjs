@@ -119,7 +119,7 @@ async function fixture(run) {
     f.rows.set(f.claimPath, { userId: f.authority.userId, requestId: f.authority.requestId, status: 'processing', reviewedRequestSha256: f.authority.reviewedRequestSha256, providerInputSha256: sha(helper.storySourceJson(f.input)), consentVersion: 'story-generation-consent-v1', consentSnapshot: f.callableInput.consentSnapshot });
     const locator = sha(helper.storySourceJson({ user_id: f.authority.userId, request_id: f.authority.requestId, reviewed_request_sha256: f.authority.reviewedRequestSha256, request_sha256: requestHash, source_input_sha256: inputHash }));
     f.bindingPath = `storytimePaidProviderBindings/${locator}`;
-    f.rows.set(f.bindingPath, { ...common, job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', account_id: 'SYNTHETIC-api-account', request_sha256: requestHash, executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_source_sha: gatewayHead, credential_sha256: credentialHash, semantic_headers_sha256: semanticHash, consent_receipt_sha256: consentHash, rights_receipt_sha256: rightsHash });
+    f.rows.set(f.bindingPath, { ...common, job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', account_id: 'SYNTHETIC-api-account', request_sha256: requestHash, executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_url: gatewayUrl, gateway_source_sha: gatewayHead, credential_sha256: credentialHash, semantic_headers_sha256: semanticHash, consent_receipt_sha256: consentHash, rights_receipt_sha256: rightsHash });
     f.rows.set(f.consentPath, consent); f.rows.set(f.rightsPath, rights);
     const fields = { job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', executor_repository: 'LifeLoggerAI/urai-storytime', executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_repository: 'LifeLoggerAI/asset-factory', gateway_source_sha: gatewayHead, consumer: 'storytime-generation', tenant_sha256: sha(f.authority.userId), provider: 'openai', account_id: 'SYNTHETIC-api-account', credential_sha256: credentialHash, source_input_sha256: inputHash, semantic_headers_sha256: semanticHash, content_type: 'application/json', request_sha256: requestHash, endpoint: 'https://api.openai.com/v1/chat/completions', model: 'synthetic-model', asset: `storytime/${sha(f.authority.userId)}/${f.authority.requestId}/session`, request_size: String(Buffer.byteLength(exact.body)) };
     const budget = { currency: 'USD', max_usd_micros: 10_000, max_credits: 0, units: 1, max_retries: 0, max_runtime_seconds: 20, hard_stop_supported: true, auto_top_up: false, storage_egress_overhead_usd_micros: 0, rates: { usd_micros_per_unit: 5_000, credits_per_unit: 0, input_usd_micros_per_million_tokens: 1_000_000, output_usd_micros_per_million_tokens: 2_000_000, receipt: 'SYNTHETIC-NOT-A-PRICE', verified_at: observed, expires_at: expires } };
@@ -196,6 +196,26 @@ for (const [name, mutate] of [
   ['dirty actual provider source', () => writeFileSync('functions/src/story-provider.ts', `${currentProviderSource}\n// dirty synthetic test`) ]
 ]) test(`actual provider rejects ${name} before any paid POST`, () => fixture(async f => { mutate(f); await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0); }));
 test('configuration readiness never reports request spend authority', () => fixture(async f => { assert.equal(f.provider.getStoryProviderReadiness().ready, true); assert.equal(f.provider.getStoryProviderReadiness().spendAuthorized, false); }));
+test('environment-only gateway redirect cannot leak a worker token or fabricate a shared-account admission', () => fixture(async f => {
+  const originalFetch = globalThis.fetch, fakeUrl = 'https://synthetic-impostor.example.invalid/api/worker/production-spend';
+  let fakeGatewayCalls = 0;
+  process.env.STORYTIME_PRODUCTION_SPEND_URL = fakeUrl;
+  globalThis.fetch = async (url, init) => {
+    if (String(url) !== fakeUrl) return originalFetch(url, init);
+    fakeGatewayCalls++;
+    const body = JSON.parse(init.body);
+    if (body.action === 'preflight') {
+      const prepared = await f.gateway(body);
+      f.rows.get(f.accountPath).reservations = [{ job_id: 'SYNTHETIC-other-unknown-hold', usd_micros: 95_000, credits: 0 }];
+      return Response.json(prepared);
+    }
+    if (body.action === 'reserve') return Response.json({ ok: true, provider_call_authorized: true, execution_performed: false, attempt_id: 'SYNTHETIC-fabricated-reserve', job_digest: body.job_digest, executor_source_sha: body.executor_source_sha, gateway_source_sha: body.gateway_source_sha, worker_id: body.worker_id, max_runtime_seconds: 20, account_id: body.account_id, credential_sha256: body.credential_sha256, semantic_headers_sha256: body.semantic_headers_sha256, source_input_sha256: body.source_input_sha256, content_type: body.content_type });
+    return Response.json({ ok: true, provider_call_authorized: false, execution_performed: false, reconciliation_required: true });
+  };
+  await assert.rejects(f.generate());
+  assert.equal(fakeGatewayCalls, 0); assert.equal(f.providerRequests.length, 0);
+  assert.equal(f.rows.get(f.jobPath).job.attempts.length, 0); assert.equal(f.rows.get(f.accountPath).reservations.length, 0);
+}));
 test('credential environment changes after preflight cannot replace frozen dispatched authorization', () => fixture(async f => {
   f.fetchHook = (kind, body) => { if (kind === 'gateway' && body.action === 'preflight') process.env.OPENAI_API_KEY = 'SYNTHETIC-changed-after-freeze'; };
   await f.generate(); assert.equal(f.providerRequests[0].headers.authorization, 'Bearer SYNTHETIC-api-key-never-production');
