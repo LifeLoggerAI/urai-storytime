@@ -386,6 +386,23 @@ test('paid persistence cannot write a story after its absolute admission expires
  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
 }));
+test('backward wall-clock adjustment cannot extend the protected provider lifetime', () => fixture(async f => {
+ const originalNow = Date.now, originalMonotonic = performance.now; const wall = originalNow(); let elapsed = 1_000;
+ Date.now = () => wall; performance.now = () => elapsed;
+ f.fetchHook = kind => { if (kind === 'provider') { elapsed += 21_000; Date.now = () => wall - 500; return Response.json(providerPayload()); } };
+ try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; performance.now = originalMonotonic; }
+ assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('paid persistence retains the original monotonic lifetime after provider completion', () => fixture(async f => {
+ const originalNow = Date.now, originalMonotonic = performance.now; const wall = originalNow(); let elapsed = 1_000;
+ Date.now = () => wall; performance.now = () => elapsed;
+ const originalCollection = f.db.collection;
+ f.db.collection = name => { const collection = originalCollection(name); if (name !== 'storytimeProviderDeadLetters') return collection;
+  return { ...collection, doc: id => { const ref = collection.doc(id), set = ref.set; return { ...ref, set: async (...args) => { await set(...args); elapsed += 21_000; } }; } };
+ };
+ try { await assert.rejects(f.generateCallable()); } finally { Date.now = originalNow; performance.now = originalMonotonic; }
+ assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0); assert.equal(f.providerRequests.length, 1);
+}));
 
 function shortApproval(f, clock) {
   const { signature, ...approval } = f.rows.get(f.approvalPath);
@@ -405,7 +422,7 @@ function committedStory(f) {
   assert.equal(f.rows.get(f.claimPath).status, 'succeeded');
   return entries[0][1];
 }
-for (const lost of [false, true]) test('actual current predecessor returns paid output after expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
+for (const lost of [false, true]) test('actual 3cbd predecessor returns paid output after expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
   const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
   shortApproval(f, clock);
   f.provider = await provider(priorHelper.executeProtectedStoryProvider);
@@ -418,7 +435,7 @@ for (const lost of [false, true]) test('actual current predecessor returns paid 
   finally { Date.now = originalNow; }
   committedStory(f); fullCallableHolds(f);
 }));
-for (const lost of [false, true]) test('actual current predecessor returns paid output after rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
+for (const lost of [false, true]) test('actual 3cbd predecessor returns paid output after rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
   f.provider = await provider(priorHelper.executeProtectedStoryProvider);
   f.db.afterTransactionCommit = async staged => {
     if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
@@ -489,5 +506,19 @@ test('revocation at final authority transaction commit conflicts and rechecks th
     if (staged.length === 0 && f.rows.get(f.claimPath)?.status === 'succeeded') f.rows.get(f.consentPath).revoked = true;
   };
   await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+
+for (const lost of [false, true]) test('a backward wall clock during ' + (lost ? 'lost' : 'normal') + ' acknowledgement cannot extend final paid output authority', () => fixture(async f => {
+  const originalNow = Date.now, originalMonotonic = performance.now;
+  const wall = originalNow(); let elapsed = 1000;
+  Date.now = () => wall; performance.now = () => elapsed;
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    elapsed += 21_000; Date.now = () => wall - 500;
+    if (lost) throw new Error('synthetic acknowledgement lost after monotonic expiry');
+  };
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; performance.now = originalMonotonic; }
   committedStory(f); fullCallableHolds(f);
 }));
