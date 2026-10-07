@@ -1,5 +1,5 @@
 import type { Firestore } from "firebase-admin/firestore";
-import { executeProtectedStoryProvider, type StoryAuthorityCommit, type StoryProviderAuthority, type StorySpendReceipt } from "./story-provider-spend.js";
+import { executeProtectedStoryProvider, type StoryAuthorityCommit, type StoryOutputAuthority, type StoryProviderAuthority, type StorySpendReceipt } from "./story-provider-spend.js";
 
 export interface StoryProviderInput {
   title: string;
@@ -49,6 +49,7 @@ export interface StoryProviderResult {
   output: StoryProviderOutput;
   receipt: StoryProviderReceipt;
   commitWithAuthority: StoryAuthorityCommit;
+  confirmOutputAuthority: StoryOutputAuthority;
 }
 
 const REQUIRED_OPENAI_ENV = ["OPENAI_API_KEY", "STORYTIME_OPENAI_MODEL"];
@@ -232,7 +233,7 @@ export async function generateStoryWithProvider(input: StoryProviderInput, autho
     })
   };
 
-  const { result, spend, commitWithAuthority } = await executeProtectedStoryProvider(db, authority, input, exactRequest, async (response) => {
+  const { result, spend, commitWithAuthority, confirmOutputAuthority } = await executeProtectedStoryProvider(db, authority, input, exactRequest, async (response) => {
 
     if (!response.ok) {
       throw new Error(`Story provider request failed with status ${response.status}.`);
@@ -312,5 +313,5 @@ export async function generateStoryWithProvider(input: StoryProviderInput, autho
       }
     };
   });
-  return { ...result, commitWithAuthority, receipt: { ...result.receipt, spend } };
+  return { ...result, commitWithAuthority, confirmOutputAuthority, receipt: { ...result.receipt, spend } };
 }

@@ -16,10 +16,13 @@ const gitBlob = value => createHash('sha1').update(Buffer.concat([Buffer.from(`b
 const currentProviderSource = readFileSync('functions/src/story-provider.ts', 'utf8');
 const callerSource = readFileSync('functions/src/storytime.ts', 'utf8');
 const helperSource = readFileSync('functions/src/story-provider-spend.ts', 'utf8');
+const priorHelperSource = readFileSync('tests/fixtures/story-provider-spend-before-3cbd61d.ts', 'utf8');
+const priorCallerSource = readFileSync('tests/fixtures/storytime-before-output-confirmation-da2bba1.ts', 'utf8');
 const originalProviderSource = readFileSync('tests/fixtures/story-provider-before-9178b98.ts', 'utf8');
 let sequence = 0;
 const importSource = source => import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`);
 const helper = await importSource(helperSource.replace('import { defineSecret } from "firebase-functions/params";', 'const defineSecret = () => ({ value: () => process.env.STORYTIME_SPEND_WORKER_TOKENS_JSON });'));
+const priorHelper = await importSource(priorHelperSource.replace('import { defineSecret } from "firebase-functions/params";', 'const defineSecret = () => ({ value: () => process.env.STORYTIME_SPEND_WORKER_TOKENS_JSON });'));
 const persistence = await importSource(readFileSync('functions/src/story-persistence.ts', 'utf8'));
 const envKeys = ['URAI_SOURCE_SHA', 'STORYTIME_SPEND_GATEWAY_SOURCE_SHA', 'STORYTIME_PRODUCTION_SPEND_URL', 'STORYTIME_SPEND_WORKER_TOKENS_JSON', 'STORYTIME_GENERATION_PROVIDER', 'OPENAI_API_KEY', 'STORYTIME_OPENAI_MODEL', 'STORYTIME_PROVIDER_SPEND_AUTHORIZED', 'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS', 'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS', 'STORYTIME_MAX_GENERATION_COST_USD', 'STORYTIME_PROVIDER_DAILY_BUDGET_USD', 'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD', 'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER'];
 const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return { privateKey: pair.privateKey, publicKey: pair.publicKey.export({ type: 'spki', format: 'pem' }) }; };
@@ -79,11 +82,11 @@ async function provider(execute = helper.executeProtectedStoryProvider, before =
   try { return await importSource(`const executeProtectedStoryProvider = globalThis[${JSON.stringify(key)}];\n${source}`); }
   finally { delete globalThis[key]; }
 }
-async function callables(f) {
+async function callables(f, beforeOutputConfirmation = false) {
   const key = `story-provider-callable-${++sequence}`;
   class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
   globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: persistence.reconcileStoryPersistence, buildInitialStoryVersionRecord: value => value, ...helper, ...f.provider };
-  const source = stripTypeScriptTypes(callerSource).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
+  const source = stripTypeScriptTypes(beforeOutputConfirmation ? priorCallerSource : callerSource).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
   try { return await importSource(`import { createHash } from 'node:crypto'; const { initializeApp, FieldValue, getFirestore, HttpsError, onCall, defineSecret, z, auditLog, reconcileStoryPersistence, buildInitialStoryVersionRecord, storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, generateStoryWithProvider, getStoryProviderCostPreflight, getStoryProviderReadiness } = globalThis[${JSON.stringify(key)}];\n${source}`); }
   finally { delete globalThis[key]; }
 }
@@ -148,13 +151,15 @@ async function fixture(run) {
       return Response.json(providerPayload(), { headers: { 'x-request-id': 'synthetic-provider-request' } });
     };
     f.generate = () => f.provider.generateStoryWithProvider(f.input, f.authority, f.db);
-    f.generateCallable = async () => { f.rows.delete(f.claimPath); const c = await callables(f); return c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }); };
+    f.generateCallable = async (beforeOutputConfirmation = false) => { f.rows.delete(f.claimPath); const c = await callables(f, beforeOutputConfirmation); return c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }); };
     return await run(f);
   } finally { process.chdir(repositoryRoot); globalThis.fetch = originalFetch; for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } rmSync(temp, { recursive: true, force: true }); }
 }
 
 test('source fixture pins actual gateway and original provider Git blobs', () => {
   assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-acea7ea.ts')), 'e547456c428c8e9f60e66162286cfb452f5ef89d');
+  assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-spend-before-3cbd61d.ts')), 'daf5bbae7e40ac1447d7f97c373515aafb190768');
+  assert.equal(gitBlob(readFileSync('tests/fixtures/storytime-before-output-confirmation-da2bba1.ts')), 'da2bba15efe31853a9a892415aa0bdf24022e308');
   assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-before-9178b98.ts')), '9178b980a5d4287b5537169bc6fbee933220a567');
 });
 test('actual predecessor dispatches under environment-only authority and mislabels priced usage as actual', () => fixture(async f => {
@@ -380,4 +385,109 @@ test('paid persistence cannot write a story after its absolute admission expires
  try { await assert.rejects(f.generateCallable()); } finally { Date.now = originalNow; }
  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
+}));
+
+function shortApproval(f, clock) {
+  const { signature, ...approval } = f.rows.get(f.approvalPath);
+  f.rows.set(f.approvalPath, signed({ ...approval, expires_at: new Date(clock + 2000).toISOString() }, approver));
+}
+function fullCallableHolds(f) {
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  const counters = [...f.rows.entries()].filter(([p]) => p.startsWith('storytimeProviderBudgetCounters/'));
+  assert.equal(counters.length, 2);
+  for (const [, value] of counters) { assert.equal(value.reservedCostUsd, .01); assert.equal(value.actualCostUsd, 0); }
+  assert.equal(f.providerRequests.length, 1);
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve', 'record']);
+}
+function committedStory(f) {
+  const entries = [...f.rows.entries()].filter(([p]) => p.startsWith('storySessions/'));
+  assert.equal(entries.length, 1);
+  assert.equal(f.rows.get(f.claimPath).status, 'succeeded');
+  return entries[0][1];
+}
+for (const lost of [false, true]) test('actual current predecessor returns paid output after expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
+  const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  shortApproval(f, clock);
+  f.provider = await provider(priorHelper.executeProtectedStoryProvider);
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    clock += 6000;
+    if (lost) throw new Error('synthetic acknowledgement lost after expiry');
+  };
+  try { const result = await f.generateCallable(true); assert.equal(result.status, 'ready'); }
+  finally { Date.now = originalNow; }
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('actual current predecessor returns paid output after rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
+  f.provider = await provider(priorHelper.executeProtectedStoryProvider);
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    f.rows.get(f.rightsPath).revoked = true;
+    if (lost) throw new Error('synthetic acknowledgement lost after rights revocation');
+  };
+  const result = await f.generateCallable(true); assert.equal(result.status, 'ready');
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement withholds paid output and retains committed success', () => fixture(async f => {
+  const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  shortApproval(f, clock);
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    clock += 6000;
+    if (lost) throw new Error('synthetic acknowledgement lost after expired commit');
+  };
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; }
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement withholds paid output after actual commit', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    f.rows.get(f.rightsPath).revoked = true;
+    if (lost) throw new Error('synthetic acknowledgement lost after revoked commit');
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('changed executor source during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement cannot return committed paid output', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    writeFileSync('functions/src/story-provider.ts', currentProviderSource + '\n// dirty after synthetic commit');
+    if (lost) throw new Error('synthetic acknowledgement lost after source change');
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const [name, mutate] of [
+  ['foreign persisted owner', session => { session.userId = 'synthetic-foreign-owner'; }],
+  ['foreign persisted request', session => { session.requestId = 'synthetic-foreign-request'; }],
+  ['different persisted attempt', session => { session.providerReceipt.spend.attemptId = 'synthetic-other-attempt'; }],
+  ['changed persisted reviewed input', session => { session.requestReview.processedRequestSha256 = 'a'.repeat(64); }]
+]) test('final committed-output confirmation rejects ' + name + ' without another dispatch', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    mutate(committedStory(f));
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+test('an expiry during the final authority transaction withholds committed output after its awaited read', () => fixture(async f => {
+  const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  f.rows.get(f.bindingPath).expires_at = new Date(clock + 2000).toISOString();
+  const runTransaction = f.db.runTransaction;
+  f.db.runTransaction = callback => runTransaction(async transaction => {
+    const result = await callback(transaction);
+    if (f.rows.get(f.claimPath)?.status === 'succeeded' && result?.binding) clock += 6000;
+    return result;
+  });
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; }
+  committedStory(f); fullCallableHolds(f);
+}));
+test('revocation at final authority transaction commit conflicts and rechecks the current grant without dispatch', () => fixture(async f => {
+  f.db.beforeTransactionCommit = async staged => {
+    if (staged.length === 0 && f.rows.get(f.claimPath)?.status === 'succeeded') f.rows.get(f.consentPath).revoked = true;
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
 }));
