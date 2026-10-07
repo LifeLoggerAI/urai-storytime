@@ -490,6 +490,7 @@ for (const [name, mutate] of [
 }));
 test('an expiry during the final authority transaction withholds committed output after its awaited read', () => fixture(async f => {
   const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  shortApproval(f, clock);
   f.rows.get(f.bindingPath).expires_at = new Date(clock + 2000).toISOString();
   const runTransaction = f.db.runTransaction;
   f.db.runTransaction = callback => runTransaction(async transaction => {
