@@ -5,6 +5,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "URAI Storytime",
   description: "Private UrAi story replays, narrator scripts, emotional arcs, and public-safe storycards.",
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nosnippet: true
+  },
   openGraph: {
     title: "URAI Storytime",
     description: "Turn opted-in UrAi memories and emotional signals into private story replays.",
