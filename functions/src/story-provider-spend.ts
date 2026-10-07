@@ -8,6 +8,7 @@ import { defineSecret } from "firebase-functions/params";
 export const storytimeSpendWorkerTokensSecret = defineSecret("STORYTIME_SPEND_WORKER_TOKENS_JSON");
 export type StoryProviderAuthority = { userId: string; requestId: string; reviewedRequestSha256: string };
 export type StoryAuthorityCommit = (write: (transaction: Transaction) => void) => Promise<void>;
+export type StoryOutputAuthority = (sessionId: string) => Promise<void>;
 export type StorySpendReceipt = {
   schemaVersion: "storytime-protected-spend-observation-v1";
   status: "RECONCILIATION_REQUIRED";
@@ -98,7 +99,7 @@ type ExactStoryRequest = {
   inputUsdPerMillionTokens: number; outputUsdPerMillionTokens: number;
 };
 /** Server-only locators do not create grants, approvals, reservations or charge receipts. */
-export async function executeProtectedStoryProvider<T>(db: Firestore, authority: StoryProviderAuthority, sourceInput: unknown, exact: ExactStoryRequest, decode: (response: Response) => Promise<T>): Promise<{ result: T; spend: StorySpendReceipt; commitWithAuthority: StoryAuthorityCommit }> {
+export async function executeProtectedStoryProvider<T>(db: Firestore, authority: StoryProviderAuthority, sourceInput: unknown, exact: ExactStoryRequest, decode: (response: Response) => Promise<T>): Promise<{ result: T; spend: StorySpendReceipt; commitWithAuthority: StoryAuthorityCommit; confirmOutputAuthority: StoryOutputAuthority }> {
   text(authority?.userId); text(authority?.requestId); digest(authority?.reviewedRequestSha256);
   const endpoint = "https://api.openai.com/v1/chat/completions", gatewayUrl = gatewayEndpoint();
   const sourceSha = storySpendSourceSha(), gatewaySha = digest(process.env.STORYTIME_SPEND_GATEWAY_SOURCE_SHA, 40);
@@ -118,7 +119,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const providerInputSha = storySpendHash(storySourceJson(sourceInput)), tenantSha = storySpendHash(authority.userId);
   const generationId = `${authority.userId}_${authority.requestId}`;
   const locator = storySpendHash(storySourceJson({ user_id: authority.userId, request_id: authority.requestId, reviewed_request_sha256: authority.reviewedRequestSha256, request_sha256: requestSha, source_input_sha256: inputSha }));
-  const readAuthority = async (transaction: Transaction) => {
+  const readAuthority = async (transaction: Transaction, expectedSessionId?: string) => {
     const [claimSnapshot, bindingSnapshot] = await Promise.all([
       transaction.get(db.doc(`storyGenerationRequests/${generationId}`)),
       transaction.get(db.doc(`storytimePaidProviderBindings/${locator}`))
@@ -126,7 +127,8 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     need(claimSnapshot.exists && bindingSnapshot.exists);
     const claim = record(claimSnapshot.data()), binding = record(bindingSnapshot.data());
     const consentSnapshot = record(claim.consentSnapshot);
-    need(claim.userId === authority.userId && claim.requestId === authority.requestId && claim.status === "processing" && claim.cancellationRequested !== true);
+    need(claim.userId === authority.userId && claim.requestId === authority.requestId && claim.cancellationRequested !== true);
+    need(expectedSessionId ? claim.status === "succeeded" && claim.sessionId === expectedSessionId : claim.status === "processing");
     need(claim.reviewedRequestSha256 === authority.reviewedRequestSha256 && claim.providerInputSha256 === providerInputSha && claim.consentVersion === "story-generation-consent-v1");
     need(consentSnapshot.storyGeneration === true && consentSnapshot.providerProcessing === true && consentSnapshot.consentVersion === claim.consentVersion);
     need(binding.user_id === authority.userId && binding.request_id === authority.requestId && binding.generation_request_id === generationId && binding.reviewed_request_sha256 === authority.reviewedRequestSha256);
@@ -149,9 +151,9 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     need(consent.status === "GRANTED" && consent.story_generation === true && consent.provider_processing === true && consent.consent_version === claim.consentVersion);
     need(rights.status === "APPROVED" && rights.rights_reviewed === true);
     need(storySpendHash(storySourceJson(consent)) === consentDigest && storySpendHash(storySourceJson(rights)) === rightsDigest);
-    return { binding, consentDigest, rightsDigest };
+    return { binding, consentDigest, rightsDigest, authorityExpiresAt: Math.min(...[binding, consent, rights].map(value => instant(value.expires_at))) };
   };
-  const loadAuthority = () => db.runTransaction(readAuthority);
+  const loadAuthority = () => db.runTransaction(transaction => readAuthority(transaction));
   const initial = await loadAuthority(), binding = initial.binding;
   const workerId = text(binding.worker_id), jobId = text(binding.job_id), accountId = text(binding.account_id);
   let tokens: Json; try { tokens = record(JSON.parse(storytimeSpendWorkerTokensSecret.value())); } catch { throw new StorySpendRejected(); }
@@ -186,6 +188,23 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     });
     withinAdmission(); verifySource();
   };
+  // A committed story or lost acknowledgement cannot renew expired authority.
+  // Confirm the original admitted output after persistence and reconciliation.
+  const confirmOutputAuthority: StoryOutputAuthority = async sessionId => {
+    text(sessionId); verifySource(); withinAdmission();
+    const current = await db.runTransaction(async transaction => {
+      const state = await readAuthority(transaction, sessionId);
+      const snapshot = await transaction.get(db.doc(`storySessions/${sessionId}`));
+      need(snapshot.exists);
+      const session = record(snapshot.data()), review = record(session.requestReview);
+      const storedSpend = record(record(session.providerReceipt).spend);
+      need(session.userId === authority.userId && session.requestId === authority.requestId && session.provider === "openai" && review.processedRequestSha256 === authority.reviewedRequestSha256);
+      need(storedSpend.jobId === jobId && storedSpend.accountId === accountId && storedSpend.attemptId === attemptId && storedSpend.requestSha256 === requestSha && storedSpend.semanticInputSha256 === semanticInputSha);
+      return state;
+    });
+    need(storySourceJson(current) === storySourceJson(initial));
+    verifySource(); withinAdmission();
+  };
   const gateway = async (action: string, extra: Json = {}) => {
     // An uncertain reserve or observation is never automatically retried.
     try { return await boundedJson(await fetch(gatewayUrl, { method: "POST", redirect: "error", cache: "no-store", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, ...fields, ...extra }), signal: AbortSignal.timeout(15_000) })); }
@@ -203,7 +222,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const approval = record(job.approval), releaseAuthority = record(envelope.authority);
   const concurrency = integer(budget.max_concurrency, 1); need(concurrency <= 20 && account.max_concurrency === concurrency && account.frozen === false && approval.max_concurrency === concurrency && controls.max_concurrency === concurrency);
   fresh(approval, "issued_at"); fresh(releaseAuthority);
-  const proofExpiry = Math.min(preparedExpiry, ...[approval, releaseAuthority, account, controls, price, rates, binding].map(value => instant(value.expires_at)));
+  const proofExpiry = Math.min(preparedExpiry, initial.authorityExpiresAt, ...[approval, releaseAuthority, account, controls, price, rates, binding].map(value => instant(value.expires_at)));
   need(Date.now() < proofExpiry);
   need(account.provider === "openai" && account.account_id === accountId && account.credential_sha256 === credentialSha && account.credential_binding_verified === true && account.trusted_readback === true); text(account.credential_binding_receipt); fresh(account);
   for (const key of ["credential_sha256", "semantic_headers_sha256", "source_input_sha256", "semantic_input_sha256", "content_type"] as const) need(controls[key] === fields[key] && price[key] === fields[key]);
@@ -250,7 +269,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
       run().then(resolve, reject).finally(() => controller.signal.removeEventListener("abort", abort));
     });
     current(); outcome = "succeeded";
-    return { result, commitWithAuthority, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, semanticInputSha256: semanticInputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
+    return { result, commitWithAuthority, confirmOutputAuthority, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, semanticInputSha256: semanticInputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
   } finally {
     clearTimeout(timer); controller.abort();
     // An outcome never settles funds. A failed observation also leaves the hold intact.

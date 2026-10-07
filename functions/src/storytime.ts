@@ -8,7 +8,7 @@ import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
-import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit } from "./story-provider-spend.js";
+import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit, type StoryOutputAuthority } from "./story-provider-spend.js";
 import {
   generateStoryWithProvider,
   getStoryProviderCostPreflight,
@@ -623,12 +623,14 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
   let generated: StoryProviderOutput;
   let providerReceipt: StoryProviderReceipt;
   let commitPaidOutput: StoryAuthorityCommit | null = null;
+  let confirmPaidOutput: StoryOutputAuthority | null = null;
   try {
     if (readiness.ready) {
       const providerResult = await generateStoryWithProvider(providerInput, { userId, requestId: input.requestId, reviewedRequestSha256: processedRequestSha256 }, db);
       generated = providerResult.output;
       providerReceipt = providerResult.receipt;
       commitPaidOutput = providerResult.commitWithAuthority;
+      confirmPaidOutput = providerResult.confirmOutputAuthority;
     } else {
       generated = fallbackProviderOutput(input, source);
       providerReceipt = {
@@ -927,6 +929,16 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
     if (!persisted) {
       auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "story_persistence_failed" });
       throw new HttpsError("internal", "Story persistence requires reconciliation. This request cannot be regenerated automatically.");
+    }
+  }
+
+  if (providerReceipt.provider === "openai") {
+    try {
+      if (!confirmPaidOutput) throw new HttpsError("failed-precondition", "Paid output requires current protected authority.");
+      await confirmPaidOutput(sessionId);
+    } catch {
+      auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "paid_output_authority_unconfirmed" });
+      throw new HttpsError("unavailable", "Story output could not be confirmed within its protected admission. Its charge remains held; do not submit a replacement request.");
     }
   }
 
