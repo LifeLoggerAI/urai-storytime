@@ -24,7 +24,7 @@ const DELETE_BATCH_LIMIT = 400;
 const EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 const STORYTIME_PRIVACY_POLICY_VERSION = "urai-privacy-0.2.0-staging-scaffold";
 const STORYTIME_EXPORT_SCHEMA_VERSION = "storytime-export-v1";
-const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v3";
+const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v4";
 const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v1";
 const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-operation-receipt-v1";
 
@@ -65,6 +65,7 @@ const accountRetainedLedgerCollections = [
 const accountUserCollections = [
   ...accountRetainedLedgerCollections,
   "storySessions",
+  "storyVersions",
   "storyDrafts",
   "storyChapters",
   "storyMoments",
@@ -95,6 +96,7 @@ const accountOwnerCollections = [
 ] as const;
 
 const sessionScalarCollections = [
+  "storyVersions",
   "storyChapters",
   "storyMoments",
   "memoryScenes",
@@ -249,8 +251,9 @@ async function readOwnedPrivacyRequest(privacyRequestId: string, userId: string,
   return request;
 }
 
-async function assertOwnedSession(sessionId: string, userId: string) {
+async function assertOwnedSession(sessionId: string, userId: string, allowDeletedSession = false) {
   const snapshot = await db.collection("storySessions").doc(sessionId).get();
+  if (!snapshot.exists && allowDeletedSession) return null;
   if (!snapshot.exists || snapshot.data()?.userId !== userId) {
     throw new HttpsError("permission-denied", "You do not own that Storytime session.");
   }
@@ -360,10 +363,10 @@ async function collectAccountRows(userId: string) {
   return collections;
 }
 
-async function collectSessionRows(userId: string, sessionId: string) {
-  const session = await assertOwnedSession(sessionId, userId);
+async function collectSessionRows(userId: string, sessionId: string, allowDeletedSession = false) {
+  const session = await assertOwnedSession(sessionId, userId, allowDeletedSession);
   const collections: Record<string, Array<{ id: string; data: DocumentData }>> = {
-    storySessions: [{ id: session.id, data: session.data }]
+    storySessions: session ? [{ id: session.id, data: session.data }] : []
   };
 
   for (const name of sessionScalarCollections) {
@@ -375,7 +378,7 @@ async function collectSessionRows(userId: string, sessionId: string) {
     collections[name] = rows.filter((row) => row.data.userId === undefined || row.data.userId === userId);
   }
 
-  const requestId = typeof session.data.requestId === "string" ? session.data.requestId : null;
+  const requestId = typeof session?.data.requestId === "string" ? session.data.requestId : null;
   collections.moderation = requestId
     ? (await listByField("moderation", "requestId", requestId)).filter((row) => row.data.userId === userId)
     : [];
@@ -477,13 +480,13 @@ function deletionPlanHash(plan: DeletionPlan) {
   return sha256(normalizeDeletionPlan(plan));
 }
 
-async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest): Promise<DeletionPlan> {
+async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest, allowDeletedSession = false): Promise<DeletionPlan> {
   const userId = request.userId;
   const scope = request.scope;
   const sessionId = request.sessionId ?? null;
   const collections = scope === "account"
     ? await collectAccountRows(userId)
-    : await collectSessionRows(userId, String(sessionId));
+    : await collectSessionRows(userId, String(sessionId), allowDeletedSession);
 
   const retainedData = [
     "privacyRequests",
@@ -894,8 +897,36 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Storytime deletion is not ready for completion verification.");
   }
 
-  const verificationPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data);
+  const planId = privacyRequest.data.deletionPlanId;
+  const planHash = privacyRequest.data.deletionPlanHash;
+  if (!planId || !planHash) {
+    throw new HttpsError("failed-precondition", "The executed deletion plan is required for verification.");
+  }
+  const storedPlanSnapshot = await db.collection("privacyDeletionPlans").doc(planId).get();
+  const storedPlan = storedPlanSnapshot.data()?.plan as DeletionPlan | undefined;
+  if (!storedPlan || deletionPlanHash(storedPlan) !== planHash
+    || storedPlan.privacyRequestId !== input.privacyRequestId
+    || storedPlan.userId !== privacyRequest.data.userId
+    || storedPlan.scope !== privacyRequest.data.scope
+    || storedPlan.sessionId !== (privacyRequest.data.sessionId ?? null)) {
+    throw new HttpsError("failed-precondition", "The executed deletion plan failed verification authority checks.");
+  }
+
+  // Only this admin-only verifier may collect children after the parent was deleted.
+  const verificationPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data, true);
   const remaining = remainingDeletionTargets(verificationPlan);
+  // Some original targets (for example moderation and public shares) depend on
+  // deleted parent metadata. Read the exact executed target set as well.
+  for (const [collectionName, ids] of Object.entries(storedPlan.targets)) {
+    for (let offset = 0; offset < ids.length; offset += QUERY_PAGE_LIMIT) {
+      const references = ids.slice(offset, offset + QUERY_PAGE_LIMIT)
+        .map((id) => db.collection(collectionName).doc(id));
+      if (references.length === 0) continue;
+      const snapshots = await db.getAll(...references);
+      remaining.push(...snapshots.filter((snapshot) => snapshot.exists)
+        .map((snapshot) => `${collectionName}/${snapshot.id}:still_exists`));
+    }
+  }
   if (verificationPlan.storageObjects.length > 0) remaining.push(`storageObjects:${verificationPlan.storageObjects.length}`);
   if (verificationPlan.executionBlockers.length > 0) remaining.push(...verificationPlan.executionBlockers);
 
@@ -972,4 +1003,5 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     completionReceiptId: receiptId
   };
 });
+
 
