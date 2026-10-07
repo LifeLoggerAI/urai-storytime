@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, type DocumentData, type DocumentReference, type SetOptions } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
-import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret } from "./story-provider-spend.js";
+import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit } from "./story-provider-spend.js";
 import {
   generateStoryWithProvider,
   getStoryProviderCostPreflight,
@@ -613,11 +613,13 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
 
   let generated: StoryProviderOutput;
   let providerReceipt: StoryProviderReceipt;
+  let commitPaidOutput: StoryAuthorityCommit | null = null;
   try {
     if (readiness.ready) {
       const providerResult = await generateStoryWithProvider(providerInput, { userId, requestId: input.requestId, reviewedRequestSha256: processedRequestSha256 }, db);
       generated = providerResult.output;
       providerReceipt = providerResult.receipt;
+      commitPaidOutput = providerResult.commitWithAuthority;
     } else {
       generated = fallbackProviderOutput(input, source);
       providerReceipt = {
@@ -861,24 +863,37 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
     emotionalArc: { id: arcId, arcLabel: arc.arcLabel, summary: arc.summary }
   });
 
-  const batch = db.batch();
-  batch.set(db.collection("storySessions").doc(sessionId), session);
-  batch.set(db.collection("storyChapters").doc(chapterId), chapter);
-  batch.set(db.collection("storyMoments").doc(momentId), moment);
-  batch.set(db.collection("memoryScenes").doc(sceneId), scene);
-  batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
-  batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
-  batch.set(db.collection("storyVersions").doc(versionId), version);
-  batch.set(generationRequest.requestRef, {
-    status: "succeeded",
-    sessionId,
-    safetyStatus: outputModeration.safetyStatus,
-    provider: session.provider,
-    providerReceipt,
-    updatedAt: createdAt
-  }, { merge: true });
+  const writeStory = (writer: {
+    set(reference: DocumentReference, data: DocumentData): unknown;
+    set(reference: DocumentReference, data: DocumentData, options: SetOptions): unknown;
+  }) => {
+    writer.set(db.collection("storySessions").doc(sessionId), session);
+    writer.set(db.collection("storyChapters").doc(chapterId), chapter);
+    writer.set(db.collection("storyMoments").doc(momentId), moment);
+    writer.set(db.collection("memoryScenes").doc(sceneId), scene);
+    writer.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
+    writer.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+    writer.set(db.collection("storyVersions").doc(versionId), version);
+    writer.set(generationRequest.requestRef, {
+      status: "succeeded",
+      sessionId,
+      safetyStatus: outputModeration.safetyStatus,
+      provider: session.provider,
+      providerReceipt,
+      updatedAt: createdAt
+    }, { merge: true });
+  };
   try {
-    await batch.commit();
+    if (providerReceipt.provider === "openai") {
+      if (!commitPaidOutput) throw new HttpsError("failed-precondition", "Paid story persistence requires current protected authority.");
+      // Grant/claim reads and every output write share one transaction. Late
+      // cancellation or revocation cannot be overwritten by a blind batch.
+      await commitPaidOutput(writeStory);
+    } else {
+      const batch = db.batch();
+      writeStory(batch);
+      await batch.commit();
+    }
   } catch {
     let persisted = false;
     try {

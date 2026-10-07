@@ -20,6 +20,7 @@ const originalProviderSource = readFileSync('tests/fixtures/story-provider-befor
 let sequence = 0;
 const importSource = source => import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`);
 const helper = await importSource(helperSource.replace('import { defineSecret } from "firebase-functions/params";', 'const defineSecret = () => ({ value: () => process.env.STORYTIME_SPEND_WORKER_TOKENS_JSON });'));
+const persistence = await importSource(readFileSync('functions/src/story-persistence.ts', 'utf8'));
 const envKeys = ['URAI_SOURCE_SHA', 'STORYTIME_SPEND_GATEWAY_SOURCE_SHA', 'STORYTIME_PRODUCTION_SPEND_URL', 'STORYTIME_SPEND_WORKER_TOKENS_JSON', 'STORYTIME_GENERATION_PROVIDER', 'OPENAI_API_KEY', 'STORYTIME_OPENAI_MODEL', 'STORYTIME_PROVIDER_SPEND_AUTHORIZED', 'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS', 'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS', 'STORYTIME_MAX_GENERATION_COST_USD', 'STORYTIME_PROVIDER_DAILY_BUDGET_USD', 'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD', 'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER'];
 const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return { privateKey: pair.privateKey, publicKey: pair.publicKey.export({ type: 'spki', format: 'pem' }) }; };
 const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
@@ -29,20 +30,28 @@ const gatewayHead = '047c8429626300c9896bc8c4b739b5902575ad38';
 
 function storage() {
   const rows = new Map(); let pending = Promise.resolve();
-  const snapshot = ref => ({ id: ref.id, exists: rows.has(ref.path), ref, data: () => structuredClone(rows.get(ref.path)) });
+  const snapshot = ref => { const exists = rows.has(ref.path), value = structuredClone(rows.get(ref.path)); return { id: ref.id, exists, ref, data: () => structuredClone(value) }; };
   const put = (ref, data, merge) => {
     const value = merge ? { ...rows.get(ref.path), ...structuredClone(data) } : structuredClone(data);
     for (const [key, next] of Object.entries(value)) if (next?.increment !== undefined) value[key] = (rows.get(ref.path)?.[key] || 0) + next.increment;
     rows.set(ref.path, value);
   };
   const doc = p => ({ path: p, id: p.split('/').at(-1), get: async () => snapshot(doc(p)), set: async (value, options) => put(doc(p), value, options?.merge), update: async value => put(doc(p), value, true) });
-  const writer = () => {
-    const staged = []; const transaction = {
-      get: async ref => snapshot(ref),
+  const writer = (atomic = false) => {
+    const staged = [], reads = new Map(); const transaction = {
+      get: async ref => { const value = snapshot(ref); reads.set(ref.path, JSON.stringify(value.data())); return value; },
       set: (ref, value, options) => { staged.push(['set', ref, value, options?.merge]); return transaction; },
       create: (ref, value) => { staged.push(['create', ref, value]); return transaction; },
       update: (ref, value) => { staged.push(['update', ref, value, true]); return transaction; },
-      commit: async () => { for (const [kind, ref] of staged) { if (kind === 'create' && rows.has(ref.path)) throw new Error('already exists'); if (kind === 'update' && !rows.has(ref.path)) throw new Error('missing'); } for (const [, ref, value, merge] of staged) put(ref, value, merge); }
+      commit: async () => {
+        if (atomic) {
+          await db.beforeTransactionCommit?.(staged);
+          for (const [p, value] of reads) if (JSON.stringify(rows.get(p)) !== value) throw new Error('synthetic transaction conflict');
+        }
+        for (const [kind, ref] of staged) { if (kind === 'create' && rows.has(ref.path)) throw new Error('already exists'); if (kind === 'update' && !rows.has(ref.path)) throw new Error('missing'); }
+        for (const [, ref, value, merge] of staged) put(ref, value, merge);
+        if (atomic) await db.afterTransactionCommit?.(staged);
+      }
     }; return transaction;
   };
   const db = {
@@ -50,7 +59,14 @@ function storage() {
     collection: name => ({ doc: id => doc(`${name}/${id}`) }),
     batch: writer,
     runTransaction: callback => {
-      const result = pending.then(async () => { const transaction = writer(); const result = await callback(transaction); await transaction.commit(); return result; });
+      const result = pending.then(async () => {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const transaction = writer(true);
+          try { const result = await callback(transaction); await transaction.commit(); return result; }
+          catch (error) { if (error.message !== 'synthetic transaction conflict') throw error; }
+        }
+        throw new Error('synthetic transaction retries exhausted');
+      });
       pending = result.catch(() => {}); return result;
     }
   };
@@ -66,7 +82,7 @@ async function provider(execute = helper.executeProtectedStoryProvider, before =
 async function callables(f) {
   const key = `story-provider-callable-${++sequence}`;
   class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
-  globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: async () => { throw new Error('unneeded'); }, buildInitialStoryVersionRecord: value => value, ...helper, ...f.provider };
+  globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: persistence.reconcileStoryPersistence, buildInitialStoryVersionRecord: value => value, ...helper, ...f.provider };
   const source = stripTypeScriptTypes(callerSource).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
   try { return await importSource(`import { createHash } from 'node:crypto'; const { initializeApp, FieldValue, getFirestore, HttpsError, onCall, defineSecret, z, auditLog, reconcileStoryPersistence, buildInitialStoryVersionRecord, storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, generateStoryWithProvider, getStoryProviderCostPreflight, getStoryProviderReadiness } = globalThis[${JSON.stringify(key)}];\n${source}`); }
   finally { delete globalThis[key]; }
@@ -206,6 +222,13 @@ test('revocation during outcome recording withholds returned story output and re
   f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'record') { const result = await f.gateway(body); f.rows.get(f.consentPath).revoked = true; return Response.json(result); } };
   await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
 }));
+test('record and final authority awaits cannot return output after the protected deadline', () => fixture(async f => {
+  const originalNow = Date.now;
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'record') { const result = await f.gateway(body); Date.now = () => originalNow() + 21_000; return Response.json(result); } };
+  try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; }
+  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  assert.equal(f.rows.get(f.jobPath).job.attempts[0].status, 'RECONCILIATION_REQUIRED');
+}));
 test('one protected deadline covers a stalled response body and retains its unresolved hold', () => fixture(async f => {
   const originalTimer = globalThis.setTimeout;
   // Advance only the admitted 20-second HTTP lifetime, without waiting in CI.
@@ -234,6 +257,60 @@ test('actual callable preserves both full daily holds after successful provider 
   const reservation = f.rows.get(`storytimeProviderBudgetReservations/${f.authority.userId}_${f.authority.requestId}`);
   assert.equal(reservation.status, 'awaiting_charge_reconciliation'); assert.equal(reservation.actualCostUsd, null); assert.equal(reservation.observedCostUsd, .00025); assert.equal(reservation.heldCostUsd, .01); assert.equal(reservation.retryAuthorized, false);
   assert.equal(f.rows.get(f.claimPath).providerBudgetStatus, 'awaiting_charge_reconciliation');
+}));
+test('revocation during caller budget bookkeeping prevents every paid story write and retains holds', () => fixture(async f => {
+  const originalCollection = f.db.collection;
+  f.db.collection = name => {
+    const collection = originalCollection(name);
+    if (name !== 'storytimeProviderDeadLetters') return collection;
+    return { ...collection, doc: id => {
+      const ref = collection.doc(id), originalSet = ref.set;
+      return { ...ref, set: async (...args) => { await originalSet(...args); f.rows.get(f.consentPath).revoked = true; } };
+    } };
+  };
+  await assert.rejects(f.generateCallable());
+  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
+  assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
+  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  for (const [p, value] of f.rows) if (p.startsWith('storytimeProviderBudgetCounters/')) assert.equal(value.reservedCostUsd, .01);
+}));
+test('late cancellation after the caller snapshot cannot be overwritten by paid output persistence', () => fixture(async f => {
+  const originalCollection = f.db.collection;
+  f.db.collection = name => {
+    const collection = originalCollection(name);
+    if (name !== 'storyGenerationRequests') return collection;
+    return { ...collection, doc: id => {
+      const ref = collection.doc(id), originalGet = ref.get;
+      return { ...ref, get: async () => {
+        const value = await originalGet();
+        if (value.data()?.providerBudgetStatus === 'awaiting_charge_reconciliation') Object.assign(f.rows.get(f.claimPath), { status: 'cancellation_requested', cancellationRequested: true });
+        return value;
+      } };
+    } };
+  };
+  await assert.rejects(f.generateCallable());
+  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
+  assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation'); assert.equal(f.rows.get(f.claimPath).cancellationRequested, true);
+  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('rights revocation at paid persistence commit conflicts and rechecks the grant without another POST', () => fixture(async f => {
+  f.db.beforeTransactionCommit = async staged => {
+    if (staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) f.rows.get(f.rightsPath).revoked = true;
+  };
+  await assert.rejects(f.generateCallable());
+  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 0);
+  assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation'); assert.equal(f.providerRequests.length, 1);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('lost paid persistence acknowledgement uses actual reconciliation without another provider dispatch', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) throw new Error('synthetic acknowledgement lost after atomic commit');
+  };
+  const result = await f.generateCallable(); assert.equal(result.status, 'ready');
+  assert.equal([...f.rows.keys()].filter(p => p.startsWith('storySessions/')).length, 1);
+  assert.equal(f.rows.get(f.claimPath).status, 'succeeded'); assert.equal(f.providerRequests.length, 1);
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve', 'record']);
+  for (const [p, value] of f.rows) if (p.startsWith('storytimeProviderBudgetCounters/')) assert.equal(value.reservedCostUsd, .01);
 }));
 test('actual callable preserves unknown holds and terminal retry barrier after a lost reservation response', () => fixture(async f => {
   f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { await f.gateway(body); throw new Error('synthetic lost response'); } };

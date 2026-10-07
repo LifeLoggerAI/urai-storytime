@@ -2,11 +2,12 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { isIP } from "node:net";
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 
 export const storytimeSpendWorkerTokensSecret = defineSecret("STORYTIME_SPEND_WORKER_TOKENS_JSON");
 export type StoryProviderAuthority = { userId: string; requestId: string; reviewedRequestSha256: string };
+export type StoryAuthorityCommit = (write: (transaction: Transaction) => void) => Promise<void>;
 export type StorySpendReceipt = {
   schemaVersion: "storytime-protected-spend-observation-v1";
   status: "RECONCILIATION_REQUIRED";
@@ -97,7 +98,7 @@ type ExactStoryRequest = {
   inputUsdPerMillionTokens: number; outputUsdPerMillionTokens: number;
 };
 /** Server-only locators do not create grants, approvals, reservations or charge receipts. */
-export async function executeProtectedStoryProvider<T>(db: Firestore, authority: StoryProviderAuthority, sourceInput: unknown, exact: ExactStoryRequest, decode: (response: Response) => Promise<T>): Promise<{ result: T; spend: StorySpendReceipt }> {
+export async function executeProtectedStoryProvider<T>(db: Firestore, authority: StoryProviderAuthority, sourceInput: unknown, exact: ExactStoryRequest, decode: (response: Response) => Promise<T>): Promise<{ result: T; spend: StorySpendReceipt; commitWithAuthority: StoryAuthorityCommit }> {
   text(authority?.userId); text(authority?.requestId); digest(authority?.reviewedRequestSha256);
   const endpoint = "https://api.openai.com/v1/chat/completions", gatewayUrl = gatewayEndpoint();
   const sourceSha = storySpendSourceSha(), gatewaySha = digest(process.env.STORYTIME_SPEND_GATEWAY_SOURCE_SHA, 40);
@@ -114,7 +115,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const providerInputSha = storySpendHash(storySourceJson(sourceInput)), tenantSha = storySpendHash(authority.userId);
   const generationId = `${authority.userId}_${authority.requestId}`;
   const locator = storySpendHash(storySourceJson({ user_id: authority.userId, request_id: authority.requestId, reviewed_request_sha256: authority.reviewedRequestSha256, request_sha256: requestSha, source_input_sha256: inputSha }));
-  const loadAuthority = () => db.runTransaction(async transaction => {
+  const readAuthority = async (transaction: Transaction) => {
     const [claimSnapshot, bindingSnapshot] = await Promise.all([
       transaction.get(db.doc(`storyGenerationRequests/${generationId}`)),
       transaction.get(db.doc(`storytimePaidProviderBindings/${locator}`))
@@ -143,7 +144,8 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     need(rights.status === "APPROVED" && rights.rights_reviewed === true);
     need(storySpendHash(storySourceJson(consent)) === consentDigest && storySpendHash(storySourceJson(rights)) === rightsDigest);
     return { binding, consentDigest, rightsDigest };
-  });
+  };
+  const loadAuthority = () => db.runTransaction(readAuthority);
   const initial = await loadAuthority(), binding = initial.binding;
   const workerId = text(binding.worker_id), jobId = text(binding.job_id), accountId = text(binding.account_id);
   let tokens: Json; try { tokens = record(JSON.parse(storytimeSpendWorkerTokensSecret.value())); } catch { throw new StorySpendRejected(); }
@@ -155,11 +157,22 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     source_input_sha256: inputSha, semantic_headers_sha256: semanticSha, content_type: "application/json",
     request_sha256: requestSha, endpoint, model: exact.model, asset: `storytime/${tenantSha}/${authority.requestId}/session`, request_size: String(bytes.length)
   };
-  const verifyCurrent = async () => {
+  const verifySource = () => {
     need(storySpendSourceSha() === sourceSha && process.env.STORYTIME_SPEND_GATEWAY_SOURCE_SHA === gatewaySha && gatewayEndpoint() === gatewayUrl);
     need(storySpendHash(storySourceJson({ authority, input: sourceInput })) === inputSha);
+  };
+  const verifyCurrent = async () => {
+    verifySource();
     const current = await loadAuthority(); need(storySourceJson(current) === storySourceJson(initial));
   };
+  // Only Firestore reads and story writes may repeat on a transaction conflict.
+  // Provider dispatch and canonical admission remain outside this transaction.
+  const commitWithAuthority: StoryAuthorityCommit = write => db.runTransaction(async transaction => {
+    verifySource();
+    const current = await readAuthority(transaction); need(storySourceJson(current) === storySourceJson(initial));
+    verifySource();
+    write(transaction);
+  });
   const gateway = async (action: string, extra: Json = {}) => {
     // An uncertain reserve or observation is never automatically retried.
     try { return await boundedJson(await fetch(gatewayUrl, { method: "POST", redirect: "error", cache: "no-store", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ action, ...fields, ...extra }), signal: AbortSignal.timeout(15_000) })); }
@@ -207,7 +220,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
       run().then(resolve, reject).finally(() => controller.signal.removeEventListener("abort", abort));
     });
     current(); outcome = "succeeded";
-    return { result, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
+    return { result, commitWithAuthority, spend: { schemaVersion: "storytime-protected-spend-observation-v1", status: "RECONCILIATION_REQUIRED", jobId, attemptId, accountId, workerId, executorSourceSha: sourceSha, gatewaySourceSha: gatewaySha, requestSha256: requestSha, sourceInputSha256: inputSha, credentialSha256: credentialSha, semanticHeadersSha256: semanticSha, consentReceiptSha256: initial.consentDigest, rightsReceiptSha256: initial.rightsDigest, pricingReceipt: text(price.receipt), reservedUsdMicros: cap, chargesReconciled: false, retryAuthorized: false } };
   } finally {
     clearTimeout(timer); controller.abort();
     // An outcome never settles funds. A failed observation also leaves the hold intact.
@@ -217,6 +230,7 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
       // Recording may await the gateway. Fence returned output against authority
       // changes during that final await as well.
       await verifyCurrent();
+      need(Date.now() < deadline);
     }
   }
 }
