@@ -1,89 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { createRequire, stripTypeScriptTypes } from 'node:module';
-
-const require = createRequire(new URL('../../functions/package.json', import.meta.url));
-const { z } = require('zod');
-let moduleId = 0;
-
-function fixture() {
-  const records = new Map();
-  const files = new Map();
-  let nextId = 0;
-  const put = (path, value) => value === undefined ? records.delete(path) : records.set(path, structuredClone(value));
-  const snapshot = path => ({ id: path.split('/').at(-1), exists: records.has(path), data: () => structuredClone(records.get(path)) });
-  const ref = path => ({ path, id: path.split('/').at(-1), get: async () => snapshot(path), set: async value => put(path, value), update: async value => {
-    assert.ok(records.has(path), 'update cannot recreate a missing record'); put(path, { ...records.get(path), ...value });
-  } });
-  const query = (name, filters = [], limit = Infinity, cursor) => ({
-    where: (field, operator, value) => query(name, [...filters, [field, operator, value]], limit, cursor),
-    orderBy: () => query(name, filters, limit, cursor),
-    limit: size => query(name, filters, size, cursor),
-    startAfter: next => query(name, filters, limit, next.id),
-    get: async () => {
-      const docs = [...records.keys()].filter(path => path.startsWith(`${name}/`)).sort().map(snapshot).filter(doc =>
-        (!cursor || doc.id > cursor) && filters.every(([field, operator, value]) => {
-          const current = Array.isArray(field) ? field.reduce((row, key) => row?.[key], doc.data()) : doc.data()?.[field];
-          if (operator === 'array-contains') return Array.isArray(current) && current.includes(value);
-          if (operator === 'in') return value.includes(current);
-          return current === value;
-        })).slice(0, limit);
-      return { docs, size: docs.length };
-    }
-  });
-  const db = {
-    collection: name => ({ ...query(name), doc: id => ref(`${name}/${id ?? `new-${++nextId}`}`) }),
-    getAll: async (...refs) => refs.map(item => snapshot(item.path)),
-    batch: () => {
-      const deletes = [];
-      return { delete: item => deletes.push(item.path), commit: async () => deletes.forEach(path => put(path, undefined)) };
-    },
-    runTransaction: async callback => {
-      const writes = [];
-      const result = await callback({ get: item => item.get(),
-        update: (item, value) => writes.push(() => item.update(value)),
-        create: (item, value) => writes.push(() => item.set(value)) });
-      for (const write of writes) await write();
-      return result;
-    }
-  };
-  const bucket = {
-    getFiles: async () => [[]],
-    file: path => ({ save: async data => files.set(path, data), delete: async () => files.delete(path), getSignedUrl: async () => ['fixture-url'] })
-  };
-  put('storySessions/session', { userId: 'owner', requestId: 'request', currentVersionId: 'version' });
-  put('storyVersions/version', { userId: 'owner', sessionId: 'session', immutable: true, snapshot: { body: 'private previous memory' } });
-  put('storyVersions/foreign', { userId: 'different-owner', sessionId: 'foreign-session', immutable: true, snapshot: { body: 'must not export' } });
-  return { db, bucket, records, files, put };
-}
-
-async function callables(f) {
-  const key = `storytime-private-version-privacy-${++moduleId}`;
-  class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
-  class Timestamp {}
-  class FieldPath { constructor(...fields) { return fields; } static documentId() { return '__name__'; } }
-  globalThis[key] = {
-    getApps: () => [{}], initializeApp: () => {}, getFirestore: () => f.db,
-    getStorage: () => ({ bucket: () => f.bucket }),
-    getAuth: () => ({ getUser: async () => ({ uid: 'owner', emailVerified: true, disabled: false, metadata: {}, providerData: [] }), deleteUser: async () => {} }),
-    HttpsError, Timestamp, FieldPath, onCall: callback => callback, onRequest: (_options, callback) => callback, z, auditLog: () => {}
-  };
-  const raw = readFileSync('functions/src/privacy-execution.ts', 'utf8');
-  const source = raw.replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
-  const prelude = `import { createHash } from 'node:crypto'; const { getApps, initializeApp, getFirestore, getStorage, getAuth, HttpsError, Timestamp, FieldPath, onCall, onRequest, z, auditLog } = globalThis[${JSON.stringify(key)}];\n`;
-  try { return await import(`data:text/javascript;base64,${Buffer.from(prelude + stripTypeScriptTypes(source) + '\n//# sourceURL=storytime-private-version-privacy-fixture.mjs').toString('base64')}`); }
-  finally { delete globalThis[key]; }
-}
-
-const ownerRequest = data => ({ auth: { uid: 'owner', token: { email_verified: true } }, data });
-const adminRequest = data => ({ auth: { uid: 'admin', token: { admin: true } }, data });
-function request(f, type, scope) {
-  f.put('privacyRequests/privacy', { schemaVersion: 'storytime-privacy-request-v1', confirmation: true,
-    createdAt: new Date(Date.now() - 1000).toISOString(), status: 'requested',
-    exportAuthorizationExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-    userId: 'owner', type, scope, sessionId: scope === 'story_session' ? 'session' : null });
-}
+import { fixture, callables, ownerRequest, adminRequest, request } from '../helpers/storytime-privacy-fixture.mjs';
 
 for (const scope of ['account', 'story_session']) {
   test(`${scope} export includes only owner-scoped private story versions`, async () => {
@@ -92,7 +9,7 @@ for (const scope of ['account', 'story_session']) {
     const file = [...f.files.entries()].find(([path]) => path.endsWith('/storytime-export.json'));
     const data = JSON.parse(file[1]);
     assert.deepEqual(data.collections.storyVersions.map(row => row.id), ['version']);
-    assert.equal(data.collections.storyVersions[0].snapshot.body, 'private previous memory');
+    assert.equal(data.collections.storyVersions[0].snapshot.body, 'synthetic private memory');
     assert.equal(data.inventoryVersion, 'storytime-owner-ledger-inventory-v4');
   });
 }
@@ -169,3 +86,4 @@ test('verification rejects a tampered executed target set', async () => {
   await assert.rejects(c.verifyStorytimeDeletion(adminRequest({ privacyRequestId: 'privacy' })), error => error.code === 'failed-precondition');
   assert.equal(f.records.get('privacyRequests/privacy').deletionCompletionVerified, false);
 });
+

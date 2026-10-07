@@ -30,7 +30,8 @@ const EXPORT_PACKAGE_TTL_MS = 24 * 60 * 60 * 1000;
 const STORYTIME_PRIVACY_POLICY_VERSION = "urai-privacy-0.2.0-staging-scaffold";
 const STORYTIME_EXPORT_SCHEMA_VERSION = "storytime-export-v1";
 const STORYTIME_EXPORT_INVENTORY_VERSION = "storytime-owner-ledger-inventory-v4";
-const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v1";
+const STORYTIME_DELETION_PLAN_SCHEMA_VERSION = "storytime-deletion-plan-v2";
+const DELETION_EXECUTION_LEASE_MS = 10 * 60 * 1000;
 const STORYTIME_PRIVACY_RECEIPT_SCHEMA_VERSION = "storytime-privacy-operation-receipt-v1";
 
 const ExportRequestSchema = z.object({
@@ -38,11 +39,11 @@ const ExportRequestSchema = z.object({
 });
 
 const DeletionPlanRequestSchema = z.object({
-  privacyRequestId: z.string().min(1).max(300)
+  privacyRequestId: z.string().min(1).max(300).regex(/^[^/]+$/)
 });
 
 const DeletionExecuteSchema = z.object({
-  privacyRequestId: z.string().min(1).max(300),
+  privacyRequestId: z.string().min(1).max(300).regex(/^[^/]+$/),
   expectedPlanHash: z.string().regex(/^[0-9a-f]{64}$/),
   confirmation: z.literal("DELETE_STORYTIME_DATA")
 });
@@ -151,10 +152,16 @@ type StoredPrivacyRequest = {
   completionReceiptId?: string | null;
   deletionPlanHash?: string | null;
   deletionPlanId?: string | null;
+  destructiveExecutionPlanHash?: string | null;
+  destructiveExecutionAuthorityHash?: string | null;
+  destructiveExecutionAttemptId?: string | null;
+  destructiveExecutionStartedBy?: string | null;
+  destructiveExecutionLeaseExpiresAt?: string | null;
 };
 
+type TargetVersion = { seconds: number; nanoseconds: number };
 type DeletionPlan = {
-  schemaVersion: typeof STORYTIME_DELETION_PLAN_SCHEMA_VERSION;
+  schemaVersion: typeof STORYTIME_DELETION_PLAN_SCHEMA_VERSION | "storytime-deletion-plan-v1";
   privacyRequestId: string;
   userId: string;
   scope: PrivacyScope;
@@ -167,6 +174,18 @@ type DeletionPlan = {
   completionBlockers: string[];
   legalHold: boolean;
   deleteAuthUser: boolean;
+  requestAuthorityHash?: string;
+  targetVersions?: Record<string, TargetVersion>;
+  storageGenerations?: Record<string, string>;
+  authAccountCreatedAt?: string | null;
+};
+
+type DeletionExecution = {
+  privacyRequestId: string;
+  planId: string;
+  planHash: string;
+  requestAuthorityHash: string;
+  attemptId: string;
 };
 
 function nowIso() {
@@ -358,23 +377,17 @@ async function familyMemberships(userId: string, transaction?: Transaction) {
   };
 }
 
-async function activeLegalHold(userId: string) {
-  const user = await db.collection("users").doc(userId).get();
+async function activeLegalHold(userId: string, transaction?: Transaction) {
+  const userRef = db.collection("users").doc(userId);
+  const user = transaction ? await transaction.get(userRef) : await userRef.get();
   if (user.exists && user.data()?.legalHold === true) return true;
 
   // Keep legal-hold lookup executable without requiring a hidden composite index.
   // We query the subject key only, then evaluate active status in trusted server code.
-  const byUid = await db.collection("legalHoldRecords")
-    .where("uid", "==", userId)
-    .limit(25)
-    .get();
-  if (byUid.docs.some((doc) => doc.data()?.status === "active")) return true;
-
-  const byUserId = await db.collection("legalHoldRecords")
-    .where("userId", "==", userId)
-    .limit(25)
-    .get();
-  return byUserId.docs.some((doc) => doc.data()?.status === "active");
+  const byUid = await listByField("legalHoldRecords", "uid", userId, transaction);
+  if (byUid.some(({ data }) => data.status === "active")) return true;
+  const byUserId = await listByField("legalHoldRecords", "userId", userId, transaction);
+  return byUserId.some(({ data }) => data.status === "active");
 }
 
 function externalArtifactPointers(rows: Array<{ collection: string; id: string; data: DocumentData }>) {
@@ -558,7 +571,13 @@ function normalizeDeletionPlan(plan: DeletionPlan) {
     executionBlockers: [...plan.executionBlockers].sort(),
     completionBlockers: [...plan.completionBlockers].sort(),
     legalHold: plan.legalHold,
-    deleteAuthUser: plan.deleteAuthUser
+    deleteAuthUser: plan.deleteAuthUser,
+    ...(plan.schemaVersion === STORYTIME_DELETION_PLAN_SCHEMA_VERSION ? {
+      requestAuthorityHash: plan.requestAuthorityHash,
+      targetVersions: Object.fromEntries(Object.entries(plan.targetVersions ?? {}).sort(([left], [right]) => left.localeCompare(right))),
+      storageGenerations: Object.fromEntries(Object.entries(plan.storageGenerations ?? {}).sort(([left], [right]) => left.localeCompare(right))),
+      authAccountCreatedAt: plan.authAccountCreatedAt ?? null
+    } : {})
   };
 }
 
@@ -566,10 +585,57 @@ function deletionPlanHash(plan: DeletionPlan) {
   return sha256(normalizeDeletionPlan(plan));
 }
 
-async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest, allowDeletedSession = false): Promise<DeletionPlan> {
+function deletionRequestAuthority(privacyRequestId: string, request: StoredPrivacyRequest) {
+  if (request.schemaVersion !== "storytime-privacy-request-v1" || request.confirmation !== true
+    || request.type !== "deletion" || !request.userId || request.userId.includes("/")
+    || !["account", "story_session"].includes(request.scope)
+    || (request.scope === "story_session" && (!request.sessionId || request.sessionId.includes("/")))
+    || !Number.isFinite(Date.parse(request.createdAt ?? "")) || Date.parse(request.createdAt ?? "") > Date.now()
+    || !["requested", "processing"].includes(request.status ?? "")) {
+    throw new HttpsError("failed-precondition", "Current confirmed Storytime deletion authority is required.");
+  }
+  return sha256(stablePortable({ privacyRequestId, schemaVersion: request.schemaVersion,
+    userId: request.userId, type: request.type, scope: request.scope,
+    sessionId: request.sessionId ?? null, confirmation: true, createdAt: request.createdAt }));
+}
+
+function targetVersion(value: Timestamp | undefined): TargetVersion {
+  if (!value || !Number.isSafeInteger(value.seconds) || !Number.isSafeInteger(value.nanoseconds)
+    || value.nanoseconds < 0 || value.nanoseconds >= 1_000_000_000) {
+    throw new HttpsError("failed-precondition", "Storytime deletion target version is unavailable.");
+  }
+  return { seconds: value.seconds, nanoseconds: value.nanoseconds };
+}
+
+function sameTargetVersion(left: TargetVersion | undefined, right: TargetVersion | undefined) {
+  return !!left && !!right && left.seconds === right.seconds && left.nanoseconds === right.nanoseconds;
+}
+
+async function captureTargetVersions(targets: Record<string, string[]>, collections: ExportCollections) {
+  const versions: Record<string, TargetVersion> = {};
+  for (const [name, ids] of Object.entries(targets)) {
+    const selected = new Map((collections[name] ?? []).map(({ id, data }) => [id, data]));
+    for (let offset = 0; offset < ids.length; offset += QUERY_PAGE_LIMIT) {
+      const refs = ids.slice(offset, offset + QUERY_PAGE_LIMIT).map((id) => db.collection(name).doc(id));
+      if (refs.length === 0) continue;
+      const snapshots = await db.getAll(...refs);
+      for (const snapshot of snapshots) {
+        if (!snapshot.exists || !selected.has(snapshot.id)
+          || sha256(stablePortable(snapshot.data())) !== sha256(stablePortable(selected.get(snapshot.id)))) {
+          throw new HttpsError("failed-precondition", "Storytime deletion targets changed during planning.");
+        }
+        versions[`${name}/${snapshot.id}`] = targetVersion(snapshot.updateTime);
+      }
+    }
+  }
+  return versions;
+}
+
+async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest, allowDeletedSession = false, captureVersions = true): Promise<DeletionPlan> {
   const userId = request.userId;
   const scope = request.scope;
   const sessionId = request.sessionId ?? null;
+  const requestAuthorityHash = deletionRequestAuthority(privacyRequestId, request);
   const collections = scope === "account"
     ? await collectAccountRows(userId)
     : await collectSessionRows(userId, String(sessionId), allowDeletedSession);
@@ -637,6 +703,18 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
     completionBlockers.push("backup_expiry_policy_not_certified");
   }
 
+  const targetVersions = captureVersions ? await captureTargetVersions(targets, collections) : {};
+  const storageGenerations: Record<string, string> = {};
+  if (captureVersions) for (const path of storageObjects) {
+    const [metadata] = await bucket.file(path).getMetadata();
+    const generation = String(metadata.generation ?? "");
+    if (!/^[1-9][0-9]*$/.test(generation)
+      || (typeof metadata.generation === "number" && !Number.isSafeInteger(metadata.generation))) {
+      throw new HttpsError("failed-precondition", "Storytime deletion object generation is unavailable.");
+    }
+    storageGenerations[path] = generation;
+  }
+  const authAccount = scope === "account" && captureVersions ? await authAccountMetadata(userId) : null;
   return {
     schemaVersion: STORYTIME_DELETION_PLAN_SCHEMA_VERSION,
     privacyRequestId,
@@ -650,32 +728,130 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
     executionBlockers: [...new Set(executionBlockers)].sort(),
     completionBlockers: [...new Set(completionBlockers)].sort(),
     legalHold,
-    deleteAuthUser: scope === "account"
+    deleteAuthUser: scope === "account",
+    requestAuthorityHash,
+    targetVersions,
+    storageGenerations,
+    authAccountCreatedAt: authAccount?.createdAt ?? null
   };
 }
 
-async function deleteTargets(plan: DeletionPlan) {
+function assertDeletionPlanAuthority(plan: DeletionPlan, requestId: string, request: StoredPrivacyRequest, expectedHash: string) {
+  if (plan.schemaVersion !== STORYTIME_DELETION_PLAN_SCHEMA_VERSION
+    || deletionPlanHash(plan) !== expectedHash || plan.privacyRequestId !== requestId
+    || plan.userId !== request.userId || plan.scope !== request.scope
+    || plan.sessionId !== (request.sessionId ?? null)
+    || plan.requestAuthorityHash !== deletionRequestAuthority(requestId, request)
+    || !plan.targetVersions || !plan.storageGenerations) {
+    throw new HttpsError("failed-precondition", "Stored Storytime deletion plan failed execution authority checks. Create a current versioned plan.");
+  }
+}
+
+async function residualDeletionPlan(stored: DeletionPlan, current: DeletionPlan) {
+  for (const [name, ids] of Object.entries(current.targets)) for (const id of ids) {
+    const path = `${name}/${id}`;
+    if (!stored.targets[name]?.includes(id)
+      || !sameTargetVersion(stored.targetVersions?.[path], current.targetVersions?.[path])) {
+      throw new HttpsError("failed-precondition", "Storytime deletion targets changed. Governed recovery cannot admit new or replaced records.");
+    }
+  }
+  for (const path of current.storageObjects) {
+    if (!stored.storageObjects.includes(path) || stored.storageGenerations?.[path] !== current.storageGenerations?.[path]) {
+      throw new HttpsError("failed-precondition", "Storytime deletion objects changed. Governed recovery cannot admit replacement objects.");
+    }
+  }
+  if (current.authAccountCreatedAt && current.authAccountCreatedAt !== stored.authAccountCreatedAt) {
+    throw new HttpsError("failed-precondition", "The Storytime account identity changed after approval.");
+  }
+  // Original targets dependent on deleted parent metadata remain authoritative
+  // only at their exact approved version. Never infer ownership from absence.
+  const targets: Record<string, string[]> = {};
+  for (const [name, ids] of Object.entries(stored.targets)) {
+    targets[name] = [];
+    for (let offset = 0; offset < ids.length; offset += QUERY_PAGE_LIMIT) {
+      const refs = ids.slice(offset, offset + QUERY_PAGE_LIMIT).map((id) => db.collection(name).doc(id));
+      if (!refs.length) continue;
+      for (const snapshot of await db.getAll(...refs)) if (snapshot.exists) {
+        if (!sameTargetVersion(stored.targetVersions?.[`${name}/${snapshot.id}`], targetVersion(snapshot.updateTime))) {
+          throw new HttpsError("failed-precondition", "An approved Storytime deletion target was replaced or corrected.");
+        }
+        targets[name].push(snapshot.id);
+      }
+    }
+  }
+  return { ...stored, targets, storageObjects: current.storageObjects,
+    completionBlockers: [...new Set([...stored.completionBlockers, ...current.completionBlockers])].sort() };
+}
+
+async function readDeletionExecution(execution: DeletionExecution, transaction?: Transaction) {
+  const current = await readPrivacyRequest(execution.privacyRequestId, transaction);
+  const data = current.data;
+  if (deletionRequestAuthority(execution.privacyRequestId, data) !== execution.requestAuthorityHash
+    || data.deletionPlanId !== execution.planId || data.deletionPlanHash !== execution.planHash
+    || data.executionState !== "executing" || data.destructiveExecutionAttemptId !== execution.attemptId
+    || data.destructiveExecutionPlanHash !== execution.planHash
+    || data.destructiveExecutionAuthorityHash !== execution.requestAuthorityHash
+    || Date.parse(data.destructiveExecutionLeaseExpiresAt ?? "") <= Date.now()
+    || !Number.isFinite(Date.parse(data.destructiveExecutionLeaseExpiresAt ?? ""))) {
+    throw new HttpsError("failed-precondition", "Storytime deletion execution authority changed or expired.");
+  }
+  if (await activeLegalHold(data.userId, transaction)) {
+    throw new HttpsError("failed-precondition", "Storytime deletion is blocked by an active legal hold.");
+  }
+  if (data.scope === "account") {
+    const family = await familyMemberships(data.userId, transaction);
+    if (process.env.STORYTIME_FIREBASE_ISOLATED !== "true" || family.memberships.length || family.truncated) {
+      throw new HttpsError("failed-precondition", "Storytime account isolation or family review is unavailable.");
+    }
+  }
+  return current;
+}
+
+async function deleteTargets(plan: DeletionPlan, execution: DeletionExecution) {
   const deletedCounts: Record<string, number> = {};
 
   for (const [collectionName, ids] of Object.entries(plan.targets)) {
     deletedCounts[collectionName] = 0;
     for (let offset = 0; offset < ids.length; offset += DELETE_BATCH_LIMIT) {
-      const batch = db.batch();
       const slice = ids.slice(offset, offset + DELETE_BATCH_LIMIT);
-      for (const id of slice) batch.delete(db.collection(collectionName).doc(id));
-      await batch.commit();
-      deletedCounts[collectionName] += slice.length;
+      const count = await db.runTransaction(async (transaction) => {
+        await readDeletionExecution(execution, transaction);
+        const refs = slice.map((id) => db.collection(collectionName).doc(id));
+        const snapshots = await transaction.getAll(...refs);
+        for (const snapshot of snapshots) if (snapshot.exists
+          && !sameTargetVersion(plan.targetVersions?.[`${collectionName}/${snapshot.id}`], targetVersion(snapshot.updateTime))) {
+          throw new HttpsError("failed-precondition", "A Storytime deletion target changed before its atomic mutation.");
+        }
+        for (const snapshot of snapshots) if (snapshot.exists) {
+          transaction.delete(snapshot.ref, { lastUpdateTime: snapshot.updateTime });
+        }
+        return snapshots.filter((snapshot) => snapshot.exists).length;
+      });
+      deletedCounts[collectionName] += count;
     }
   }
 
   for (let offset = 0; offset < plan.storageObjects.length; offset += DELETE_BATCH_LIMIT) {
     const slice = plan.storageObjects.slice(offset, offset + DELETE_BATCH_LIMIT);
-    await Promise.all(slice.map((path) => bucket.file(path).delete({ ignoreNotFound: true })));
+    for (const path of slice) {
+      await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
+      const generation = plan.storageGenerations?.[path];
+      if (!generation || !/^[1-9][0-9]*$/.test(generation)) {
+        throw new HttpsError("failed-precondition", "Approved Storytime deletion object generation is unavailable.");
+      }
+      await bucket.file(path, { generation }).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
+    }
   }
   deletedCounts.storageObjects = plan.storageObjects.length;
 
   if (plan.deleteAuthUser) {
     try {
+      await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
+      const account = await authAccountMetadata(plan.userId);
+      if (account && (!plan.authAccountCreatedAt || account.createdAt !== plan.authAccountCreatedAt)) {
+        throw new HttpsError("failed-precondition", "The approved Storytime authentication identity changed.");
+      }
+      await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
       await auth.deleteUser(plan.userId);
       deletedCounts.authUsers = 1;
     } catch (error) {
@@ -1026,6 +1202,9 @@ export const planStorytimeDeletion = onCall(async (request) => {
   const userId = requireVerifiedOwner(request);
   const input = DeletionPlanRequestSchema.parse(request.data);
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "deletion");
+  if (privacyRequest.data.executionState === "executing") {
+    throw new HttpsError("failed-precondition", "Resume or settle the current deletion execution before replacing its plan.");
+  }
   const plan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data);
   const planHash = deletionPlanHash(plan);
   const planId = `${input.privacyRequestId}_${planHash}`;
@@ -1038,7 +1217,13 @@ export const planStorytimeDeletion = onCall(async (request) => {
     createdAt: plan.generatedAt
   }, { merge: false });
 
-  await privacyRequest.ref.update({
+  await db.runTransaction(async (transaction) => {
+    const current = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "deletion", transaction);
+    if (deletionRequestAuthority(input.privacyRequestId, current.data) !== plan.requestAuthorityHash
+      || current.data.executionState === "executing") {
+      throw new HttpsError("failed-precondition", "Storytime deletion authority changed during planning.");
+    }
+    transaction.update(current.ref, {
     status: "processing",
     executionState: plan.executionBlockers.length === 0 ? "plan_ready" : "blocked",
     deletionPlanId: planId,
@@ -1047,6 +1232,7 @@ export const planStorytimeDeletion = onCall(async (request) => {
     deletionExecutionBlockers: plan.executionBlockers,
     deletionCompletionBlockers: plan.completionBlockers,
     updatedAt: plan.generatedAt
+    });
   });
 
   auditLog({
@@ -1076,7 +1262,7 @@ export const executeStorytimeDeletion = onCall(async (request) => {
 
   const planId = String(privacyRequest.data.deletionPlanId ?? "");
   const storedPlanHash = String(privacyRequest.data.deletionPlanHash ?? "");
-  if (!planId || !storedPlanHash || storedPlanHash !== input.expectedPlanHash) {
+  if (planId !== `${input.privacyRequestId}_${input.expectedPlanHash}` || !storedPlanHash || storedPlanHash !== input.expectedPlanHash) {
     throw new HttpsError("failed-precondition", "A current approved deletion plan hash is required.");
   }
 
@@ -1087,9 +1273,22 @@ export const executeStorytimeDeletion = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Stored Storytime deletion plan failed integrity verification.");
   }
 
-  const currentPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data);
+  assertDeletionPlanAuthority(storedPlan, input.privacyRequestId, privacyRequest.data, input.expectedPlanHash);
+  const recovering = ["retry_required", "executing"].includes(privacyRequest.data.executionState ?? "");
+  if (recovering && (privacyRequest.data.destructiveExecutionPlanHash !== input.expectedPlanHash
+    || privacyRequest.data.destructiveExecutionAuthorityHash !== storedPlan.requestAuthorityHash
+    || !privacyRequest.data.destructiveExecutionAttemptId || !privacyRequest.data.destructiveExecutionStartedBy
+    || (privacyRequest.data.executionState === "executing"
+      && (!Number.isFinite(Date.parse(privacyRequest.data.destructiveExecutionLeaseExpiresAt ?? ""))
+        || Date.parse(privacyRequest.data.destructiveExecutionLeaseExpiresAt ?? "") > Date.now())))) {
+    throw new HttpsError("failed-precondition", "An expired or failed exact-plan execution is required for governed recovery.");
+  }
+  if (!recovering && privacyRequest.data.executionState !== "plan_ready") {
+    throw new HttpsError("failed-precondition", "The approved Storytime deletion plan is not ready for execution.");
+  }
+  const currentPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data, recovering);
   const currentHash = deletionPlanHash(currentPlan);
-  if (currentHash !== input.expectedPlanHash) {
+  if (!recovering && currentHash !== input.expectedPlanHash) {
     throw new HttpsError("failed-precondition", "Storytime deletion targets changed. Run a new deletion plan before execution.");
   }
   if (currentPlan.executionBlockers.length > 0) {
@@ -1097,28 +1296,53 @@ export const executeStorytimeDeletion = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Storytime deletion is blocked by unresolved privacy/runtime prerequisites.");
   }
 
-  await privacyRequest.ref.update({
-    status: "processing",
-    executionState: "executing",
-    destructiveExecutionStartedAt: nowIso(),
-    destructiveExecutionStartedBy: adminUid,
-    updatedAt: nowIso()
+  const executionPlan = recovering ? await residualDeletionPlan(storedPlan, currentPlan) : currentPlan;
+  const execution: DeletionExecution = { privacyRequestId: input.privacyRequestId, planId,
+    planHash: input.expectedPlanHash, requestAuthorityHash: storedPlan.requestAuthorityHash!,
+    attemptId: db.collection("privacyOperationReceipts").doc().id };
+  await db.runTransaction(async (transaction) => {
+    const latest = await readPrivacyRequest(input.privacyRequestId, transaction);
+    if (deletionRequestAuthority(input.privacyRequestId, latest.data) !== execution.requestAuthorityHash
+      || latest.data.deletionPlanId !== planId || latest.data.deletionPlanHash !== input.expectedPlanHash
+      || latest.data.executionState !== privacyRequest.data.executionState
+      || latest.data.destructiveExecutionAttemptId !== privacyRequest.data.destructiveExecutionAttemptId) {
+      throw new HttpsError("failed-precondition", "Storytime deletion authority changed before execution was reserved.");
+    }
+    const approved = await transaction.get(db.collection("privacyDeletionPlans").doc(planId));
+    const approvedPlan = approved.data()?.plan as DeletionPlan | undefined;
+    if (!approvedPlan) throw new HttpsError("failed-precondition", "The approved deletion plan is unavailable.");
+    assertDeletionPlanAuthority(approvedPlan, input.privacyRequestId, latest.data, execution.planHash);
+    if (await activeLegalHold(latest.data.userId, transaction)) {
+      throw new HttpsError("failed-precondition", "Storytime deletion is blocked by an active legal hold.");
+    }
+    transaction.update(latest.ref, {
+      status: "processing", executionState: "executing", destructiveExecutionStartedAt: nowIso(),
+      destructiveExecutionStartedBy: adminUid, destructiveExecutionPlanHash: execution.planHash,
+      destructiveExecutionAuthorityHash: execution.requestAuthorityHash,
+      destructiveExecutionAttemptId: execution.attemptId,
+      destructiveExecutionLeaseExpiresAt: new Date(Date.now() + DELETION_EXECUTION_LEASE_MS).toISOString(),
+      deletionCompletionVerified: false, completionReceiptId: null, updatedAt: nowIso()
+    });
   });
 
   try {
-    const deletedCounts = await deleteTargets(currentPlan);
+    const deletedCounts = await deleteTargets(executionPlan, execution);
     const receiptId = await writeReceipt({
       userId: currentPlan.userId,
       privacyRequestId: input.privacyRequestId,
       type: "deletion_mutation",
       metadata: {
         planHash: input.expectedPlanHash,
+        attemptId: execution.attemptId,
+        recovered: recovering,
         deletedCounts,
         completionBlockers: currentPlan.completionBlockers
       }
     });
 
-    await privacyRequest.ref.update({
+    await db.runTransaction(async (transaction) => {
+      const current = await readDeletionExecution(execution, transaction);
+      transaction.update(current.ref, {
       status: "processing",
       executionState: "verification_required",
       primaryStoreDeletionReceiptId: receiptId,
@@ -1127,7 +1351,9 @@ export const executeStorytimeDeletion = onCall(async (request) => {
       deletionCompletionVerificationRequired: true,
       deletionCompletionVerified: false,
       completionReceiptId: null,
+      destructiveExecutionLeaseExpiresAt: null,
       updatedAt: nowIso()
+      });
     });
 
     auditLog({ event: "privacy_deletion_executed", userId: currentPlan.userId, errorCode: "verification_required" });
@@ -1141,13 +1367,22 @@ export const executeStorytimeDeletion = onCall(async (request) => {
       completionBlockers: currentPlan.completionBlockers
     };
   } catch (error) {
-    await privacyRequest.ref.update({
+    await db.runTransaction(async (transaction) => {
+      const current = await readPrivacyRequest(input.privacyRequestId, transaction);
+      if (current.data.executionState !== "executing"
+        || current.data.destructiveExecutionAttemptId !== execution.attemptId) return;
+      // A revocation or successor plan wins over an old attempt's failure update.
+      if (current.data.status === "cancelled" || current.data.status === "rejected"
+        || current.data.deletionPlanHash !== execution.planHash) return;
+      transaction.update(current.ref, {
       status: "processing",
       executionState: "retry_required",
       deletionCompletionVerified: false,
       completionReceiptId: null,
       deletionFailureCode: error instanceof Error ? error.name : "unknown",
+      destructiveExecutionLeaseExpiresAt: null,
       updatedAt: nowIso()
+      });
     });
     auditLog({ event: "privacy_deletion_blocked", userId: currentPlan.userId, errorCode: "retry_required" });
     throw new HttpsError("internal", "Storytime deletion did not complete. The request remains open for governed recovery.");
@@ -1180,8 +1415,9 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "The executed deletion plan failed verification authority checks.");
   }
 
-  // Only this admin-only verifier may collect children after the parent was deleted.
-  const verificationPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data, true);
+  // Only this verifier and a version-bound admin recovery may collect children
+  // after the parent was deleted. Ordinary exports still require the live parent.
+  const verificationPlan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data, true, false);
   const remaining = remainingDeletionTargets(verificationPlan);
   // Some original targets (for example moderation and public shares) depend on
   // deleted parent metadata. Read the exact executed target set as well.
@@ -1271,5 +1507,6 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     completionReceiptId: receiptId
   };
 });
+
 
 
