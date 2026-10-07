@@ -7,6 +7,7 @@ import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
+import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret } from "./story-provider-spend.js";
 import {
   generateStoryWithProvider,
   getStoryProviderCostPreflight,
@@ -208,6 +209,14 @@ function roundedUsd(value: number) {
   return Math.round(value * 100_000_000) / 100_000_000;
 }
 
+function checkedBudgetUsd(value: unknown) {
+  if (value === undefined) return 0;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new HttpsError("failed-precondition", "Storytime provider budget counters require reconciliation.");
+  }
+  return value;
+}
+
 function providerInputFromRequest(input: z.infer<typeof GenerateStorySchema>, source: string): StoryProviderInput {
   return {
     title: input.title,
@@ -250,11 +259,12 @@ async function reserveProviderBudget(
       throw new HttpsError("already-exists", "A provider budget reservation already exists for this Storytime request.");
     }
 
-    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
-    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
-    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
-    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
-    const estimate = preflight.estimatedMaxCostUsd;
+    const globalActual = checkedBudgetUsd(globalSnapshot.data()?.actualCostUsd);
+    const globalReserved = checkedBudgetUsd(globalSnapshot.data()?.reservedCostUsd);
+    const userActual = checkedBudgetUsd(userSnapshot.data()?.actualCostUsd);
+    const userReserved = checkedBudgetUsd(userSnapshot.data()?.reservedCostUsd);
+    // Hold the entire local ceiling. The canonical cap must fit inside it.
+    const estimate = preflight.maxGenerationCostUsd;
 
     if (globalActual + globalReserved + estimate > preflight.globalDailyBudgetUsd) {
       throw new HttpsError("resource-exhausted", "Storytime provider daily budget is exhausted.");
@@ -298,54 +308,37 @@ async function reserveProviderBudget(
   return {
     reservationId,
     dayId,
-    estimatedMaxCostUsd: preflight.estimatedMaxCostUsd,
+    estimatedMaxCostUsd: preflight.maxGenerationCostUsd,
     globalDailyBudgetUsd: preflight.globalDailyBudgetUsd,
     userDailyBudgetUsd: preflight.userDailyBudgetUsd
   };
 }
 
-async function settleProviderBudget(
+async function observeProviderBudget(
   userId: string,
   reservation: ProviderBudgetReservation,
-  actualCostUsd: number
+  receipt: StoryProviderReceipt
 ) {
-  const globalRef = db.collection("storytimeProviderBudgetCounters").doc(`global_${reservation.dayId}`);
-  const userRef = db.collection("storytimeProviderBudgetCounters").doc(`user_${userId}_${reservation.dayId}`);
   const reservationRef = db.collection("storytimeProviderBudgetReservations").doc(reservation.reservationId);
-
+  if (receipt.provider !== "openai" || receipt.actualCostUsd !== null || receipt.settlementStatus !== "RECONCILIATION_REQUIRED" || receipt.spend?.status !== "RECONCILIATION_REQUIRED" || receipt.spend.chargesReconciled !== false) {
+    throw new HttpsError("failed-precondition", "Provider usage cannot settle a Storytime charge.");
+  }
   await db.runTransaction(async (transaction) => {
-    const [globalSnapshot, userSnapshot, reservationSnapshot] = await Promise.all([
-      transaction.get(globalRef),
-      transaction.get(userRef),
-      transaction.get(reservationRef)
-    ]);
+    const reservationSnapshot = await transaction.get(reservationRef);
     const reservationData = reservationSnapshot.data() ?? {};
-    if (reservationData.status === "settled") return;
-    if (!reservationSnapshot.exists || reservationData.userId !== userId) {
+    if (!reservationSnapshot.exists || reservationData.userId !== userId || reservationData.dayId !== reservation.dayId || reservationData.estimatedMaxCostUsd !== reservation.estimatedMaxCostUsd || !["reserved", "awaiting_charge_reconciliation"].includes(reservationData.status)) {
       throw new HttpsError("failed-precondition", "Storytime provider budget reservation is unavailable.");
     }
-
-    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
-    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
-    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
-    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
-    const reserved = Number(reservationData.estimatedMaxCostUsd || reservation.estimatedMaxCostUsd);
     const updatedAt = now();
-
-    transaction.set(globalRef, {
-      actualCostUsd: roundedUsd(globalActual + actualCostUsd),
-      reservedCostUsd: roundedUsd(Math.max(0, globalReserved - reserved)),
-      updatedAt
-    }, { merge: true });
-    transaction.set(userRef, {
-      actualCostUsd: roundedUsd(userActual + actualCostUsd),
-      reservedCostUsd: roundedUsd(Math.max(0, userReserved - reserved)),
-      updatedAt
-    }, { merge: true });
+    // Keep both daily counters reserved. Only independent final-charge reconciliation
+    // may move money; a successful story response is a usage observation.
     transaction.update(reservationRef, {
-      status: "settled",
-      actualCostUsd: roundedUsd(actualCostUsd),
-      settledAt: updatedAt,
+      status: "awaiting_charge_reconciliation",
+      actualCostUsd: null,
+      observedCostUsd: receipt.observedCostUsd,
+      heldCostUsd: reservation.estimatedMaxCostUsd,
+      providerReceipt: receipt,
+      retryAuthorized: false,
       updatedAt
     });
   });
@@ -436,6 +429,8 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       consentVersion: input.consentSnapshot.consentVersion,
       reviewVersion: input.requestReview.reviewVersion,
       reviewedRequestSha256: reviewedRequestSha256(input),
+      providerInputSha256: storySpendHash(storySourceJson(providerInputFromRequest(input, input.sourceText || "A quiet signal became a private URAI story."))),
+      consentSnapshot: input.consentSnapshot,
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -539,7 +534,7 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
   return { ref: sessionSnap.ref, data: sessionSnap.data()! };
 }
 
-export const generateStorySession = onCall(async (request) => {
+export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerTokensSecret] }, async (request) => {
   requireAuth(request.auth?.uid);
   requireVerifiedAdultAccount(request.auth?.token.email_verified);
   const userId = request.auth!.uid;
@@ -620,7 +615,7 @@ export const generateStorySession = onCall(async (request) => {
   let providerReceipt: StoryProviderReceipt;
   try {
     if (readiness.ready) {
-      const providerResult = await generateStoryWithProvider(providerInput);
+      const providerResult = await generateStoryWithProvider(providerInput, { userId, requestId: input.requestId, reviewedRequestSha256: processedRequestSha256 }, db);
       generated = providerResult.output;
       providerReceipt = providerResult.receipt;
     } else {
@@ -637,6 +632,9 @@ export const generateStorySession = onCall(async (request) => {
         configuredOutputUsdPerMillionTokens: null,
         estimatedMaxCostUsd: 0,
         actualCostUsd: 0,
+        observedCostUsd: null,
+        settlementStatus: "NO_PROVIDER_SPEND",
+        spend: null,
         maxAllowedCostUsd: null,
         attemptCount: 1,
         costStatus: "no_provider_spend"
@@ -654,39 +652,42 @@ export const generateStorySession = onCall(async (request) => {
       });
     }
     await generationRequest.requestRef.set({
-      status: "failed",
+      status: budgetReservation ? "requires_reconciliation" : "failed",
       errorCode: error instanceof Error ? error.name : "unknown",
       providerBudgetStatus: budgetReservation ? "held_after_failure" : "not_reserved",
       updatedAt: now()
     }, { merge: true });
     auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
-    throw new HttpsError("internal", "Story generation could not be completed safely. Please try again.");
+    throw new HttpsError("internal", "Story generation could not be confirmed safely. Its budget remains held; do not submit a replacement request.");
   }
 
   if (budgetReservation && providerReceipt.provider === "openai") {
     try {
-      await settleProviderBudget(userId, budgetReservation, providerReceipt.actualCostUsd);
+      await observeProviderBudget(userId, budgetReservation, providerReceipt);
+      await retainProviderDeadLetter({ userId, requestId: input.requestId, reservation: budgetReservation, failureCode: "charge_reconciliation_required" });
       await generationRequest.requestRef.set({
-        providerBudgetStatus: "settled",
-        providerActualCostUsd: providerReceipt.actualCostUsd,
+        providerBudgetStatus: "awaiting_charge_reconciliation",
+        providerActualCostUsd: null,
+        providerObservedCostUsd: providerReceipt.observedCostUsd,
+        providerReceipt,
         updatedAt: now()
       }, { merge: true });
     } catch (error) {
-      await holdProviderBudgetReservation(budgetReservation, "budget_settlement_failed");
+      await holdProviderBudgetReservation(budgetReservation, "budget_observation_failed");
       await retainProviderDeadLetter({
         userId,
         requestId: input.requestId,
         reservation: budgetReservation,
-        failureCode: "budget_settlement_failed"
+        failureCode: "budget_observation_failed"
       });
       await generationRequest.requestRef.set({
-        status: "failed",
-        errorCode: "budget_settlement_failed",
+        status: "requires_reconciliation",
+        errorCode: "budget_observation_failed",
         providerBudgetStatus: "held_after_failure",
         updatedAt: now()
       }, { merge: true });
-      auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_settlement_failed" });
-      throw new HttpsError("internal", "Story generation cost receipt could not be settled safely.");
+      auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_observation_failed" });
+      throw new HttpsError("internal", "Story generation usage could not be retained safely. Reconcile its held budget before any replacement generation.");
     }
   }
 

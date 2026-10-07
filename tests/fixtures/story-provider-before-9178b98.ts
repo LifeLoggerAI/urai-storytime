@@ -1,6 +1,3 @@
-import type { Firestore } from "firebase-admin/firestore";
-import { executeProtectedStoryProvider, type StoryProviderAuthority, type StorySpendReceipt } from "./story-provider-spend.js";
-
 export interface StoryProviderInput {
   title: string;
   sourceText?: string;
@@ -36,13 +33,10 @@ export interface StoryProviderReceipt {
   configuredInputUsdPerMillionTokens: number | null;
   configuredOutputUsdPerMillionTokens: number | null;
   estimatedMaxCostUsd: number;
-  actualCostUsd: number | null;
-  observedCostUsd: number | null;
-  settlementStatus: "RECONCILIATION_REQUIRED" | "NO_PROVIDER_SPEND";
-  spend: StorySpendReceipt | null;
+  actualCostUsd: number;
   maxAllowedCostUsd: number | null;
   attemptCount: 1;
-  costStatus: "priced_usage_observation" | "no_provider_spend";
+  costStatus: "priced_from_configured_rates" | "no_provider_spend";
 }
 
 export interface StoryProviderResult {
@@ -94,9 +88,7 @@ export function getStoryProviderReadiness() {
     provider,
     ready: provider === "openai" && missing.length === 0,
     missing,
-    // Readiness describes configuration; each request still needs genuine gateway admission.
-    spendAuthorized: false,
-    spendAdmission: "per_request_canonical_gateway_required"
+    spendAuthorized: provider === "openai" && providerPricingConfig().spendAuthorized
   };
 }
 
@@ -191,7 +183,7 @@ export function getStoryProviderCostPreflight(input: StoryProviderInput) {
   };
 }
 
-export async function generateStoryWithProvider(input: StoryProviderInput, authority: StoryProviderAuthority, db: Firestore): Promise<StoryProviderResult> {
+export async function generateStoryWithProvider(input: StoryProviderInput): Promise<StoryProviderResult> {
   const readiness = getStoryProviderReadiness();
   if (!readiness.ready) {
     throw new Error(`Story provider is not configured. Missing: ${readiness.missing.join(", ")}`);
@@ -209,12 +201,11 @@ export async function generateStoryWithProvider(input: StoryProviderInput, autho
   }
   const estimatedMaxCostUsd = preflight.estimatedMaxCostUsd;
 
-  const exactRequest = {
-    model: process.env.STORYTIME_OPENAI_MODEL!,
-    estimatedMaxCostUsd,
-    maxGenerationCostUsd: pricing.maxGenerationCostUsd,
-    inputUsdPerMillionTokens: pricing.inputUsdPerMillionTokens,
-    outputUsdPerMillionTokens: pricing.outputUsdPerMillionTokens,
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20_000);
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
@@ -229,87 +220,80 @@ export async function generateStoryWithProvider(input: StoryProviderInput, autho
       max_tokens: pricing.maxOutputTokens,
       response_format: { type: "json_object" }
     })
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) {
+    throw new Error(`Story provider request failed with status ${response.status}.`);
+  }
+
+  const payload = await response.json() as {
+    id?: string;
+    model?: string;
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+    choices?: Array<{ message?: { content?: string } }>;
   };
+  const content = payload.choices?.[0]?.message?.content;
+  if (!content) throw new Error("Story provider returned no content.");
 
-  const { result, spend } = await executeProtectedStoryProvider(db, authority, input, exactRequest, async (response) => {
+  const providerRequestId = response.headers.get("x-request-id") || payload.id;
+  const promptTokens = payload.usage?.prompt_tokens;
+  const completionTokens = payload.usage?.completion_tokens;
+  const totalTokens = payload.usage?.total_tokens;
+  if (
+    !providerRequestId
+    || typeof promptTokens !== "number" || !Number.isInteger(promptTokens) || promptTokens < 0
+    || typeof completionTokens !== "number" || !Number.isInteger(completionTokens) || completionTokens < 0
+    || typeof totalTokens !== "number" || !Number.isInteger(totalTokens) || totalTokens < 0
+  ) {
+    throw new Error("Story provider usage receipt is incomplete.");
+  }
 
-    if (!response.ok) {
-      throw new Error(`Story provider request failed with status ${response.status}.`);
+  const actualCostUsd =
+    (Number(promptTokens) / 1_000_000) * pricing.inputUsdPerMillionTokens
+    + (Number(completionTokens) / 1_000_000) * pricing.outputUsdPerMillionTokens;
+  if (actualCostUsd > pricing.maxGenerationCostUsd) {
+    throw new Error("Story provider actual cost exceeded the configured per-request ceiling.");
+  }
+
+  const parsed = JSON.parse(content) as unknown;
+  assertStringRecord(parsed);
+
+  const output = {
+    chapterTitle: readString(parsed, "chapterTitle", "Chapter One: The Signal Becomes a Story", 140),
+    chapterSummary: readString(parsed, "chapterSummary", "A private moment was shaped into a gentle narrative replay.", 800),
+    momentTitle: readString(parsed, "momentTitle", "A moment worth remembering", 140),
+    momentBody: readString(parsed, "momentBody", input.sourceText || "A quiet signal became a private story.", 1600),
+    narratorText: readString(parsed, "narratorText", "This private moment can be held gently.", 1200),
+    scenePrompt: readString(parsed, "scenePrompt", "A private, symbolic memory scene with soft light.", 500),
+    visualMood: readString(parsed, "visualMood", input.emotionalTone, 80),
+    audioMood: readString(parsed, "audioMood", "warm, slow, spacious", 120),
+    arcLabel: readString(parsed, "arcLabel", "gentle return", 80),
+    arcSummary: readString(parsed, "arcSummary", "The story moves from signal to meaning, then returns to a calmer frame.", 800),
+    peakTone: readString(parsed, "peakTone", "noticed", 80),
+    resolutionTone: readString(parsed, "resolutionTone", "settled", 80)
+  };
+  assertProviderOutputSafe(output);
+  return {
+    output,
+    receipt: {
+      schemaVersion: "storytime-provider-receipt-v1",
+      provider: "openai",
+      model: payload.model || process.env.STORYTIME_OPENAI_MODEL!,
+      providerRequestId,
+      promptTokens: Number(promptTokens),
+      completionTokens: Number(completionTokens),
+      totalTokens: Number(totalTokens),
+      configuredInputUsdPerMillionTokens: pricing.inputUsdPerMillionTokens,
+      configuredOutputUsdPerMillionTokens: pricing.outputUsdPerMillionTokens,
+      estimatedMaxCostUsd,
+      actualCostUsd,
+      maxAllowedCostUsd: pricing.maxGenerationCostUsd,
+      attemptCount: 1,
+      costStatus: "priced_from_configured_rates"
     }
-
-    const payload = await response.json() as {
-      id?: string;
-      model?: string;
-      usage?: {
-        prompt_tokens?: number;
-        completion_tokens?: number;
-        total_tokens?: number;
-      };
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) throw new Error("Story provider returned no content.");
-
-    const providerRequestId = response.headers.get("x-request-id") || payload.id;
-    const promptTokens = payload.usage?.prompt_tokens;
-    const completionTokens = payload.usage?.completion_tokens;
-    const totalTokens = payload.usage?.total_tokens;
-    if (
-      !providerRequestId
-      || typeof promptTokens !== "number" || !Number.isInteger(promptTokens) || promptTokens < 0
-      || typeof completionTokens !== "number" || !Number.isInteger(completionTokens) || completionTokens < 0
-      || typeof totalTokens !== "number" || !Number.isInteger(totalTokens) || totalTokens < 0
-    ) {
-      throw new Error("Story provider usage receipt is incomplete.");
-    }
-
-    const observedCostUsd =
-      (Number(promptTokens) / 1_000_000) * exactRequest.inputUsdPerMillionTokens
-      + (Number(completionTokens) / 1_000_000) * exactRequest.outputUsdPerMillionTokens;
-    if (observedCostUsd > pricing.maxGenerationCostUsd!) {
-      throw new Error("Story provider observed token pricing exceeded the configured per-request ceiling.");
-    }
-
-    const parsed = JSON.parse(content) as unknown;
-    assertStringRecord(parsed);
-
-    const output = {
-      chapterTitle: readString(parsed, "chapterTitle", "Chapter One: The Signal Becomes a Story", 140),
-      chapterSummary: readString(parsed, "chapterSummary", "A private moment was shaped into a gentle narrative replay.", 800),
-      momentTitle: readString(parsed, "momentTitle", "A moment worth remembering", 140),
-      momentBody: readString(parsed, "momentBody", input.sourceText || "A quiet signal became a private story.", 1600),
-      narratorText: readString(parsed, "narratorText", "This private moment can be held gently.", 1200),
-      scenePrompt: readString(parsed, "scenePrompt", "A private, symbolic memory scene with soft light.", 500),
-      visualMood: readString(parsed, "visualMood", input.emotionalTone, 80),
-      audioMood: readString(parsed, "audioMood", "warm, slow, spacious", 120),
-      arcLabel: readString(parsed, "arcLabel", "gentle return", 80),
-      arcSummary: readString(parsed, "arcSummary", "The story moves from signal to meaning, then returns to a calmer frame.", 800),
-      peakTone: readString(parsed, "peakTone", "noticed", 80),
-      resolutionTone: readString(parsed, "resolutionTone", "settled", 80)
-    };
-    assertProviderOutputSafe(output);
-    return {
-      output,
-      receipt: {
-        schemaVersion: "storytime-provider-receipt-v1" as const,
-        provider: "openai" as const,
-        model: payload.model || exactRequest.model,
-        providerRequestId,
-        promptTokens: Number(promptTokens),
-        completionTokens: Number(completionTokens),
-        totalTokens: Number(totalTokens),
-        configuredInputUsdPerMillionTokens: pricing.inputUsdPerMillionTokens,
-        configuredOutputUsdPerMillionTokens: pricing.outputUsdPerMillionTokens,
-        estimatedMaxCostUsd,
-        actualCostUsd: null,
-        observedCostUsd,
-        settlementStatus: "RECONCILIATION_REQUIRED" as const,
-        spend: null,
-        maxAllowedCostUsd: pricing.maxGenerationCostUsd,
-        attemptCount: 1 as const,
-        costStatus: "priced_usage_observation" as const
-      }
-    };
-  });
-  return { ...result, receipt: { ...result.receipt, spend } };
+  };
 }

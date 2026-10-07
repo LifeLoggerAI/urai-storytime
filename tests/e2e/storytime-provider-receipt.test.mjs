@@ -8,7 +8,7 @@ const env = fs.readFileSync('.env.example', 'utf8');
 const readiness = fs.readFileSync('functions/src/readiness.ts', 'utf8');
 const validator = fs.readFileSync('scripts/validate-provider-wiring.mjs', 'utf8');
 
-test('OpenAI readiness requires explicit spend authorization and operator-supplied pricing', () => {
+test('OpenAI configuration keeps its kill switch and pricing while per-request spend authority stays separate', () => {
   for (const marker of [
     'STORYTIME_PROVIDER_SPEND_AUTHORIZED',
     'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS',
@@ -23,6 +23,8 @@ test('OpenAI readiness requires explicit spend authorization and operator-suppli
   assert.match(provider, /globalDailyBudgetUsd/);
   assert.match(provider, /userDailyBudgetUsd/);
   assert.match(validator, /Live provider mode requires STORYTIME_PROVIDER_SPEND_AUTHORIZED=true/);
+  assert.match(provider, /spendAuthorized: false/);
+  assert.match(provider, /per_request_canonical_gateway_required/);
 });
 
 test('provider enforces a conservative pre-call per-request cost ceiling and bounded output', () => {
@@ -40,8 +42,10 @@ test('successful provider output requires request id, usage and priced receipt e
   assert.match(provider, /payload\.usage\?\.completion_tokens/);
   assert.match(provider, /payload\.usage\?\.total_tokens/);
   assert.match(provider, /Story provider usage receipt is incomplete/);
-  assert.match(provider, /costStatus: "priced_from_configured_rates"/);
-  assert.match(provider, /actualCostUsd/);
+  assert.match(provider, /costStatus: "priced_usage_observation"/);
+  assert.match(provider, /actualCostUsd: null/);
+  assert.match(provider, /observedCostUsd/);
+  assert.match(provider, /settlementStatus: "RECONCILIATION_REQUIRED"/);
   assert.doesNotMatch(provider, /configuredInputUsdPerMillionTokens:\s*[0-9]+(?:\.[0-9]+)?\s*,/);
 });
 

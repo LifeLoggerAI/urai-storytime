@@ -1,0 +1,246 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createRequire, stripTypeScriptTypes } from 'node:module';
+import * as gate from '../fixtures/canonical-spend-gateway-047c84.ts';
+
+const require = createRequire(new URL('../../functions/package.json', import.meta.url));
+const { z } = require('zod');
+const repositoryRoot = process.cwd();
+const sha = value => createHash('sha256').update(value).digest('hex');
+const gitBlob = value => createHash('sha1').update(Buffer.concat([Buffer.from(`blob ${value.length}\0`), value])).digest('hex');
+const currentProviderSource = readFileSync('functions/src/story-provider.ts', 'utf8');
+const callerSource = readFileSync('functions/src/storytime.ts', 'utf8');
+const helperSource = readFileSync('functions/src/story-provider-spend.ts', 'utf8');
+const originalProviderSource = readFileSync('tests/fixtures/story-provider-before-9178b98.ts', 'utf8');
+let sequence = 0;
+const importSource = source => import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`);
+const helper = await importSource(helperSource.replace('import { defineSecret } from "firebase-functions/params";', 'const defineSecret = () => ({ value: () => process.env.STORYTIME_SPEND_WORKER_TOKENS_JSON });'));
+const envKeys = ['URAI_SOURCE_SHA', 'STORYTIME_SPEND_GATEWAY_SOURCE_SHA', 'STORYTIME_PRODUCTION_SPEND_URL', 'STORYTIME_SPEND_WORKER_TOKENS_JSON', 'STORYTIME_GENERATION_PROVIDER', 'OPENAI_API_KEY', 'STORYTIME_OPENAI_MODEL', 'STORYTIME_PROVIDER_SPEND_AUTHORIZED', 'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS', 'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS', 'STORYTIME_MAX_GENERATION_COST_USD', 'STORYTIME_PROVIDER_DAILY_BUDGET_USD', 'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD', 'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER'];
+const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return { privateKey: pair.privateKey, publicKey: pair.publicKey.export({ type: 'spki', format: 'pem' }) }; };
+const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
+const signed = (record, pair) => ({ ...record, signature: sign(null, Buffer.from(gate.canonical(record)), pair.privateKey).toString('base64') });
+const gatewayUrl = 'https://synthetic-factory.example.invalid/api/worker/production-spend';
+const gatewayHead = '047c8429626300c9896bc8c4b739b5902575ad38';
+
+function storage() {
+  const rows = new Map(); let pending = Promise.resolve();
+  const snapshot = ref => ({ id: ref.id, exists: rows.has(ref.path), ref, data: () => structuredClone(rows.get(ref.path)) });
+  const put = (ref, data, merge) => {
+    const value = merge ? { ...rows.get(ref.path), ...structuredClone(data) } : structuredClone(data);
+    for (const [key, next] of Object.entries(value)) if (next?.increment !== undefined) value[key] = (rows.get(ref.path)?.[key] || 0) + next.increment;
+    rows.set(ref.path, value);
+  };
+  const doc = p => ({ path: p, id: p.split('/').at(-1), get: async () => snapshot(doc(p)), set: async (value, options) => put(doc(p), value, options?.merge), update: async value => put(doc(p), value, true) });
+  const writer = () => {
+    const staged = []; const transaction = {
+      get: async ref => snapshot(ref),
+      set: (ref, value, options) => { staged.push(['set', ref, value, options?.merge]); return transaction; },
+      create: (ref, value) => { staged.push(['create', ref, value]); return transaction; },
+      update: (ref, value) => { staged.push(['update', ref, value, true]); return transaction; },
+      commit: async () => { for (const [kind, ref] of staged) { if (kind === 'create' && rows.has(ref.path)) throw new Error('already exists'); if (kind === 'update' && !rows.has(ref.path)) throw new Error('missing'); } for (const [, ref, value, merge] of staged) put(ref, value, merge); }
+    }; return transaction;
+  };
+  const db = {
+    doc,
+    collection: name => ({ doc: id => doc(`${name}/${id}`) }),
+    batch: writer,
+    runTransaction: callback => {
+      const result = pending.then(async () => { const transaction = writer(); const result = await callback(transaction); await transaction.commit(); return result; });
+      pending = result.catch(() => {}); return result;
+    }
+  };
+  return { db, rows };
+}
+async function provider(execute = helper.executeProtectedStoryProvider, before = false) {
+  const key = `story-provider-execute-${++sequence}`; globalThis[key] = execute;
+  const raw = before ? originalProviderSource : currentProviderSource;
+  const source = stripTypeScriptTypes(raw).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
+  try { return await importSource(`const executeProtectedStoryProvider = globalThis[${JSON.stringify(key)}];\n${source}`); }
+  finally { delete globalThis[key]; }
+}
+async function callables(f) {
+  const key = `story-provider-callable-${++sequence}`;
+  class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
+  globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: async () => { throw new Error('unneeded'); }, buildInitialStoryVersionRecord: value => value, ...helper, ...f.provider };
+  const source = stripTypeScriptTypes(callerSource).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
+  try { return await importSource(`import { createHash } from 'node:crypto'; const { initializeApp, FieldValue, getFirestore, HttpsError, onCall, defineSecret, z, auditLog, reconcileStoryPersistence, buildInitialStoryVersionRecord, storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, generateStoryWithProvider, getStoryProviderCostPreflight, getStoryProviderReadiness } = globalThis[${JSON.stringify(key)}];\n${source}`); }
+  finally { delete globalThis[key]; }
+}
+const syntheticInput = () => ({ title: 'SYNTHETIC story', sourceText: 'A synthetic tree grows in a fictional garden.', emotionalTone: 'gentle', symbolicMotifs: ['tree'], locale: 'en-US', audienceAgeBand: 'family' });
+const callableInput = input => ({ ...input, requestId: 'synthetic-request', sourceSignals: [], operator: { role: 'adult_or_guardian', affirmed: true }, requestReview: { reviewed: true, reviewVersion: 'story-request-review-v1' }, consentSnapshot: { storyGeneration: true, providerProcessing: true, consentVersion: 'story-generation-consent-v1', voiceover: false, publicSharing: false, memoryUse: false } });
+const reviewedHash = input => sha(JSON.stringify({ title: input.title, sourceText: input.sourceText ?? '', emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs, sourceSignals: input.sourceSignals, locale: input.locale, audienceAgeBand: input.audienceAgeBand, operator: input.operator, requestReview: input.requestReview, consentSnapshot: input.consentSnapshot }));
+const providerPayload = () => ({ id: 'synthetic-provider-task', model: 'synthetic-model', usage: { prompt_tokens: 50, completion_tokens: 100, total_tokens: 150 }, choices: [{ message: { content: JSON.stringify({ chapterTitle: 'A synthetic garden', momentBody: 'A fictional tree grew.', narratorText: 'The tree grew gently.' }) } }] });
+
+async function fixture(run) {
+  const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]])), originalFetch = globalThis.fetch;
+  const temp = mkdtempSync(path.join(tmpdir(), 'storytime-spend-synthetic-'));
+  for (const [file, content] of [['story-provider.ts', currentProviderSource], ['story-provider-spend.ts', helperSource], ['storytime.ts', callerSource]]) { const p = path.join(temp, 'functions/src', file); mkdirSync(path.dirname(p), { recursive: true }); writeFileSync(p, content); }
+  const git = args => execFileSync('git', ['-C', temp, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  git(['init', '-q']); git(['add', '.']); git(['-c', 'user.name=Synthetic fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Synthetic clean-source fixture; not production provenance']);
+  Object.assign(process.env, { URAI_SOURCE_SHA: git(['rev-parse', 'HEAD']), STORYTIME_SPEND_GATEWAY_SOURCE_SHA: gatewayHead, STORYTIME_PRODUCTION_SPEND_URL: gatewayUrl, STORYTIME_SPEND_WORKER_TOKENS_JSON: JSON.stringify({ 'synthetic-worker': 'SYNTHETIC-worker-token-never-production-000' }), STORYTIME_GENERATION_PROVIDER: 'openai', OPENAI_API_KEY: 'SYNTHETIC-api-key-never-production', STORYTIME_OPENAI_MODEL: 'synthetic-model', STORYTIME_PROVIDER_SPEND_AUTHORIZED: 'true', STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS: '1', STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS: '2', STORYTIME_MAX_GENERATION_COST_USD: '.01', STORYTIME_PROVIDER_DAILY_BUDGET_USD: '1', STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD: '.5', STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER: 'false' });
+  process.chdir(temp);
+  try {
+    const f = storage(); f.provider = await provider(); f.input = syntheticInput(); f.callableInput = callableInput(f.input);
+    f.authority = { userId: 'synthetic-owner', requestId: f.callableInput.requestId, reviewedRequestSha256: reviewedHash(f.callableInput) };
+    let exact;
+    const probe = await provider(async (...args) => { exact = args[3]; return { result: { output: {}, receipt: {} }, spend: {} }; });
+    await probe.generateStoryWithProvider(f.input, f.authority, f.db);
+    f.exact = exact; f.gatewayActions = []; f.providerRequests = []; f.fetchHook = undefined;
+    const now = Date.now(), observed = new Date(now - 1000).toISOString(), expires = new Date(now + 600_000).toISOString();
+    const inputHash = sha(helper.storySourceJson({ authority: f.authority, input: f.input })), requestHash = sha(Buffer.concat([Buffer.from('POST\nhttps://api.openai.com/v1/chat/completions\n'), Buffer.from(exact.body)]));
+    const normalized = new Headers(exact.headers), credentialHash = sha(helper.storySourceJson({ authorization: normalized.get('authorization') })), semanticHash = sha(helper.storySourceJson(Object.fromEntries([...normalized].filter(([key]) => key !== 'authorization'))));
+    const generationId = `${f.authority.userId}_${f.authority.requestId}`;
+    const common = { user_id: f.authority.userId, request_id: f.authority.requestId, generation_request_id: generationId, reviewed_request_sha256: f.authority.reviewedRequestSha256, source_input_sha256: inputHash, provider: 'openai', purpose: 'storytime.generate', trusted_readback: true, revoked: false, receipt: 'SYNTHETIC-NOT-A-GRANT', observed_at: observed, expires_at: expires };
+    const consent = { ...common, status: 'GRANTED', story_generation: true, provider_processing: true, consent_version: 'story-generation-consent-v1' }, rights = { ...common, status: 'APPROVED', rights_reviewed: true };
+    const consentHash = sha(helper.storySourceJson(consent)), rightsHash = sha(helper.storySourceJson(rights));
+    f.claimPath = `storyGenerationRequests/${generationId}`;
+    f.consentPath = `storytimeProviderConsentReceipts/${consentHash}`; f.rightsPath = `storytimeProviderRightsReceipts/${rightsHash}`;
+    f.rows.set(f.claimPath, { userId: f.authority.userId, requestId: f.authority.requestId, status: 'processing', reviewedRequestSha256: f.authority.reviewedRequestSha256, providerInputSha256: sha(helper.storySourceJson(f.input)), consentVersion: 'story-generation-consent-v1', consentSnapshot: f.callableInput.consentSnapshot });
+    const locator = sha(helper.storySourceJson({ user_id: f.authority.userId, request_id: f.authority.requestId, reviewed_request_sha256: f.authority.reviewedRequestSha256, request_sha256: requestHash, source_input_sha256: inputHash }));
+    f.bindingPath = `storytimePaidProviderBindings/${locator}`;
+    f.rows.set(f.bindingPath, { ...common, job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', account_id: 'SYNTHETIC-api-account', request_sha256: requestHash, executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_source_sha: gatewayHead, credential_sha256: credentialHash, semantic_headers_sha256: semanticHash, consent_receipt_sha256: consentHash, rights_receipt_sha256: rightsHash });
+    f.rows.set(f.consentPath, consent); f.rows.set(f.rightsPath, rights);
+    const fields = { job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', executor_repository: 'LifeLoggerAI/urai-storytime', executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_repository: 'LifeLoggerAI/asset-factory', gateway_source_sha: gatewayHead, consumer: 'storytime-generation', tenant_sha256: sha(f.authority.userId), provider: 'openai', account_id: 'SYNTHETIC-api-account', credential_sha256: credentialHash, source_input_sha256: inputHash, semantic_headers_sha256: semanticHash, content_type: 'application/json', request_sha256: requestHash, endpoint: 'https://api.openai.com/v1/chat/completions', model: 'synthetic-model', asset: `storytime/${sha(f.authority.userId)}/${f.authority.requestId}/session`, request_size: String(Buffer.byteLength(exact.body)) };
+    const budget = { currency: 'USD', max_usd_micros: 10_000, max_credits: 0, units: 1, max_retries: 0, max_runtime_seconds: 20, hard_stop_supported: true, auto_top_up: false, storage_egress_overhead_usd_micros: 0, rates: { usd_micros_per_unit: 5_000, credits_per_unit: 0, input_usd_micros_per_million_tokens: 1_000_000, output_usd_micros_per_million_tokens: 2_000_000, receipt: 'SYNTHETIC-NOT-A-PRICE', verified_at: observed, expires_at: expires } };
+    const controls = signed({ ...fields, binding: fields, verified: true, trusted_readback: true, deployment_id: 'SYNTHETIC-NOT-A-DEPLOYMENT', proof_receipt: 'SYNTHETIC-NOT-A-VERIFICATION', observed_at: observed, expires_at: expires, enforcement_source_sha: gatewayHead, max_usd_micros: budget.max_usd_micros, max_credits: 0, max_runtime_seconds: budget.max_runtime_seconds, hard_stop_supported: true, cost_cap_enforced: true, auto_top_up: false, verifier: 'synthetic-verifier', key_id: 'verify' }, verifier);
+    const deployment = signed({ binding: fields, verified: true, trusted_readback: true, deployment_id: controls.deployment_id, proof_receipt: 'SYNTHETIC-NOT-A-DEPLOYMENT', observed_at: observed, expires_at: expires, verifier: 'synthetic-verifier', key_id: 'verify' }, verifier);
+    const controlsHash = gate.hash(gate.canonical(controls)), deploymentHash = gate.hash(gate.canonical(deployment));
+    const pricing = { ...fields, model_version: 'synthetic-model', trusted_readback: true, receipt: 'SYNTHETIC-NOT-A-PRICE', observed_at: observed, expires_at: expires, rates: budget.rates };
+    const pricingHash = gate.hash(gate.canonical(pricing)), authorityHash = sha('SYNTHETIC-authority');
+    const inputs = [inputHash, requestHash, consentHash, rightsHash];
+    const job = { schema_version: 1, job_id: fields.job_id, provider: 'openai', account_id: fields.account_id, operation: 'storytime.generate', model_version: fields.model, owner_lane: 'storytime', consumer: fields.consumer, truth_class: 'INTERPRETIVE', rights_reviewed: true, authority: { repository: fields.executor_repository, sha: fields.executor_source_sha }, authority_ref: authorityHash, input_sha256: inputs, reuse_review: { input_sha256: inputs, decision: 'MISSING_COMPONENT', receipt: 'SYNTHETIC-NOT-A-RIGHTS-REVIEW' }, acceptance: { stage: 'SPECIFIED', criteria: 'synthetic output', verification: 'synthetic review' }, expected_outputs: ['synthetic story'], budget, pricing_ref: pricingHash, executor: { binding_version: 2, repository: fields.executor_repository, source_sha: fields.executor_source_sha, gateway_repository: fields.gateway_repository, gateway_source_sha: gatewayHead, worker_id: fields.worker_id, tenant_sha256: fields.tenant_sha256, credential_sha256: credentialHash, source_input_sha256: inputHash, semantic_headers_sha256: semanticHash, content_type: fields.content_type, request_sha256: requestHash, endpoint: fields.endpoint, asset: fields.asset, request_size: fields.request_size, deployment_ref: deploymentHash, controls_ref: controlsHash }, approval_ref: sha('SYNTHETIC-approval'), attempts: [] };
+    const approval = signed({ status: 'APPROVED', kind: 'EXPLICIT_BOUNDED_SPEND', job_digest: gate.jobDigest(job), max_usd_micros: 10_000, max_credits: 0, receipt: 'SYNTHETIC-NOT-AN-APPROVAL', approver: 'synthetic-approver', key_id: 'approve', issued_at: observed, expires_at: expires }, approver);
+    const account = { provider: 'openai', account_id: fields.account_id, credential_sha256: credentialHash, credential_binding_verified: true, credential_binding_receipt: 'SYNTHETIC-NOT-ACCOUNT-PROOF', balance_type: 'API', trusted_readback: true, available_usd_micros: 100_000, available_credits: 0, observed_at: observed, expires_at: expires, reservations: [] };
+    f.jobPath = `assetFactorySpendJobs/${gate.hash(job.job_id)}`; f.accountPath = `assetFactorySpendAccounts/${gate.hash(`openai\n${fields.account_id}`)}`; f.pricePath = `assetFactorySpendPricing/${pricingHash}`; f.controlsPath = `assetFactorySpendControls/${controlsHash}`; f.approvalPath = `assetFactorySpendApprovals/${job.approval_ref}`;
+    f.rows.set(f.jobPath, { job }); f.rows.set(f.accountPath, account); f.rows.set(f.pricePath, pricing); f.rows.set(f.controlsPath, controls); f.rows.set(`assetFactorySpendDeployments/${deploymentHash}`, deployment); f.rows.set(f.approvalPath, approval); f.rows.set(`assetFactorySpendAuthorities/${authorityHash}`, { binding: job.authority, trusted_readback: true, observed_at: observed, expires_at: expires });
+    const registry = { 'synthetic-worker': { token: 'SYNTHETIC-worker-token-never-production-000', executor_repository: fields.executor_repository, executor_source_sha: fields.executor_source_sha, consumer: fields.consumer, tenant_sha256: fields.tenant_sha256, provider: 'openai', account_id: fields.account_id, credential_sha256: credentialHash } };
+    f.gateway = async body => gate.spendAction(f.db, body.action, body, { now: Date.now, sourceSha: gatewayHead, worker: gate.authenticateSpendWorker(registry, 'SYNTHETIC-worker-token-never-production-000'), approvalKeys: { approve: { subject: 'synthetic-approver', publicKey: approver.publicKey } }, reconciliationKeys: { reconcile: { subject: 'synthetic-reconciler', publicKey: reconciler.publicKey } }, verifierKeys: { verify: { subject: 'synthetic-verifier', publicKey: verifier.publicKey } } });
+    globalThis.fetch = async (url, init) => {
+      if (String(url) === gatewayUrl) {
+        const body = JSON.parse(init.body); f.gatewayActions.push(body.action);
+        if (f.fetchHook) { const response = await f.fetchHook('gateway', body, init); if (response) return response; }
+        try { return Response.json(await f.gateway(body)); } catch { return Response.json({ ok: false }, { status: 409 }); }
+      }
+      assert.equal(String(url), 'https://api.openai.com/v1/chat/completions');
+      f.providerRequests.push({ url: String(url), body: Buffer.from(init.body).toString('utf8'), headers: Object.fromEntries(new Headers(init.headers)), signal: init.signal, redirect: init.redirect });
+      if (f.fetchHook) { const response = await f.fetchHook('provider', undefined, init); if (response) return response; }
+      return Response.json(providerPayload(), { headers: { 'x-request-id': 'synthetic-provider-request' } });
+    };
+    f.generate = () => f.provider.generateStoryWithProvider(f.input, f.authority, f.db);
+    f.generateCallable = async () => { f.rows.delete(f.claimPath); const c = await callables(f); return c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }); };
+    return await run(f);
+  } finally { process.chdir(repositoryRoot); globalThis.fetch = originalFetch; for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } rmSync(temp, { recursive: true, force: true }); }
+}
+
+test('source fixture pins actual gateway and original provider Git blobs', () => {
+  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-047c84.ts')), '1bdf4e1d6b21cdf95a55984c1d81a83dfcec8021');
+  assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-before-9178b98.ts')), '9178b980a5d4287b5537169bc6fbee933220a567');
+});
+test('actual predecessor dispatches under environment-only authority and mislabels priced usage as actual', () => fixture(async f => {
+  const baseline = await provider(undefined, true); const result = await baseline.generateStoryWithProvider(f.input);
+  assert.equal(f.providerRequests.length, 1); assert.deepEqual(f.gatewayActions, []);
+  assert.equal(result.receipt.actualCostUsd, .00025); assert.equal(result.receipt.costStatus, 'priced_from_configured_rates');
+}));
+test('actual provider dispatches frozen bytes once through real v2 gateway and keeps unresolved account hold', () => fixture(async f => {
+  const result = await f.generate();
+  assert.equal(f.providerRequests.length, 1); assert.equal(f.providerRequests[0].body, f.exact.body); assert.equal(f.providerRequests[0].redirect, 'error');
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve', 'record']);
+  assert.equal(result.receipt.actualCostUsd, null); assert.equal(result.receipt.observedCostUsd, .00025); assert.equal(result.receipt.settlementStatus, 'RECONCILIATION_REQUIRED');
+  assert.equal(result.receipt.spend.chargesReconciled, false); assert.equal(result.receipt.spend.retryAuthorized, false);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  assert.equal(f.rows.get(f.jobPath).job.attempts[0].status, 'RECONCILIATION_REQUIRED');
+}));
+for (const [name, mutate] of [
+  ['missing mapping', f => f.rows.delete(f.bindingPath)],
+  ['foreign owner', f => f.rows.get(f.bindingPath).user_id = 'foreign'],
+  ['foreign request', f => f.rows.get(f.bindingPath).generation_request_id = 'other'],
+  ['changed source authority', f => f.rows.get(f.bindingPath).executor_source_sha = 'a'.repeat(40)],
+  ['cancelled processing claim', f => f.rows.get(f.claimPath).cancellationRequested = true],
+  ['changed reviewed source', f => f.rows.get(f.claimPath).reviewedRequestSha256 = 'a'.repeat(64)],
+  ['changed provider input', f => f.rows.get(f.claimPath).providerInputSha256 = 'a'.repeat(64)],
+  ['absent owner consent', f => f.rows.get(f.claimPath).consentSnapshot.providerProcessing = false],
+  ['missing protected consent', f => f.rows.delete(f.consentPath)],
+  ['revoked protected consent', f => f.rows.get(f.consentPath).revoked = true],
+  ['expired protected consent', f => f.rows.get(f.consentPath).expires_at = new Date(Date.now() - 1000).toISOString()],
+  ['missing reviewed rights', f => f.rows.delete(f.rightsPath)],
+  ['changed rights digest', f => f.rows.get(f.rightsPath).receipt = 'changed'],
+  ['unverified account credential', f => f.rows.get(f.accountPath).credential_binding_verified = false],
+  ['missing signed approval', f => f.rows.delete(f.approvalPath)],
+  ['invalid signed approval', f => f.rows.get(f.approvalPath).signature = 'YQ=='],
+  ['expired protected pricing', f => f.rows.get(f.pricePath).expires_at = new Date(Date.now() - 1000).toISOString()],
+  ['changed protected token rates', f => f.rows.get(f.pricePath).rates.input_usd_micros_per_million_tokens++],
+  ['unbound wire credentials', () => process.env.OPENAI_API_KEY = 'SYNTHETIC-other-credential'],
+  ['unavailable genuine gateway', f => f.fetchHook = kind => kind === 'gateway' ? Response.json({ ok: false }, { status: 503 }) : undefined],
+  ['declared source differs from tracked head', () => process.env.URAI_SOURCE_SHA = 'a'.repeat(40)],
+  ['dirty actual provider source', () => writeFileSync('functions/src/story-provider.ts', `${currentProviderSource}\n// dirty synthetic test`) ]
+]) test(`actual provider rejects ${name} before any paid POST`, () => fixture(async f => { mutate(f); await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0); }));
+test('configuration readiness never reports request spend authority', () => fixture(async f => { assert.equal(f.provider.getStoryProviderReadiness().ready, true); assert.equal(f.provider.getStoryProviderReadiness().spendAuthorized, false); }));
+test('credential environment changes after preflight cannot replace frozen dispatched authorization', () => fixture(async f => {
+  f.fetchHook = (kind, body) => { if (kind === 'gateway' && body.action === 'preflight') process.env.OPENAI_API_KEY = 'SYNTHETIC-changed-after-freeze'; };
+  await f.generate(); assert.equal(f.providerRequests[0].headers.authorization, 'Bearer SYNTHETIC-api-key-never-production');
+}));
+test('lost reserve reply retains canonical hold and never dispatches or repeats reserve', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { await f.gateway(body); throw new Error('synthetic reply lost'); } };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0); assert.deepEqual(f.gatewayActions, ['preflight', 'reserve']);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000); assert.equal(f.rows.get(f.jobPath).job.attempts.length, 1);
+}));
+test('revocation during reserve await fences paid dispatch and keeps the admitted hold', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { const result = await f.gateway(body); f.rows.get(f.consentPath).revoked = true; return Response.json(result); } };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('provider failure is observed without settlement or automatic second POST', () => fixture(async f => {
+  f.fetchHook = kind => kind === 'provider' ? Response.json({ error: 'synthetic' }, { status: 429 }) : undefined;
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 1); assert.deepEqual(f.gatewayActions, ['preflight', 'reserve', 'record']);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000); assert.equal(f.rows.get(f.jobPath).job.attempts[0].reported_outcome, 'failed');
+}));
+test('lost outcome observation withholds success and keeps the uncertain reservation', () => fixture(async f => {
+  f.fetchHook = (kind, body) => { if (kind === 'gateway' && body.action === 'record') throw new Error('synthetic observation lost'); };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('one protected deadline covers a stalled response body and retains its unresolved hold', () => fixture(async f => {
+  const originalTimer = globalThis.setTimeout;
+  // Advance only the admitted 20-second HTTP lifetime, without waiting in CI.
+  globalThis.setTimeout = (fn, ms, ...args) => originalTimer(fn, ms === 20_000 ? 25 : ms, ...args);
+  f.fetchHook = kind => kind === 'provider' ? new Response(new ReadableStream({ start(controller) {
+    f.providerRequests.at(-1).signal.addEventListener('abort', () => controller.error(new Error('synthetic body abort')), { once: true });
+  } }), { headers: { 'x-request-id': 'synthetic-stalled-body' } }) : undefined;
+  try { await assert.rejects(f.generate()); } finally { globalThis.setTimeout = originalTimer; }
+  assert.equal(f.providerRequests.length, 1); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  assert.equal(f.rows.get(f.jobPath).job.attempts[0].reported_outcome, 'failed');
+}));
+test('bad reservation echo prevents dispatch while the canonical admitted hold remains', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { const result = await f.gateway(body); return Response.json({ ...result, credential_sha256: 'a'.repeat(64) }); } };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('unknown existing daily holds count against the next request and block dispatch', () => fixture(async f => {
+  const d = new Date(), day = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+  f.rows.set(`storytimeProviderBudgetCounters/global_${day}`, { actualCostUsd: 0, reservedCostUsd: .995 });
+  await assert.rejects(f.generateCallable(), error => error.code === 'resource-exhausted'); assert.equal(f.providerRequests.length, 0); assert.deepEqual(f.gatewayActions, []);
+  assert.equal(f.rows.get(`storytimeProviderBudgetCounters/global_${day}`).reservedCostUsd, .995);
+}));
+test('actual callable preserves both full daily holds after successful provider usage', () => fixture(async f => {
+  const result = await f.generateCallable(); assert.equal(result.status, 'ready');
+  const counters = [...f.rows.entries()].filter(([p]) => p.startsWith('storytimeProviderBudgetCounters/')).map(([, value]) => value);
+  assert.equal(counters.length, 2); for (const value of counters) { assert.equal(value.reservedCostUsd, .01); assert.equal(value.actualCostUsd, 0); }
+  const reservation = f.rows.get(`storytimeProviderBudgetReservations/${f.authority.userId}_${f.authority.requestId}`);
+  assert.equal(reservation.status, 'awaiting_charge_reconciliation'); assert.equal(reservation.actualCostUsd, null); assert.equal(reservation.observedCostUsd, .00025); assert.equal(reservation.heldCostUsd, .01); assert.equal(reservation.retryAuthorized, false);
+  assert.equal(f.rows.get(f.claimPath).providerBudgetStatus, 'awaiting_charge_reconciliation');
+}));
+test('actual callable preserves unknown holds and terminal retry barrier after a lost reservation response', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { await f.gateway(body); throw new Error('synthetic lost response'); } };
+  await assert.rejects(f.generateCallable()); assert.equal(f.rows.get(f.claimPath).status, 'requires_reconciliation');
+  const before = f.gatewayActions.length; const c = await callables(f);
+  await assert.rejects(c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }), error => error.code === 'failed-precondition');
+  assert.equal(f.gatewayActions.length, before); assert.equal(f.providerRequests.length, 0);
+  for (const [p, value] of f.rows) if (p.startsWith('storytimeProviderBudgetCounters/')) assert.equal(value.reservedCostUsd, .01);
+}));
+for (const value of [NaN, -1, '0']) test(`actual daily budget rejects malformed stored counter ${String(value)}`, () => fixture(async f => {
+  const d = new Date(), day = `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+  f.rows.set(`storytimeProviderBudgetCounters/global_${day}`, { reservedCostUsd: value });
+  await assert.rejects(f.generateCallable(), error => error.code === 'failed-precondition'); assert.equal(f.providerRequests.length, 0); assert.deepEqual(f.gatewayActions, []);
+}));
