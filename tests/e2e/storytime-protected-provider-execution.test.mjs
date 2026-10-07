@@ -444,3 +444,135 @@ test('missing, frozen or inconsistent signed account concurrency caps deny befor
  }
  f.fetchHook = originalHook;
 }));
+
+
+function shortApproval(f, clock) {
+  const { signature, ...approval } = f.rows.get(f.approvalPath);
+  f.rows.set(f.approvalPath, signed({ ...approval, expires_at: new Date(clock + 2000).toISOString() }, approver));
+}
+function fullCallableHolds(f) {
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  const counters = [...f.rows.entries()].filter(([p]) => p.startsWith('storytimeProviderBudgetCounters/'));
+  assert.equal(counters.length, 2);
+  for (const [, value] of counters) { assert.equal(value.reservedCostUsd, .01); assert.equal(value.actualCostUsd, 0); }
+  assert.equal(f.providerRequests.length, 1);
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve', 'record']);
+}
+function committedStory(f) {
+  const entries = [...f.rows.entries()].filter(([p]) => p.startsWith('storySessions/'));
+  assert.equal(entries.length, 1);
+  assert.equal(f.rows.get(f.claimPath).status, 'succeeded');
+  return entries[0][1];
+}
+for (const lost of [false, true]) test('expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement withholds paid output and retains committed success', () => fixture(async f => {
+  const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  shortApproval(f, clock);
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    clock += 6000;
+    if (lost) throw new Error('synthetic acknowledgement lost after expired commit');
+  };
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; }
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement withholds paid output after actual commit', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    f.rows.get(f.rightsPath).revoked = true;
+    if (lost) throw new Error('synthetic acknowledgement lost after revoked commit');
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const lost of [false, true]) test('changed executor source during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement cannot return committed paid output', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    writeFileSync('functions/src/story-provider.ts', currentProviderSource + '\n// dirty after synthetic commit');
+    if (lost) throw new Error('synthetic acknowledgement lost after source change');
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+for (const [name, mutate] of [
+  ['foreign persisted owner', session => { session.userId = 'synthetic-foreign-owner'; }],
+  ['foreign persisted request', session => { session.requestId = 'synthetic-foreign-request'; }],
+  ['different persisted attempt', session => { session.providerReceipt.spend.attemptId = 'synthetic-other-attempt'; }],
+  ['changed persisted reviewed input', session => { session.requestReview.processedRequestSha256 = 'a'.repeat(64); }]
+]) test('final committed-output confirmation rejects ' + name + ' without another dispatch', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    mutate(committedStory(f));
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+test('an expiry during the final authority transaction withholds committed output after its awaited read', () => fixture(async f => {
+  const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
+  shortApproval(f, clock);
+  f.rows.get(f.bindingPath).expires_at = new Date(clock + 2000).toISOString();
+  const runTransaction = f.db.runTransaction;
+  f.db.runTransaction = callback => runTransaction(async transaction => {
+    const result = await callback(transaction);
+    if (f.rows.get(f.claimPath)?.status === 'succeeded' && result?.binding) clock += 6000;
+    return result;
+  });
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; }
+  committedStory(f); fullCallableHolds(f);
+}));
+test('revocation at final authority transaction commit conflicts and rechecks the current grant without dispatch', () => fixture(async f => {
+  f.db.beforeTransactionCommit = async staged => {
+    if (staged.length === 0 && f.rows.get(f.claimPath)?.status === 'succeeded') f.rows.get(f.consentPath).revoked = true;
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+
+for (const lost of [false, true]) test('a backward wall clock during ' + (lost ? 'lost' : 'normal') + ' acknowledgement cannot extend final paid output authority', () => fixture(async f => {
+  const originalNow = Date.now, originalMonotonic = performance.now;
+  const wall = originalNow(); let elapsed = 1000;
+  Date.now = () => wall; performance.now = () => elapsed;
+  f.db.afterTransactionCommit = async staged => {
+    if (!staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) return;
+    elapsed += 21_000; Date.now = () => wall - 500;
+    if (lost) throw new Error('synthetic acknowledgement lost after monotonic expiry');
+  };
+  try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
+  finally { Date.now = originalNow; performance.now = originalMonotonic; }
+  committedStory(f); fullCallableHolds(f);
+}));
+
+
+test('final committed-output confirmation rejects a changed stored semantic fingerprint without another dispatch', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) committedStory(f).providerReceipt.spend.semanticInputSha256 = 'a'.repeat(64);
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
+  committedStory(f); fullCallableHolds(f);
+}));
+
+for (const kind of ['consent', 'rights']) test(`the original ${kind} receipt expiry rejects a broader issuer admission before paid dispatch`, () => fixture(async f => {
+  const originalNow = Date.now, originalMonotonic = performance.now;
+  const wall = originalNow(); let elapsed = 1000;
+  Date.now = () => wall; performance.now = () => elapsed;
+  const pathKey = `${kind}Path`, oldPath = f[pathKey], oldHash = oldPath.split('/').at(-1);
+  const receipt = { ...f.rows.get(oldPath), expires_at: new Date(wall + 2000).toISOString() };
+  const nextHash = sha(helper.storySourceJson(receipt)), nextPath = `storytimeProvider${kind === 'consent' ? 'Consent' : 'Rights'}Receipts/${nextHash}`;
+  f.rows.delete(oldPath); f.rows.set(nextPath, receipt); f[pathKey] = nextPath;
+  f.rows.get(f.bindingPath)[`${kind}_receipt_sha256`] = nextHash;
+  const job = f.rows.get(f.jobPath).job;
+  job.input_sha256 = job.input_sha256.map(value => value === oldHash ? nextHash : value);
+  job.reuse_review.input_sha256 = job.input_sha256;
+  const { signature, ...approval } = f.rows.get(f.approvalPath);
+  f.rows.set(f.approvalPath, signed({ ...approval, job_digest: gate.jobDigest(job) }, approver));
+  f.fetchHook = async kind => {
+    if (kind !== 'provider') return;
+    elapsed += 3000; Date.now = () => wall - 500;
+  };
+  try { await assert.rejects(f.generate()); }
+  finally { Date.now = originalNow; performance.now = originalMonotonic; }
+  assert.equal(f.providerRequests.length, 0);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve']);
+}));
