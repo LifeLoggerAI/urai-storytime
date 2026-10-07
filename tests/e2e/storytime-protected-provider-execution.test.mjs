@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -360,6 +361,20 @@ test('approval expiry during a delayed reserve reply rejects without dispatch an
  f.fetchHook = async (kind, body) => { if (kind === 'gateway' && body.action === 'reserve') { const reply = await f.gateway(body); clock += 6_000; return Response.json(reply); } };
  try { await assert.rejects(f.generate()); } finally { Date.now = originalNow; }
  assert.equal(f.providerRequests.length, 0); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+}));
+test('a backwards wall clock cannot extend the monotonic paid runtime across reserve await', () => fixture(async f => {
+  const originalNow = Date.now, originalMonotonic = performance.now.bind(performance);
+  const started = originalNow(), monotonic = originalMonotonic(); let elapsed = 0;
+  Date.now = () => started;
+  Object.defineProperty(performance, 'now', { configurable: true, value: () => monotonic + elapsed });
+  f.fetchHook = async (kind, body) => {
+    if (kind === 'gateway' && body.action === 'reserve') {
+      const result = await f.gateway(body); elapsed = 21_000; return Response.json(result);
+    }
+  };
+  try { await assert.rejects(f.generate()); }
+  finally { Date.now = originalNow; delete performance.now; }
+  assert.equal(f.providerRequests.length, 0); assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
 }));
 test('reserve-response latency cannot restart the admitted runtime for decoding', () => fixture(async f => {
  const originalNow = Date.now; const started = originalNow(); let clock = started; Date.now = () => clock;

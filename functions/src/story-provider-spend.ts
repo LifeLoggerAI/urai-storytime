@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { isIP } from "node:net";
+import { performance } from "node:perf_hooks";
 import type { Firestore, Transaction } from "firebase-admin/firestore";
 import { defineSecret } from "firebase-functions/params";
 
@@ -169,8 +170,8 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
     const current = await loadAuthority(); need(storySourceJson(current) === storySourceJson(initial));
     verifySource();
   };
-  let executionDeadline = 0;
-  const withinAdmission = () => need(executionDeadline > 0 && Date.now() < executionDeadline);
+  let executionDeadline = 0, monotonicDeadline = 0;
+  const withinAdmission = () => need(executionDeadline > 0 && monotonicDeadline > 0 && Date.now() < executionDeadline && performance.now() < monotonicDeadline);
   // Only Firestore reads and story writes may repeat on a transaction conflict.
   // Provider dispatch and canonical admission remain outside this transaction.
   const commitWithAuthority: StoryAuthorityCommit = async write => {
@@ -217,7 +218,9 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   await verifyCurrent();
   // Start the conservative runtime before the reserve round-trip. A delayed
   // reply cannot renew an approval or add another full provider lifetime.
-  executionDeadline = Math.min(proofExpiry, Date.now() + runtime * 1000);
+  const admissionStarted = Date.now(), admissionMonotonic = performance.now();
+  executionDeadline = Math.min(proofExpiry, admissionStarted + runtime * 1000);
+  monotonicDeadline = admissionMonotonic + executionDeadline - admissionStarted;
   withinAdmission();
   const admitted = await gateway("reserve", { job_digest: jobDigest });
   need(admitted.provider_call_authorized === true && admitted.execution_performed === false && admitted.executor_source_sha === sourceSha && admitted.gateway_source_sha === gatewaySha && admitted.worker_id === workerId && admitted.job_digest === jobDigest && admitted.max_runtime_seconds === runtime);
@@ -225,9 +228,10 @@ export async function executeProtectedStoryProvider<T>(db: Firestore, authority:
   const reservedAt = instant(admitted.reserved_at), admittedExpiry = instant(admitted.admission_expires_at);
   need(reservedAt <= Date.now() && reservedAt < admittedExpiry && admittedExpiry <= proofExpiry && admittedExpiry <= reservedAt + runtime * 1000);
   executionDeadline = Math.min(executionDeadline, admittedExpiry);
+  monotonicDeadline = Math.min(monotonicDeadline, performance.now() + executionDeadline - Date.now());
   withinAdmission();
   const attemptId = text(admitted.attempt_id), controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), executionDeadline - Date.now());
+  const timer = setTimeout(() => controller.abort(), Math.min(executionDeadline - Date.now(), monotonicDeadline - performance.now()));
   let outcome: "succeeded" | "failed" = "failed", requestId: string | undefined;
   const current = () => { need(!controller.signal.aborted); withinAdmission(); };
   try {
