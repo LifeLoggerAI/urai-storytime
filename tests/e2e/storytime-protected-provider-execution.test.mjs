@@ -6,7 +6,8 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
-import * as gate from '../fixtures/canonical-spend-gateway-acea7ea.ts';
+import * as gate from '../fixtures/canonical-spend-gateway-1d2439e.ts';
+import * as priorGate from '../fixtures/canonical-spend-gateway-acea7ea.ts';
 
 const require = createRequire(new URL('../../functions/package.json', import.meta.url));
 const { z } = require('zod');
@@ -29,7 +30,8 @@ const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return 
 const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
 const signed = (record, pair) => ({ ...record, signature: sign(null, Buffer.from(gate.canonical(record)), pair.privateKey).toString('base64') });
 const gatewayUrl = 'https://synthetic-factory.example.invalid/api/worker/production-spend';
-const gatewayHead = 'acea7eaf1ccec8ce34bff99ebb8eb527a7b67098';
+const gatewayHead = '1d2439e7de4125ac1d4597050d8de7249a3102bf';
+const priorGatewayHead = 'acea7eaf1ccec8ce34bff99ebb8eb527a7b67098';
 
 function storage() {
   const rows = new Map(); let pending = Promise.resolve();
@@ -95,21 +97,27 @@ const callableInput = input => ({ ...input, requestId: 'synthetic-request', sour
 const reviewedHash = input => sha(JSON.stringify({ title: input.title, sourceText: input.sourceText ?? '', emotionalTone: input.emotionalTone, symbolicMotifs: input.symbolicMotifs, sourceSignals: input.sourceSignals, locale: input.locale, audienceAgeBand: input.audienceAgeBand, operator: input.operator, requestReview: input.requestReview, consentSnapshot: input.consentSnapshot }));
 const providerPayload = () => ({ id: 'synthetic-provider-task', model: 'synthetic-model', usage: { prompt_tokens: 50, completion_tokens: 100, total_tokens: 150 }, choices: [{ message: { content: JSON.stringify({ chapterTitle: 'A synthetic garden', momentBody: 'A fictional tree grew.', narratorText: 'The tree grew gently.' }) } }] });
 
-async function fixture(run) {
+async function fixture(run, { historicalGateway = false, sharedStorage, input, requestId = 'synthetic-request', jobId = 'SYNTHETIC-story-job', encodeBody } = {}) {
+  const fixtureGate = historicalGateway ? priorGate : gate, fixtureGatewayHead = historicalGateway ? priorGatewayHead : gatewayHead;
   const previous = Object.fromEntries(envKeys.map(key => [key, process.env[key]])), originalFetch = globalThis.fetch;
   const temp = mkdtempSync(path.join(tmpdir(), 'storytime-spend-synthetic-'));
   for (const [file, content] of [['story-provider.ts', currentProviderSource], ['story-provider-spend.ts', helperSource], ['storytime.ts', callerSource]]) { const p = path.join(temp, 'functions/src', file); mkdirSync(path.dirname(p), { recursive: true }); writeFileSync(p, content); }
   const git = args => execFileSync('git', ['-C', temp, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-  git(['init', '-q']); git(['add', '.']); git(['-c', 'user.name=Synthetic fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Synthetic clean-source fixture; not production provenance']);
-  Object.assign(process.env, { URAI_SOURCE_SHA: git(['rev-parse', 'HEAD']), STORYTIME_SPEND_GATEWAY_SOURCE_SHA: gatewayHead, STORYTIME_PRODUCTION_SPEND_URL: gatewayUrl, STORYTIME_SPEND_WORKER_TOKENS_JSON: JSON.stringify({ 'synthetic-worker': 'SYNTHETIC-worker-token-never-production-000' }), STORYTIME_GENERATION_PROVIDER: 'openai', OPENAI_API_KEY: 'SYNTHETIC-api-key-never-production', STORYTIME_OPENAI_MODEL: 'synthetic-model', STORYTIME_PROVIDER_SPEND_AUTHORIZED: 'true', STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS: '1', STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS: '2', STORYTIME_MAX_GENERATION_COST_USD: '.01', STORYTIME_PROVIDER_DAILY_BUDGET_USD: '1', STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD: '.5', STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER: 'false' });
+  git(['init', '-q']); git(['add', '.']); git(['-c', 'user.name=Synthetic fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', `Synthetic clean-source fixture ${jobId}; not production provenance`]);
+  Object.assign(process.env, { URAI_SOURCE_SHA: git(['rev-parse', 'HEAD']), STORYTIME_SPEND_GATEWAY_SOURCE_SHA: fixtureGatewayHead, STORYTIME_PRODUCTION_SPEND_URL: gatewayUrl, STORYTIME_SPEND_WORKER_TOKENS_JSON: JSON.stringify({ 'synthetic-worker': 'SYNTHETIC-worker-token-never-production-000' }), STORYTIME_GENERATION_PROVIDER: 'openai', OPENAI_API_KEY: 'SYNTHETIC-api-key-never-production', STORYTIME_OPENAI_MODEL: 'synthetic-model', STORYTIME_PROVIDER_SPEND_AUTHORIZED: 'true', STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS: '1', STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS: '2', STORYTIME_MAX_GENERATION_COST_USD: '.01', STORYTIME_PROVIDER_DAILY_BUDGET_USD: '1', STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD: '.5', STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER: 'false' });
   process.chdir(temp);
   try {
-    const f = storage(); f.provider = await provider(); f.input = syntheticInput(); f.callableInput = callableInput(f.input);
+    const f = sharedStorage ? { db: sharedStorage.db, rows: sharedStorage.rows } : storage(); f.provider = await provider(); f.input = input || syntheticInput(); f.callableInput = { ...callableInput(f.input), requestId };
     f.authority = { userId: 'synthetic-owner', requestId: f.callableInput.requestId, reviewedRequestSha256: reviewedHash(f.callableInput) };
     let exact;
     const probe = await provider(async (...args) => { exact = args[3]; return { result: { output: {}, receipt: {} }, spend: {} }; });
     await probe.generateStoryWithProvider(f.input, f.authority, f.db);
-    f.exact = exact; f.gatewayActions = []; f.providerRequests = []; f.fetchHook = undefined;
+    if (encodeBody) {
+      exact = { ...exact, body: encodeBody(exact.body) };
+      f.provider = await provider((db, authority, source, request, decode) => helper.executeProtectedStoryProvider(db, authority, source, { ...request, body: encodeBody(request.body) }, decode));
+    }
+    f.exact = exact; f.gatewayActions = []; f.gatewayBodies = []; f.gatewayFailures = []; f.providerRequests = []; f.fetchHook = undefined;
+    const semanticInputHash = sha(helper.storySourceJson(JSON.parse(exact.body))), semanticInputFields = historicalGateway ? {} : { semantic_input_sha256: semanticInputHash };
     const now = Date.now(), observed = new Date(now - 1000).toISOString(), expires = new Date(now + 600_000).toISOString();
     const inputHash = sha(helper.storySourceJson({ authority: f.authority, input: f.input })), requestHash = sha(Buffer.concat([Buffer.from('POST\nhttps://api.openai.com/v1/chat/completions\n'), Buffer.from(exact.body)]));
     const normalized = new Headers(exact.headers), credentialHash = sha(helper.storySourceJson({ authorization: normalized.get('authorization') })), semanticHash = sha(helper.storySourceJson(Object.fromEntries([...normalized].filter(([key]) => key !== 'authorization'))));
@@ -122,28 +130,29 @@ async function fixture(run) {
     f.rows.set(f.claimPath, { userId: f.authority.userId, requestId: f.authority.requestId, status: 'processing', reviewedRequestSha256: f.authority.reviewedRequestSha256, providerInputSha256: sha(helper.storySourceJson(f.input)), consentVersion: 'story-generation-consent-v1', consentSnapshot: f.callableInput.consentSnapshot });
     const locator = sha(helper.storySourceJson({ user_id: f.authority.userId, request_id: f.authority.requestId, reviewed_request_sha256: f.authority.reviewedRequestSha256, request_sha256: requestHash, source_input_sha256: inputHash }));
     f.bindingPath = `storytimePaidProviderBindings/${locator}`;
-    f.rows.set(f.bindingPath, { ...common, job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', account_id: 'SYNTHETIC-api-account', request_sha256: requestHash, executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_url: gatewayUrl, gateway_source_sha: gatewayHead, credential_sha256: credentialHash, semantic_headers_sha256: semanticHash, consent_receipt_sha256: consentHash, rights_receipt_sha256: rightsHash });
+    f.rows.set(f.bindingPath, { ...common, ...semanticInputFields, job_id: jobId, worker_id: 'synthetic-worker', account_id: 'SYNTHETIC-api-account', request_sha256: requestHash, executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_url: gatewayUrl, gateway_source_sha: fixtureGatewayHead, credential_sha256: credentialHash, semantic_headers_sha256: semanticHash, consent_receipt_sha256: consentHash, rights_receipt_sha256: rightsHash });
     f.rows.set(f.consentPath, consent); f.rows.set(f.rightsPath, rights);
-    const fields = { job_id: 'SYNTHETIC-story-job', worker_id: 'synthetic-worker', executor_repository: 'LifeLoggerAI/urai-storytime', executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_repository: 'LifeLoggerAI/asset-factory', gateway_source_sha: gatewayHead, consumer: 'storytime-generation', tenant_sha256: sha(f.authority.userId), provider: 'openai', account_id: 'SYNTHETIC-api-account', credential_sha256: credentialHash, source_input_sha256: inputHash, semantic_headers_sha256: semanticHash, content_type: 'application/json', request_sha256: requestHash, endpoint: 'https://api.openai.com/v1/chat/completions', model: 'synthetic-model', asset: `storytime/${sha(f.authority.userId)}/${f.authority.requestId}/session`, request_size: String(Buffer.byteLength(exact.body)) };
+    const fields = { job_id: jobId, worker_id: 'synthetic-worker', executor_repository: 'LifeLoggerAI/urai-storytime', executor_source_sha: process.env.URAI_SOURCE_SHA, gateway_repository: 'LifeLoggerAI/asset-factory', gateway_source_sha: fixtureGatewayHead, consumer: 'storytime-generation', tenant_sha256: sha(f.authority.userId), provider: 'openai', account_id: 'SYNTHETIC-api-account', credential_sha256: credentialHash, source_input_sha256: inputHash, ...semanticInputFields, semantic_headers_sha256: semanticHash, content_type: 'application/json', request_sha256: requestHash, endpoint: 'https://api.openai.com/v1/chat/completions', model: 'synthetic-model', asset: `storytime/${sha(f.authority.userId)}/${f.authority.requestId}/session`, request_size: String(Buffer.byteLength(exact.body)) };
     const budget = { currency: 'USD', max_usd_micros: 10_000, max_credits: 0, units: 1, max_retries: 0, max_runtime_seconds: 20, hard_stop_supported: true, auto_top_up: false, storage_egress_overhead_usd_micros: 0, rates: { usd_micros_per_unit: 5_000, credits_per_unit: 0, input_usd_micros_per_million_tokens: 1_000_000, output_usd_micros_per_million_tokens: 2_000_000, receipt: 'SYNTHETIC-NOT-A-PRICE', verified_at: observed, expires_at: expires } };
-    const controls = signed({ ...fields, binding: fields, verified: true, trusted_readback: true, deployment_id: 'SYNTHETIC-NOT-A-DEPLOYMENT', proof_receipt: 'SYNTHETIC-NOT-A-VERIFICATION', observed_at: observed, expires_at: expires, enforcement_source_sha: gatewayHead, max_usd_micros: budget.max_usd_micros, max_credits: 0, max_runtime_seconds: budget.max_runtime_seconds, hard_stop_supported: true, cost_cap_enforced: true, auto_top_up: false, verifier: 'synthetic-verifier', key_id: 'verify' }, verifier);
+    const controls = signed({ ...fields, binding: fields, verified: true, trusted_readback: true, deployment_id: 'SYNTHETIC-NOT-A-DEPLOYMENT', proof_receipt: 'SYNTHETIC-NOT-A-VERIFICATION', observed_at: observed, expires_at: expires, enforcement_source_sha: fixtureGatewayHead, max_usd_micros: budget.max_usd_micros, max_credits: 0, max_runtime_seconds: budget.max_runtime_seconds, hard_stop_supported: true, cost_cap_enforced: true, auto_top_up: false, verifier: 'synthetic-verifier', key_id: 'verify' }, verifier);
     const deployment = signed({ binding: fields, verified: true, trusted_readback: true, deployment_id: controls.deployment_id, proof_receipt: 'SYNTHETIC-NOT-A-DEPLOYMENT', observed_at: observed, expires_at: expires, verifier: 'synthetic-verifier', key_id: 'verify' }, verifier);
-    const controlsHash = gate.hash(gate.canonical(controls)), deploymentHash = gate.hash(gate.canonical(deployment));
+    const controlsHash = fixtureGate.hash(fixtureGate.canonical(controls)), deploymentHash = fixtureGate.hash(fixtureGate.canonical(deployment));
     const pricing = { ...fields, model_version: 'synthetic-model', trusted_readback: true, receipt: 'SYNTHETIC-NOT-A-PRICE', observed_at: observed, expires_at: expires, rates: budget.rates };
-    const pricingHash = gate.hash(gate.canonical(pricing)), authorityHash = sha('SYNTHETIC-authority');
-    const inputs = [inputHash, requestHash, consentHash, rightsHash];
-    const job = { schema_version: 1, job_id: fields.job_id, provider: 'openai', account_id: fields.account_id, operation: 'storytime.generate', model_version: fields.model, owner_lane: 'storytime', consumer: fields.consumer, truth_class: 'INTERPRETIVE', rights_reviewed: true, authority: { repository: fields.executor_repository, sha: fields.executor_source_sha }, authority_ref: authorityHash, input_sha256: inputs, reuse_review: { input_sha256: inputs, decision: 'MISSING_COMPONENT', receipt: 'SYNTHETIC-NOT-A-RIGHTS-REVIEW' }, acceptance: { stage: 'SPECIFIED', criteria: 'synthetic output', verification: 'synthetic review' }, expected_outputs: ['synthetic story'], budget, pricing_ref: pricingHash, executor: { binding_version: 2, repository: fields.executor_repository, source_sha: fields.executor_source_sha, gateway_repository: fields.gateway_repository, gateway_source_sha: gatewayHead, worker_id: fields.worker_id, tenant_sha256: fields.tenant_sha256, credential_sha256: credentialHash, source_input_sha256: inputHash, semantic_headers_sha256: semanticHash, content_type: fields.content_type, request_sha256: requestHash, endpoint: fields.endpoint, asset: fields.asset, request_size: fields.request_size, deployment_ref: deploymentHash, controls_ref: controlsHash }, approval_ref: sha('SYNTHETIC-approval'), attempts: [] };
-    const approval = signed({ status: 'APPROVED', kind: 'EXPLICIT_BOUNDED_SPEND', job_digest: gate.jobDigest(job), max_usd_micros: 10_000, max_credits: 0, receipt: 'SYNTHETIC-NOT-AN-APPROVAL', approver: 'synthetic-approver', key_id: 'approve', issued_at: observed, expires_at: expires }, approver);
+    const pricingHash = fixtureGate.hash(fixtureGate.canonical(pricing)), authorityHash = sha(`SYNTHETIC-authority:${jobId}:${process.env.URAI_SOURCE_SHA}`);
+    const inputs = [inputHash, requestHash, consentHash, rightsHash, ...(historicalGateway ? [] : [semanticInputHash])];
+    const job = { schema_version: 1, job_id: fields.job_id, provider: 'openai', account_id: fields.account_id, operation: 'storytime.generate', model_version: fields.model, owner_lane: 'storytime', consumer: fields.consumer, truth_class: 'INTERPRETIVE', rights_reviewed: true, authority: { repository: fields.executor_repository, sha: fields.executor_source_sha }, authority_ref: authorityHash, input_sha256: inputs, reuse_review: { input_sha256: inputs, decision: 'MISSING_COMPONENT', receipt: 'SYNTHETIC-NOT-A-RIGHTS-REVIEW' }, acceptance: { stage: 'SPECIFIED', criteria: 'synthetic output', verification: 'synthetic review' }, expected_outputs: ['synthetic story'], budget, pricing_ref: pricingHash, executor: { binding_version: 2, repository: fields.executor_repository, source_sha: fields.executor_source_sha, gateway_repository: fields.gateway_repository, gateway_source_sha: fixtureGatewayHead, worker_id: fields.worker_id, tenant_sha256: fields.tenant_sha256, credential_sha256: credentialHash, source_input_sha256: inputHash, ...semanticInputFields, semantic_headers_sha256: semanticHash, content_type: fields.content_type, request_sha256: requestHash, endpoint: fields.endpoint, asset: fields.asset, request_size: fields.request_size, deployment_ref: deploymentHash, controls_ref: controlsHash }, approval_ref: sha(`SYNTHETIC-approval:${jobId}`), attempts: [] };
+    const approval = signed({ status: 'APPROVED', kind: 'EXPLICIT_BOUNDED_SPEND', job_digest: fixtureGate.jobDigest(job), max_usd_micros: 10_000, max_credits: 0, receipt: 'SYNTHETIC-NOT-AN-APPROVAL', approver: 'synthetic-approver', key_id: 'approve', issued_at: observed, expires_at: expires }, approver);
     const account = { provider: 'openai', account_id: fields.account_id, credential_sha256: credentialHash, credential_binding_verified: true, credential_binding_receipt: 'SYNTHETIC-NOT-ACCOUNT-PROOF', balance_type: 'API', trusted_readback: true, available_usd_micros: 100_000, available_credits: 0, observed_at: observed, expires_at: expires, reservations: [] };
-    f.jobPath = `assetFactorySpendJobs/${gate.hash(job.job_id)}`; f.accountPath = `assetFactorySpendAccounts/${gate.hash(`openai\n${fields.account_id}`)}`; f.pricePath = `assetFactorySpendPricing/${pricingHash}`; f.controlsPath = `assetFactorySpendControls/${controlsHash}`; f.approvalPath = `assetFactorySpendApprovals/${job.approval_ref}`;
-    f.rows.set(f.jobPath, { job }); f.rows.set(f.accountPath, account); f.rows.set(f.pricePath, pricing); f.rows.set(f.controlsPath, controls); f.rows.set(`assetFactorySpendDeployments/${deploymentHash}`, deployment); f.rows.set(f.approvalPath, approval); f.rows.set(`assetFactorySpendAuthorities/${authorityHash}`, { binding: job.authority, trusted_readback: true, observed_at: observed, expires_at: expires });
+    f.jobPath = `assetFactorySpendJobs/${fixtureGate.hash(job.job_id)}`; f.accountPath = `assetFactorySpendAccounts/${fixtureGate.hash(`openai\n${fields.account_id}`)}`; f.pricePath = `assetFactorySpendPricing/${pricingHash}`; f.controlsPath = `assetFactorySpendControls/${controlsHash}`; f.approvalPath = `assetFactorySpendApprovals/${job.approval_ref}`;
+    f.rows.set(f.jobPath, { job }); if (!f.rows.has(f.accountPath)) f.rows.set(f.accountPath, account); f.rows.set(f.pricePath, pricing); f.rows.set(f.controlsPath, controls); f.rows.set(`assetFactorySpendDeployments/${deploymentHash}`, deployment); f.rows.set(f.approvalPath, approval); f.rows.set(`assetFactorySpendAuthorities/${authorityHash}`, { binding: job.authority, trusted_readback: true, observed_at: observed, expires_at: expires });
     const registry = { 'synthetic-worker': { token: 'SYNTHETIC-worker-token-never-production-000', executor_repository: fields.executor_repository, executor_source_sha: fields.executor_source_sha, consumer: fields.consumer, tenant_sha256: fields.tenant_sha256, provider: 'openai', account_id: fields.account_id, credential_sha256: credentialHash } };
-    f.gateway = async body => gate.spendAction(f.db, body.action, body, { now: Date.now, sourceSha: gatewayHead, worker: gate.authenticateSpendWorker(registry, 'SYNTHETIC-worker-token-never-production-000'), approvalKeys: { approve: { subject: 'synthetic-approver', publicKey: approver.publicKey } }, reconciliationKeys: { reconcile: { subject: 'synthetic-reconciler', publicKey: reconciler.publicKey } }, verifierKeys: { verify: { subject: 'synthetic-verifier', publicKey: verifier.publicKey } } });
+    f.fields = fields;
+    f.gateway = async body => fixtureGate.spendAction(f.db, body.action, body, { now: Date.now, sourceSha: fixtureGatewayHead, worker: fixtureGate.authenticateSpendWorker(registry, 'SYNTHETIC-worker-token-never-production-000'), approvalKeys: { approve: { subject: 'synthetic-approver', publicKey: approver.publicKey } }, reconciliationKeys: { reconcile: { subject: 'synthetic-reconciler', publicKey: reconciler.publicKey } }, verifierKeys: { verify: { subject: 'synthetic-verifier', publicKey: verifier.publicKey } } });
     globalThis.fetch = async (url, init) => {
       if (String(url) === gatewayUrl) {
-        const body = JSON.parse(init.body); f.gatewayActions.push(body.action);
+        const body = JSON.parse(init.body); f.gatewayActions.push(body.action); f.gatewayBodies.push(structuredClone(body));
         if (f.fetchHook) { const response = await f.fetchHook('gateway', body, init); if (response) return response; }
-        try { return Response.json(await f.gateway(body)); } catch { return Response.json({ ok: false }, { status: 409 }); }
+        try { return Response.json(await f.gateway(body)); } catch (error) { f.gatewayFailures.push(error.message); return Response.json({ ok: false }, { status: 409 }); }
       }
       assert.equal(String(url), 'https://api.openai.com/v1/chat/completions');
       f.providerRequests.push({ url: String(url), body: Buffer.from(init.body).toString('utf8'), headers: Object.fromEntries(new Headers(init.headers)), signal: init.signal, redirect: init.redirect });
@@ -157,6 +166,7 @@ async function fixture(run) {
 }
 
 test('source fixture pins actual gateway and original provider Git blobs', () => {
+  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-1d2439e.ts')), '7f356cf43b497e1580e835c9631cc32806bbb65e');
   assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-acea7ea.ts')), 'e547456c428c8e9f60e66162286cfb452f5ef89d');
   assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-spend-before-3cbd61d.ts')), 'daf5bbae7e40ac1447d7f97c373515aafb190768');
   assert.equal(gitBlob(readFileSync('tests/fixtures/storytime-before-output-confirmation-da2bba1.ts')), 'da2bba15efe31853a9a892415aa0bdf24022e308');
@@ -434,7 +444,7 @@ for (const lost of [false, true]) test('actual 3cbd predecessor returns paid out
   try { const result = await f.generateCallable(true); assert.equal(result.status, 'ready'); }
   finally { Date.now = originalNow; }
   committedStory(f); fullCallableHolds(f);
-}));
+}, { historicalGateway: true }));
 for (const lost of [false, true]) test('actual 3cbd predecessor returns paid output after rights revocation during ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement', () => fixture(async f => {
   f.provider = await provider(priorHelper.executeProtectedStoryProvider);
   f.db.afterTransactionCommit = async staged => {
@@ -444,7 +454,7 @@ for (const lost of [false, true]) test('actual 3cbd predecessor returns paid out
   };
   const result = await f.generateCallable(true); assert.equal(result.status, 'ready');
   committedStory(f); fullCallableHolds(f);
-}));
+}, { historicalGateway: true }));
 for (const lost of [false, true]) test('expired ' + (lost ? 'lost' : 'normal') + ' persistence acknowledgement withholds paid output and retains committed success', () => fixture(async f => {
   const originalNow = Date.now; let clock = originalNow(); Date.now = () => clock;
   shortApproval(f, clock);
@@ -521,5 +531,97 @@ for (const lost of [false, true]) test('a backward wall clock during ' + (lost ?
   };
   try { await assert.rejects(f.generateCallable(), error => error.code === 'unavailable'); }
   finally { Date.now = originalNow; performance.now = originalMonotonic; }
+  committedStory(f); fullCallableHolds(f);
+}));
+
+test('actual JSON semantic fingerprint binds nested finite values while preserving exact outgoing bytes', () => fixture(async f => {
+  const expected = sha(helper.storySourceJson(JSON.parse(f.exact.body)));
+  const result = await f.generate();
+  assert.equal(result.receipt.spend.semanticInputSha256, expected);
+  assert.equal(f.providerRequests[0].body, f.exact.body);
+  assert.equal(f.providerRequests.length, 1);
+  for (const request of f.gatewayBodies) assert.equal(request.semantic_input_sha256, expected);
+  const claims = [...f.rows.entries()].filter(([path]) => path.startsWith('assetFactorySpendInputClaims/'));
+  assert.equal(claims.length, 1); assert.equal(claims[0][1].semantic_input_sha256, expected);
+  assert.notEqual(expected, f.fields.source_input_sha256); assert.notEqual(expected, f.fields.request_sha256);
+}, { input: { ...syntheticInput(), sourceText: 'A fictional café grows a tree. ✔' } }));
+
+for (const [name, mutate] of [
+  ['missing protected Story mapping', f => { delete f.rows.get(f.bindingPath).semantic_input_sha256; }],
+  ['mismatched protected Story mapping', f => { f.rows.get(f.bindingPath).semantic_input_sha256 = 'a'.repeat(64); }],
+  ['missing canonical executor', f => { delete f.rows.get(f.jobPath).job.executor.semantic_input_sha256; }],
+  ['missing protected controls', f => { delete f.rows.get(f.controlsPath).semantic_input_sha256; }],
+  ['mismatched protected controls', f => { f.rows.get(f.controlsPath).semantic_input_sha256 = 'a'.repeat(64); }],
+  ['missing protected pricing', f => { delete f.rows.get(f.pricePath).semantic_input_sha256; }],
+  ['mismatched protected pricing', f => { f.rows.get(f.pricePath).semantic_input_sha256 = 'a'.repeat(64); }]
+]) test('missing or changed actual semantic fingerprint rejects ' + name + ' before dispatch', () => fixture(async f => {
+  mutate(f); await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0);
+  assert.equal(f.rows.get(f.accountPath).reservations.length, 0);
+  assert.equal([...f.rows.keys()].filter(path => path.startsWith('assetFactorySpendInputClaims/')).length, 0);
+}));
+
+for (const [part, field] of [['executor', 'semantic_input_sha256'], ['controls', 'semantic_input_sha256'], ['pricing', 'semantic_input_sha256']]) {
+  test('preflight cannot omit bound semantic input from ' + part, () => fixture(async f => {
+    f.fetchHook = async (kind, body) => {
+      if (kind !== 'gateway' || body.action !== 'preflight') return;
+      const reply = await f.gateway(body);
+      const proof = part === 'executor' ? reply.envelope.job.executor : part === 'controls' ? reply.envelope.protected_controls : reply.envelope.protected_pricing;
+      delete proof[field]; return Response.json(reply);
+    };
+    await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0);
+    assert.equal(f.rows.get(f.accountPath).reservations.length, 0);
+  }));
+}
+for (const missing of [true, false]) test((missing ? 'missing' : 'changed') + ' reserve semantic echo retains the real hold and blocks provider dispatch', () => fixture(async f => {
+  f.fetchHook = async (kind, body) => {
+    if (kind !== 'gateway' || body.action !== 'reserve') return;
+    const reply = await f.gateway(body);
+    if (missing) delete reply.semantic_input_sha256; else reply.semantic_input_sha256 = 'a'.repeat(64);
+    return Response.json(reply);
+  };
+  await assert.rejects(f.generate()); assert.equal(f.providerRequests.length, 0);
+  assert.deepEqual(f.gatewayActions, ['preflight', 'reserve']);
+  assert.equal(f.rows.get(f.accountPath).reservations[0].usd_micros, 10_000);
+  assert.equal([...f.rows.keys()].filter(path => path.startsWith('assetFactorySpendInputClaims/')).length, 1);
+}));
+
+const reverseJsonKeys = value => {
+  if (Array.isArray(value)) return value.map(reverseJsonKeys);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).reverse().map(key => [key, reverseJsonKeys(value[key])]));
+};
+test('renamed request source and equivalent reencoded JSON cannot reopen the actual canonical input claim', () => fixture(async first => {
+  await first.generateCallable(); fullCallableHolds(first);
+  const firstSemantic = sha(helper.storySourceJson(JSON.parse(first.exact.body)));
+  const firstWire = first.fields.request_sha256, firstSource = first.fields.executor_source_sha;
+  const firstHolds = structuredClone(first.rows.get(first.accountPath).reservations);
+  await fixture(async second => {
+    assert.equal(second.fields.semantic_input_sha256, firstSemantic);
+    assert.notEqual(second.fields.request_sha256, firstWire); assert.notEqual(second.fields.source_input_sha256, first.fields.source_input_sha256);
+    assert.notEqual(second.fields.executor_source_sha, firstSource);
+    assert.notEqual(second.fields.job_id, first.fields.job_id);
+    const before = structuredClone(second.rows);
+    await assert.rejects(second.generate()); assert.equal(second.providerRequests.length, 0);
+    assert.deepEqual(second.gatewayActions, ['preflight'], second.gatewayFailures.join('; '));
+    assert.match(second.gatewayFailures[0], /semantic input already reserved by another execution identity/);
+    assert.deepEqual(second.rows, before);
+    assert.deepEqual(second.rows.get(second.accountPath).reservations, firstHolds);
+    assert.equal([...second.rows.keys()].filter(path => path.startsWith('assetFactorySpendInputClaims/')).length, 1);
+  }, { sharedStorage: first, input: first.input, requestId: 'synthetic-renamed-request', jobId: 'SYNTHETIC-renamed-job', encodeBody: body => JSON.stringify(reverseJsonKeys(JSON.parse(body)), null, 2).replace(/✔/g, '\\u2714') });
+  fullCallableHolds(first);
+}, { input: { ...syntheticInput(), sourceText: 'A fictional café grows a tree. ✔' } }));
+
+test('array order remains part of actual JSON semantic admission', () => fixture(async f => {
+  const parsed = JSON.parse(f.exact.body), reordered = { ...parsed, messages: [...parsed.messages].reverse() };
+  assert.notEqual(sha(helper.storySourceJson(parsed)), sha(helper.storySourceJson(reordered)));
+  const result = await f.generate(); assert.equal(result.receipt.spend.semanticInputSha256, sha(helper.storySourceJson(parsed)));
+  assert.equal(f.providerRequests.length, 1);
+}));
+
+test('final committed-output confirmation rejects a changed stored semantic fingerprint without another dispatch', () => fixture(async f => {
+  f.db.afterTransactionCommit = async staged => {
+    if (staged.some(([, ref]) => ref.path.startsWith('storySessions/'))) committedStory(f).providerReceipt.spend.semanticInputSha256 = 'a'.repeat(64);
+  };
+  await assert.rejects(f.generateCallable(), error => error.code === 'unavailable');
   committedStory(f); fullCallableHolds(f);
 }));
