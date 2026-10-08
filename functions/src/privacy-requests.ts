@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { requireCurrentStorytimeOwner } from "./privacy-actor.js";
 
 if (getApps().length === 0) initializeApp();
 
@@ -30,7 +31,7 @@ function requireVerifiedAccount(request: { auth?: { uid: string; token?: { email
 }
 
 export const requestPrivacyOperation = onCall(async (request) => {
-  const userId = requireVerifiedAccount(request);
+  const userId = await requireCurrentStorytimeOwner(request);
   const parsed = PrivacyRequestSchema.safeParse(request.data);
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", "Provide a valid, explicitly confirmed privacy request.");
@@ -50,6 +51,7 @@ export const requestPrivacyOperation = onCall(async (request) => {
   const ref = db.collection("privacyRequests").doc(docId);
   const result = await db.runTransaction(async (transaction) => {
     const existing = await transaction.get(ref);
+    await requireCurrentStorytimeOwner(request);
     if (existing.exists) {
       const data = existing.data() || {};
       if (data.userId !== userId) throw new HttpsError("permission-denied", "Privacy request is unavailable.");
@@ -89,6 +91,6 @@ export const requestPrivacyOperation = onCall(async (request) => {
     userId,
     errorCode: `${input.type}:${input.scope}`
   });
-
+  await requireCurrentStorytimeOwner(request);
   return result;
 });

@@ -9,7 +9,8 @@ let moduleId = 0;
 
 export async function exportRuntime({ body = 'synthetic private story' } = {}) {
   const f = { now: Date.now(), monotonic: 0, records: new Map(), files: new Map(), generations: new Map(),
-    tokens: [], streams: 0, signedUrls: 0, nextId: 0, generation: 0, tokenRevoked: false };
+    tokens: [], streams: 0, signedUrls: 0, nextId: 0, generation: 0, tokenRevoked: false,
+    disabled: false, ownerVerified: true, onTransactionRead: null, onSave: null, onUser: null };
   f.put = (path, value) => value === undefined ? f.records.delete(path) : f.records.set(path, structuredClone(value));
   const snapshot = path => ({ id: path.split('/').at(-1), exists: f.records.has(path), data: () => structuredClone(f.records.get(path)) });
   const ref = path => ({ path, id: path.split('/').at(-1), get: async () => snapshot(path), set: async value => f.put(path, value),
@@ -32,7 +33,7 @@ export async function exportRuntime({ body = 'synthetic private story' } = {}) {
   f.db = { collection: name => ({ ...query(name), doc: id => ref(`${name}/${id ?? `new-${++f.nextId}`}`) }),
     runTransaction: async callback => {
       const writes = [];
-      const result = await callback({ get: item => item.get(), update: (item, value) => writes.push(() => item.update(value)),
+      const result = await callback({ get: async item => { const value = await item.get(); await f.onTransactionRead?.(item.path); return value; }, update: (item, value) => writes.push(() => item.update(value)),
         create: (item, value) => writes.push(() => item.set(value)) });
       if (f.failCommit) throw new Error('synthetic audit commit failure');
       for (const write of writes) await write();
@@ -43,6 +44,7 @@ export async function exportRuntime({ body = 'synthetic private story' } = {}) {
     save: async (data, config) => {
       const stored = { body: Buffer.from(data), config, generation: String(++f.generation) };
       f.files.set(path, stored); f.generations.set(`${path}:${stored.generation}`, stored);
+      await f.onSave?.(path);
     },
     getMetadata: async () => {
       const stored = f.files.get(path); if (!stored) throw new Error('object missing');
@@ -61,7 +63,7 @@ export async function exportRuntime({ body = 'synthetic private story' } = {}) {
   class Timestamp {}
   class FieldPath { constructor(...fields) { return fields; } static documentId() { return '__name__'; } }
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [f.now])); } static now() { return f.now; } }
-  const auth = { getUser: async () => ({ uid: 'owner', emailVerified: true, disabled: false, metadata: {}, providerData: [] }),
+  const auth = { getUser: async uid => { const value = { uid, emailVerified: f.ownerVerified, disabled: f.disabled, metadata: {}, providerData: [] }; await f.onUser?.(uid); return value; },
     verifyIdToken: async (token, checkRevoked) => {
       f.tokens.push([token, checkRevoked]); assert.equal(checkRevoked, true);
       if (f.tokenRevoked || token === 'revoked') throw new Error('token revoked');
@@ -76,12 +78,14 @@ export async function exportRuntime({ body = 'synthetic private story' } = {}) {
   const prelude = `import { createHash } from 'node:crypto'; import { pipeline } from 'node:stream/promises'; import { Readable } from 'node:stream';
     const { getApps, initializeApp, getFirestore, getStorage, getAuth, HttpsError, Timestamp, FieldPath, onCall, onRequest, z, auditLog, Clock, performance } = globalThis[${JSON.stringify(key)}]; const Date = Clock;\n`;
   async function load(path) {
-    const raw = readFileSync(path, 'utf8').replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
-    return import(`data:text/javascript;base64,${Buffer.from(prelude + stripTypeScriptTypes(raw)).toString('base64')}`);
+    const raw = readFileSync(process.env.STORYTIME_PRIVACY_CONTRACT_SOURCE && path === 'functions/src/privacy-execution.ts' ? process.env.STORYTIME_PRIVACY_CONTRACT_SOURCE : process.env.STORYTIME_REQUEST_CONTRACT_SOURCE && path === 'functions/src/privacy-requests.ts' ? process.env.STORYTIME_REQUEST_CONTRACT_SOURCE : path, 'utf8').replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
+    const actor = readFileSync('functions/src/privacy-actor.ts', 'utf8').replace(/^import[\s\S]*?from "[^"]+";\n/gm, '');
+    return import(`data:text/javascript;base64,${Buffer.from(prelude + stripTypeScriptTypes(actor) + '\n' + stripTypeScriptTypes(raw)).toString('base64')}`);
   }
   try { f.module = { ...await load('functions/src/privacy-execution.ts'), ...await load('functions/src/privacy-requests.ts') }; }
   finally { delete globalThis[key]; }
-  f.owner = data => ({ auth: { uid: 'owner', token: { email_verified: true } }, data });
+  f.owner = data => ({ auth: { uid: 'owner', token: { email_verified: true } }, data,
+    rawRequest: { get: header => header.toLowerCase() === 'authorization' ? 'Bearer valid' : undefined } });
   f.put('users/owner', { profile: 'synthetic owner' });
   f.put('storySessions/session', { userId: 'owner', requestId: 'generation-a' });
   f.put('storyVersions/version', { userId: 'owner', sessionId: 'session', immutable: true, snapshot: { body } });

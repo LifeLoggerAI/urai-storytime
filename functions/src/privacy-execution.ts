@@ -16,6 +16,7 @@ import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { requireCurrentStorytimeAdmin, requireCurrentStorytimeOwner } from "./privacy-actor.js";
 
 if (getApps().length === 0) initializeApp();
 
@@ -186,6 +187,8 @@ type DeletionExecution = {
   planHash: string;
   requestAuthorityHash: string;
   attemptId: string;
+  actorUid: string;
+  actorCheckpoint: () => Promise<string>;
 };
 
 function nowIso() {
@@ -631,14 +634,14 @@ async function captureTargetVersions(targets: Record<string, string[]>, collecti
   return versions;
 }
 
-async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest, allowDeletedSession = false, captureVersions = true): Promise<DeletionPlan> {
+async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivacyRequest, allowDeletedSession = false, captureVersions = true, transaction?: Transaction): Promise<DeletionPlan> {
   const userId = request.userId;
   const scope = request.scope;
   const sessionId = request.sessionId ?? null;
   const requestAuthorityHash = deletionRequestAuthority(privacyRequestId, request);
   const collections = scope === "account"
-    ? await collectAccountRows(userId)
-    : await collectSessionRows(userId, String(sessionId), allowDeletedSession);
+    ? await collectAccountRows(userId, transaction)
+    : await collectSessionRows(userId, String(sessionId), allowDeletedSession, transaction);
 
   const retainedData = [
     "privacyRequests",
@@ -679,11 +682,11 @@ async function buildDeletionPlan(privacyRequestId: string, request: StoredPrivac
 
   const storageObjects = scope === "account" ? await exportStorageObjects(userId) : [];
   const completionBlockers: string[] = [];
-  const legalHold = await activeLegalHold(userId);
+  const legalHold = await activeLegalHold(userId, transaction);
   if (legalHold) executionBlockers.push("active_legal_hold");
 
   if (scope === "account") {
-    const family = await familyMemberships(userId);
+    const family = await familyMemberships(userId, transaction);
     if (family.memberships.length > 0) {
       executionBlockers.push("family_or_child_data_requires_urai_privacy_review");
     }
@@ -791,6 +794,7 @@ async function readDeletionExecution(execution: DeletionExecution, transaction?:
     || data.executionState !== "executing" || data.destructiveExecutionAttemptId !== execution.attemptId
     || data.destructiveExecutionPlanHash !== execution.planHash
     || data.destructiveExecutionAuthorityHash !== execution.requestAuthorityHash
+    || data.destructiveExecutionStartedBy !== execution.actorUid
     || Date.parse(data.destructiveExecutionLeaseExpiresAt ?? "") <= Date.now()
     || !Number.isFinite(Date.parse(data.destructiveExecutionLeaseExpiresAt ?? ""))) {
     throw new HttpsError("failed-precondition", "Storytime deletion execution authority changed or expired.");
@@ -804,6 +808,7 @@ async function readDeletionExecution(execution: DeletionExecution, transaction?:
       throw new HttpsError("failed-precondition", "Storytime account isolation or family review is unavailable.");
     }
   }
+  await execution.actorCheckpoint();
   return current;
 }
 
@@ -822,6 +827,7 @@ async function deleteTargets(plan: DeletionPlan, execution: DeletionExecution) {
           && !sameTargetVersion(plan.targetVersions?.[`${collectionName}/${snapshot.id}`], targetVersion(snapshot.updateTime))) {
           throw new HttpsError("failed-precondition", "A Storytime deletion target changed before its atomic mutation.");
         }
+        await execution.actorCheckpoint();
         for (const snapshot of snapshots) if (snapshot.exists) {
           transaction.delete(snapshot.ref, { lastUpdateTime: snapshot.updateTime });
         }
@@ -840,6 +846,7 @@ async function deleteTargets(plan: DeletionPlan, execution: DeletionExecution) {
         throw new HttpsError("failed-precondition", "Approved Storytime deletion object generation is unavailable.");
       }
       await bucket.file(path, { generation }).delete({ ignoreNotFound: true, ifGenerationMatch: generation });
+      await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
     }
   }
   deletedCounts.storageObjects = plan.storageObjects.length;
@@ -853,6 +860,7 @@ async function deleteTargets(plan: DeletionPlan, execution: DeletionExecution) {
       }
       await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
       await auth.deleteUser(plan.userId);
+      await db.runTransaction((transaction) => readDeletionExecution(execution, transaction));
       deletedCounts.authUsers = 1;
     } catch (error) {
       const code = (error as { code?: unknown })?.code;
@@ -874,11 +882,19 @@ function remainingDeletionTargets(plan: DeletionPlan) {
 }
 
 export const processStorytimeExportRequest = onCall(async (request) => {
-  const userId = requireVerifiedOwner(request);
+  const userId = await requireCurrentStorytimeOwner(request);
   const input = ExportRequestSchema.parse(request.data);
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export");
   const requestAuthority = exportRequestAuthority(input.privacyRequestId, privacyRequest.data);
   const sources = await currentExportSources(privacyRequest.data);
+  const packagingCheckpoint = () => db.runTransaction(async transaction => {
+    const current = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export", transaction);
+    if (exportRequestAuthority(input.privacyRequestId, current.data).hash !== requestAuthority.hash
+      || (await currentExportSources(current.data, transaction)).hash !== sources.hash) {
+      throw new HttpsError("failed-precondition", "Storytime export packaging authority changed.");
+    }
+    await requireCurrentStorytimeOwner(request);
+  });
 
   if (
     privacyRequest.data.executionState === "completed"
@@ -890,6 +906,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     && Date.parse(privacyRequest.data.exportExpiresAt ?? "") > Date.now()
     && privacyRequest.data.completionReceiptId
   ) {
+    await packagingCheckpoint();
     return {
       privacyRequestId: input.privacyRequestId,
       status: "completed",
@@ -933,6 +950,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
   };
   const packageDigest = sha256(exportPackage);
   const prefix = `storytime-exports/${sha256(userId)}/${input.privacyRequestId}`;
+  await packagingCheckpoint();
   const exportFile = await writeJson(`${prefix}/storytime-export.json`, exportPackage);
   const manifest = {
     schemaVersion: "storytime-export-manifest-v1",
@@ -948,7 +966,9 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     blockers,
     completeness: blockers.length === 0 ? "complete_for_storytime_owned_data" : "partial_review_required"
   };
+  await packagingCheckpoint();
   const manifestFile = await writeJson(`${prefix}/manifest.json`, manifest);
+  await packagingCheckpoint();
   const receiptId = await writeReceipt({
     userId,
     privacyRequestId: input.privacyRequestId,
@@ -975,6 +995,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
       || Date.parse(exportExpiresAt) <= Date.now()) {
       throw new HttpsError("failed-precondition", "Storytime export authority or source inventory changed during packaging.");
     }
+    await requireCurrentStorytimeOwner(request);
     transaction.update(privacyRequest.ref, {
     status: blockers.length === 0 ? "completed" : "processing",
     executionState: blockers.length === 0 ? "completed" : "review_required",
@@ -999,7 +1020,7 @@ export const processStorytimeExportRequest = onCall(async (request) => {
     userId,
     errorCode: blockers.length === 0 ? "complete" : "review_required"
   });
-
+  await requireCurrentStorytimeOwner(request);
   return {
     privacyRequestId: input.privacyRequestId,
     status: blockers.length === 0 ? "completed" : "processing",
@@ -1100,7 +1121,7 @@ function downloadAudit(transaction: Transaction, userId: string, privacyRequestI
 }
 
 export const getStorytimeExportDownloadUrl = onCall(async (request) => {
-  const userId = requireVerifiedOwner(request);
+  const userId = await requireCurrentStorytimeOwner(request);
   const input = ExportRequestSchema.parse(request.data);
   const authority = await db.runTransaction((transaction) => readStorytimeExportAuthority(transaction, userId, input.privacyRequestId));
   await exportObjectGeneration(authority);
@@ -1114,9 +1135,11 @@ export const getStorytimeExportDownloadUrl = onCall(async (request) => {
     if (current.identityHash !== authority.identityHash || expiresAt <= Date.now()) {
       throw new HttpsError("failed-precondition", "Storytime export authority changed before issuing the download.");
     }
+    await requireCurrentStorytimeOwner(request);
     return downloadAudit(transaction, userId, input.privacyRequestId, "export_download_url_created", current.identityHash, expiresAt);
   });
   auditLog({ event: "privacy_export_download_url_created", userId });
+  await requireCurrentStorytimeOwner(request);
   return { privacyRequestId: input.privacyRequestId, url: url.toString(), requiresAuthorization: true,
     expiresAt: new Date(expiresAt).toISOString(), packageExpiresAt: new Date(authority.packageExpiresAt).toISOString(),
     completeness: authority.data.exportCompleteness, packageSha256: authority.data.exportPackageSha256, auditId };
@@ -1138,6 +1161,7 @@ export const downloadStorytimeExportPackage = onRequest({ cors: true, timeoutSec
     try { verified = await auth.verifyIdToken(bearer, true); }
     catch { throw new HttpsError("unauthenticated", "Current authentication is required."); }
     const userId = requireVerifiedOwner({ auth: { uid: verified.uid, token: verified } });
+    const ownerActor = { auth: { uid: userId, token: verified }, rawRequest: request };
     const input = ExportDeliverySchema.parse(request.query);
     const authority = await db.runTransaction((transaction) => readStorytimeExportAuthority(transaction, userId, input.privacyRequestId));
     if (authority.identityHash !== input.authorityHash || input.expiresAt <= Date.now()
@@ -1151,6 +1175,7 @@ export const downloadStorytimeExportPackage = onRequest({ cors: true, timeoutSec
       if (current.identityHash !== input.authorityHash || input.expiresAt <= Date.now() || performance.now() >= monotonicDeadline) {
         throw new HttpsError("failed-precondition", "Storytime export authority changed before delivery.");
       }
+      await requireCurrentStorytimeOwner(ownerActor);
       downloadAudit(transaction, userId, input.privacyRequestId, "export_download_authorized", current.identityHash, input.expiresAt);
     });
     response.set({ "Content-Type": "application/json", "Content-Disposition": 'attachment; filename="storytime-export.json"' });
@@ -1170,6 +1195,7 @@ export const downloadStorytimeExportPackage = onRequest({ cors: true, timeoutSec
               || performance.now() >= monotonicDeadline || emittedBytes + part.length > objectVersion.bytes) {
               throw new HttpsError("failed-precondition", "Storytime export authority changed during delivery.");
             }
+            await requireCurrentStorytimeOwner(ownerActor);
             emittedBytes += part.length;
             yield part;
           }
@@ -1189,17 +1215,18 @@ export const downloadStorytimeExportPackage = onRequest({ cors: true, timeoutSec
 });
 
 export const revokeStorytimeExportRequest = onCall(async (request) => {
-  const userId = requireVerifiedOwner(request);
+  const userId = await requireCurrentStorytimeOwner(request);
   const input = ExportRequestSchema.parse(request.data);
   await db.runTransaction(async (transaction) => {
     const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "export", transaction);
+    await requireCurrentStorytimeOwner(request);
     transaction.update(privacyRequest.ref, { status: "cancelled", executionState: "revoked", revokedAt: nowIso(), updatedAt: nowIso() });
   });
   return { privacyRequestId: input.privacyRequestId, status: "cancelled" };
 });
 
 export const planStorytimeDeletion = onCall(async (request) => {
-  const userId = requireVerifiedOwner(request);
+  const userId = await requireCurrentStorytimeOwner(request);
   const input = DeletionPlanRequestSchema.parse(request.data);
   const privacyRequest = await readOwnedPrivacyRequest(input.privacyRequestId, userId, "deletion");
   if (privacyRequest.data.executionState === "executing") {
@@ -1208,7 +1235,7 @@ export const planStorytimeDeletion = onCall(async (request) => {
   const plan = await buildDeletionPlan(input.privacyRequestId, privacyRequest.data);
   const planHash = deletionPlanHash(plan);
   const planId = `${input.privacyRequestId}_${planHash}`;
-
+  await requireCurrentStorytimeOwner(request);
   await db.collection("privacyDeletionPlans").doc(planId).set({
     plan,
     planHash,
@@ -1223,6 +1250,7 @@ export const planStorytimeDeletion = onCall(async (request) => {
       || current.data.executionState === "executing") {
       throw new HttpsError("failed-precondition", "Storytime deletion authority changed during planning.");
     }
+    await requireCurrentStorytimeOwner(request);
     transaction.update(current.ref, {
     status: "processing",
     executionState: plan.executionBlockers.length === 0 ? "plan_ready" : "blocked",
@@ -1240,7 +1268,7 @@ export const planStorytimeDeletion = onCall(async (request) => {
     userId,
     errorCode: plan.executionBlockers.length === 0 ? "ready" : "blocked"
   });
-
+  await requireCurrentStorytimeOwner(request);
   return {
     privacyRequestId: input.privacyRequestId,
     planHash,
@@ -1253,7 +1281,7 @@ export const planStorytimeDeletion = onCall(async (request) => {
 });
 
 export const executeStorytimeDeletion = onCall(async (request) => {
-  const adminUid = requireAdmin(request);
+  const adminUid = await requireCurrentStorytimeAdmin(request);
   const input = DeletionExecuteSchema.parse(request.data);
   const privacyRequest = await readPrivacyRequest(input.privacyRequestId);
   if (privacyRequest.data.type !== "deletion") {
@@ -1299,7 +1327,8 @@ export const executeStorytimeDeletion = onCall(async (request) => {
   const executionPlan = recovering ? await residualDeletionPlan(storedPlan, currentPlan) : currentPlan;
   const execution: DeletionExecution = { privacyRequestId: input.privacyRequestId, planId,
     planHash: input.expectedPlanHash, requestAuthorityHash: storedPlan.requestAuthorityHash!,
-    attemptId: db.collection("privacyOperationReceipts").doc().id };
+    attemptId: db.collection("privacyOperationReceipts").doc().id, actorUid: adminUid,
+    actorCheckpoint: () => requireCurrentStorytimeAdmin(request) };
   await db.runTransaction(async (transaction) => {
     const latest = await readPrivacyRequest(input.privacyRequestId, transaction);
     if (deletionRequestAuthority(input.privacyRequestId, latest.data) !== execution.requestAuthorityHash
@@ -1315,6 +1344,7 @@ export const executeStorytimeDeletion = onCall(async (request) => {
     if (await activeLegalHold(latest.data.userId, transaction)) {
       throw new HttpsError("failed-precondition", "Storytime deletion is blocked by an active legal hold.");
     }
+    await execution.actorCheckpoint();
     transaction.update(latest.ref, {
       status: "processing", executionState: "executing", destructiveExecutionStartedAt: nowIso(),
       destructiveExecutionStartedBy: adminUid, destructiveExecutionPlanHash: execution.planHash,
@@ -1327,6 +1357,7 @@ export const executeStorytimeDeletion = onCall(async (request) => {
 
   try {
     const deletedCounts = await deleteTargets(executionPlan, execution);
+    await db.runTransaction(transaction => readDeletionExecution(execution, transaction));
     const receiptId = await writeReceipt({
       userId: currentPlan.userId,
       privacyRequestId: input.privacyRequestId,
@@ -1357,7 +1388,7 @@ export const executeStorytimeDeletion = onCall(async (request) => {
     });
 
     auditLog({ event: "privacy_deletion_executed", userId: currentPlan.userId, errorCode: "verification_required" });
-
+    await execution.actorCheckpoint();
     return {
       privacyRequestId: input.privacyRequestId,
       status: "processing",
@@ -1390,7 +1421,7 @@ export const executeStorytimeDeletion = onCall(async (request) => {
 });
 
 export const verifyStorytimeDeletion = onCall(async (request) => {
-  const adminUid = requireAdmin(request);
+  const adminUid = await requireCurrentStorytimeAdmin(request);
   const input = DeletionPlanRequestSchema.parse(request.data);
   const privacyRequest = await readPrivacyRequest(input.privacyRequestId);
   if (privacyRequest.data.type !== "deletion") {
@@ -1414,6 +1445,32 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     || storedPlan.sessionId !== (privacyRequest.data.sessionId ?? null)) {
     throw new HttpsError("failed-precondition", "The executed deletion plan failed verification authority checks.");
   }
+  const verificationAuthority = sha256(stablePortable(privacyRequest.data));
+  const commitVerification = (fields: DocumentData) => db.runTransaction(async transaction => {
+    const current = await readPrivacyRequest(input.privacyRequestId, transaction);
+    const approved = await transaction.get(db.collection("privacyDeletionPlans").doc(planId));
+    if (sha256(stablePortable(current.data)) !== verificationAuthority
+      || !approved.exists || deletionPlanHash(approved.data()?.plan as DeletionPlan) !== planHash) {
+      throw new HttpsError("failed-precondition", "Current Storytime verification authority changed.");
+    }
+    if (fields.deletionCompletionVerified === true) {
+      const residual = await buildDeletionPlan(input.privacyRequestId, current.data, true, false, transaction);
+      if (remainingDeletionTargets(residual).length || residual.storageObjects.length || residual.executionBlockers.length) {
+        throw new HttpsError("failed-precondition", "Storytime deletion residuals changed during verification.");
+      }
+      for (const [name, ids] of Object.entries(storedPlan.targets)) for (let offset = 0; offset < ids.length; offset += QUERY_PAGE_LIMIT) {
+        const references = ids.slice(offset, offset + QUERY_PAGE_LIMIT).map(id => db.collection(name).doc(id));
+        if (references.length && (await transaction.getAll(...references)).some(row => row.exists)) {
+          throw new HttpsError("failed-precondition", "An original Storytime target returned during verification.");
+        }
+      }
+      if (current.data.scope === "account" && await authAccountMetadata(current.data.userId)) {
+        throw new HttpsError("failed-precondition", "The Storytime authentication subject returned during verification.");
+      }
+    }
+    await requireCurrentStorytimeAdmin(request);
+    transaction.update(current.ref, fields);
+  });
 
   // Only this verifier and a version-bound admin recovery may collect children
   // after the parent was deleted. Ordinary exports still require the live parent.
@@ -1433,6 +1490,10 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
   }
   if (verificationPlan.storageObjects.length > 0) remaining.push(`storageObjects:${verificationPlan.storageObjects.length}`);
   if (verificationPlan.executionBlockers.length > 0) remaining.push(...verificationPlan.executionBlockers);
+  // Original external/provider cleanup obligations do not disappear when their
+  // pointer rows are deleted. Environment readiness certifies only its named
+  // backup gate and cannot manufacture provider erasure evidence.
+  remaining.push(...storedPlan.completionBlockers.filter(blocker => blocker !== "backup_expiry_policy_not_certified"));
 
   if (privacyRequest.data.scope === "account") {
     try {
@@ -1445,7 +1506,7 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
   }
 
   if (remaining.length > 0) {
-    await privacyRequest.ref.update({
+    await commitVerification({
       status: "processing",
       executionState: "verification_failed",
       deletionCompletionVerified: false,
@@ -1462,7 +1523,7 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
   }
 
   if (process.env.STORYTIME_BACKUP_RETENTION_POLICY_READY !== "true") {
-    await privacyRequest.ref.update({
+    await commitVerification({
       status: "processing",
       executionState: "backup_expiry_pending",
       deletionCompletionVerified: true,
@@ -1477,6 +1538,7 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     };
   }
 
+  await requireCurrentStorytimeAdmin(request);
   const receiptId = await writeReceipt({
     userId: privacyRequest.data.userId,
     privacyRequestId: input.privacyRequestId,
@@ -1488,7 +1550,7 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
     }
   });
 
-  await privacyRequest.ref.update({
+  await commitVerification({
     status: "completed",
     executionState: "completed",
     deletionCompletionVerified: true,
@@ -1499,7 +1561,7 @@ export const verifyStorytimeDeletion = onCall(async (request) => {
   });
 
   auditLog({ event: "privacy_deletion_verified", userId: privacyRequest.data.userId, errorCode: "completed" });
-
+  await requireCurrentStorytimeAdmin(request);
   return {
     privacyRequestId: input.privacyRequestId,
     completed: true,
