@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 
 const packageJson = JSON.parse(read('package.json'));
+const packageLock = JSON.parse(read('package-lock.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const authPanel = read('src/components/storytime/AuthPanel.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
@@ -37,7 +38,10 @@ test('Next and Firebase scripts are present', () => {
   assert.equal(packageJson.scripts.build, 'next build');
   assert.equal(packageJson.scripts.typecheck, 'tsc --noEmit');
   assert.match(packageJson.scripts['deploy:rules'], /firestore:rules/);
-  assert.match(packageJson.dependencies.next, /^\^15/);
+  assert.equal(packageJson.dependencies.next, '15.5.27');
+  assert.equal(packageLock.packages[''].dependencies.next, packageJson.dependencies.next);
+  assert.equal(packageLock.packages['node_modules/next'].version, packageJson.dependencies.next);
+  assert.match(packageLock.packages['node_modules/next'].integrity, /^sha512-/);
   assert.match(packageJson.dependencies.firebase, /^\^11/);
 });
 

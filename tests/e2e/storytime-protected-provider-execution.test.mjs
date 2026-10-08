@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createRequire, stripTypeScriptTypes } from 'node:module';
-import * as gate from '../fixtures/canonical-spend-gateway-8fbc356.ts';
+import * as gate from '../fixtures/canonical-spend-gateway-46ed831.ts';
 
 const require = createRequire(new URL('../../functions/package.json', import.meta.url));
 const { z } = require('zod');
@@ -26,7 +26,7 @@ const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return 
 const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
 const signed = (record, pair) => ({ ...record, signature: sign(null, Buffer.from(gate.canonical(record)), pair.privateKey).toString('base64') });
 const gatewayUrl = 'https://synthetic-factory.example.invalid/api/worker/production-spend';
-const gatewayHead = '8fbc356ed190de99e336d64c18d068e8992020d3';
+const gatewayHead = '46ed83135c26942d3130d0c57baab9ad3dadd714';
 
 function storage() {
   const rows = new Map(); let pending = Promise.resolve();
@@ -136,7 +136,8 @@ async function fixture(run) {
     f.jobPath = `assetFactorySpendJobs/${gate.hash(job.job_id)}`; f.accountPath = `assetFactorySpendAccounts/${gate.hash(`openai\n${fields.account_id}`)}`; f.pricePath = `assetFactorySpendPricing/${pricingHash}`; f.controlsPath = `assetFactorySpendControls/${controlsHash}`; f.approvalPath = `assetFactorySpendApprovals/${job.approval_ref}`;
     f.rows.set(f.jobPath, { job }); f.rows.set(f.accountPath, account); f.rows.set(f.pricePath, pricing); f.rows.set(f.controlsPath, controls); f.rows.set(`assetFactorySpendDeployments/${deploymentHash}`, deployment); f.rows.set(f.approvalPath, approval); f.rows.set(`assetFactorySpendAuthorities/${authorityHash}`, { binding: job.authority, trusted_readback: true, observed_at: observed, expires_at: expires });
     const registry = { 'synthetic-worker': { token: 'SYNTHETIC-worker-token-never-production-000', executor_repository: fields.executor_repository, executor_source_sha: fields.executor_source_sha, consumer: fields.consumer, tenant_sha256: fields.tenant_sha256, provider: 'openai', account_id: fields.account_id, credential_sha256: credentialHash } };
-    f.gateway = async body => gate.spendAction(f.db, body.action, body, { now: Date.now, sourceSha: gatewayHead, worker: gate.authenticateSpendWorker(registry, 'SYNTHETIC-worker-token-never-production-000'), approvalKeys: { approve: { subject: 'synthetic-approver', publicKey: approver.publicKey } }, reconciliationKeys: { reconcile: { subject: 'synthetic-reconciler', publicKey: reconciler.publicKey } }, verifierKeys: { verify: { subject: 'synthetic-verifier', publicKey: verifier.publicKey } } });
+    f.issuerPolicy = { now: () => Date.now(), sourceSha: gatewayHead, worker: gate.authenticateSpendWorker(registry, 'SYNTHETIC-worker-token-never-production-000'), approvalKeys: { approve: { subject: 'synthetic-approver', publicKey: approver.publicKey } }, reconciliationKeys: { reconcile: { subject: 'synthetic-reconciler', publicKey: reconciler.publicKey } }, verifierKeys: { verify: { subject: 'synthetic-verifier', publicKey: verifier.publicKey } } };
+    f.gateway = async body => gate.spendAction(f.db, body.action, body, f.issuerPolicy);
     globalThis.fetch = async (url, init) => {
       if (String(url) === gatewayUrl) {
         const body = JSON.parse(init.body); f.gatewayActions.push(body.action);
@@ -154,8 +155,25 @@ async function fixture(run) {
   } finally { process.chdir(repositoryRoot); globalThis.fetch = originalFetch; for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } rmSync(temp, { recursive: true, force: true }); }
 }
 
+const issuerChanges = [
+  ['approval key reused for charge reconciliation', f => { f.issuerPolicy.reconciliationKeys.reconcile.publicKey = f.issuerPolicy.approvalKeys.approve.publicKey; }],
+  ['charge subject aliases approval through case', f => { f.issuerPolicy.reconciliationKeys.reconcile.subject = 'SYNTHETIC-APPROVER'; }],
+  ['charge subject aliases approval through Unicode normalization', f => { f.issuerPolicy.reconciliationKeys.reconcile.subject = 'ｓｙｎｔｈｅｔｉｃ-ａｐｐｒｏｖｅｒ'; }],
+  ['verification subject aliases approval through case', f => { f.issuerPolicy.verifierKeys.verify.subject = 'SYNTHETIC-APPROVER'; }],
+  ['verification subject aliases charge through Unicode normalization', f => { f.issuerPolicy.verifierKeys.verify.subject = 'ｓｙｎｔｈｅｔｉｃ-ｒｅｃｏｎｃｉｌｅｒ'; }],
+  ['approval registry missing', f => { delete f.issuerPolicy.approvalKeys.approve; }],
+  ['charge reconciliation registry missing', f => { delete f.issuerPolicy.reconciliationKeys.reconcile; }],
+];
+for (const [name, change] of issuerChanges) test(`independent signing registries deny before Storytime paid dispatch: ${name}`, () => fixture(async f => {
+  change(f);
+  await assert.rejects(f.generate());
+  assert.equal(f.providerRequests.length, 0); assert.deepEqual(f.gatewayActions, ['preflight']);
+  assert.deepEqual(f.rows.get(f.accountPath).reservations, []);
+  assert.equal([...f.rows.keys()].some(path => path.startsWith('assetFactorySpendInputClaims/')), false);
+}));
+
 test('source fixture pins actual gateway and original provider Git blobs', () => {
-  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-8fbc356.ts')), 'cacbae5c35e62540d019e879f46e41981c8e42d3');
+  assert.equal(gitBlob(readFileSync('tests/fixtures/canonical-spend-gateway-46ed831.ts')), 'c212ef5d520e9aa1ed60fac656b030018cae4730');
   assert.equal(gitBlob(readFileSync('tests/fixtures/story-provider-before-9178b98.ts')), '9178b980a5d4287b5537169bc6fbee933220a567');
 });
 test('malformed provider headers reject without exposing the secret or reaching transport', () => fixture(async f => {
