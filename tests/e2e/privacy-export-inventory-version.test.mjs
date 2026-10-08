@@ -29,6 +29,7 @@ function handlers(current = false) {
   const context = vm.createContext({
     exports: {}, onCall: fn => fn, onRequest: (_options, fn) => fn,
     requireVerifiedOwner: () => 'owner-a',
+    requireCurrentStorytimeOwner: async () => 'owner-a',
     z, ExportRequestSchema: z.object({ privacyRequestId: z.string().min(1) }),
     readOwnedPrivacyRequest: async () => ({ data, ref: { update: async value => updates.push(value) } }),
     collectAccountRows: async () => { scans++; return {}; }, collectSessionRows: async () => ({}),
@@ -54,7 +55,7 @@ test('legacy completed exports are regenerated with the current owner-ledger inv
   const h = handlers();
   const result = await h.processStorytimeExportRequest({ data: { privacyRequestId: 'privacy-a' } });
   assert.equal(result.reused, false);
-  assert.equal(h.scans(), 2);
+  assert.equal(h.scans(), 5);
   assert.equal(h.updates.at(-1).exportInventoryVersion, inventoryVersion);
 });
 
@@ -62,7 +63,7 @@ test('current inventory exports retain reuse only after a fresh source inventory
   const h = handlers(true);
   const result = await h.processStorytimeExportRequest({ data: { privacyRequestId: 'privacy-a' } });
   assert.equal(result.reused, true);
-  assert.equal(h.scans(), 1);
+  assert.equal(h.scans(), 2);
 });
 
 test('legacy inventory cannot receive authenticated download authority', async () => {
