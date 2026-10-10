@@ -1,60 +1,43 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import vm from 'node:vm';
-import ts from 'typescript';
+import { fixture, callables, ownerRequest, request } from '../helpers/storytime-privacy-fixture.mjs';
 
-const source = readFileSync(new URL('../../functions/src/privacy-execution.ts', import.meta.url), 'utf8');
 const ledgerNames = ['storytimeSafetyReportCounters', 'storytimeProviderBudgetCounters', 'storytimeProviderBudgetReservations', 'storytimeProviderDeadLetters'];
-function between(start, end) {
-  const a = source.indexOf(start), b = source.indexOf(end, a);
-  assert.ok(a >= 0 && b > a, `missing source section ${start}`);
-  return source.slice(a, b);
-}
-const definitions = between(source.includes('const accountRetainedLedgerCollections') ? 'const accountRetainedLedgerCollections' : 'const accountUserCollections', 'type PrivacyScope');
-const compiled = ts.transpileModule([
-  definitions,
-  between('async function collectAccountRows(', 'async function collectSessionRows('),
-  between('async function buildDeletionPlan(', 'async function deleteTargets('),
-].join('\n'), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
-
-function routines(fixtures) {
-  const context = vm.createContext({
-    db: { collection: () => ({ doc: () => ({ get: async () => ({ exists: false }) }) }) },
-    listByField: async (name, field, value) => (fixtures[name] ?? []).filter(row => row.data[field] === value),
-    exportStorageObjects: async () => [], activeLegalHold: async () => false,
-    familyMemberships: async () => ({ memberships: [], truncated: false }),
-    flattenExternalRows: () => [], externalArtifactPointers: () => [],
-    nowIso: () => '2026-09-26T00:00:00.000Z',
-    STORYTIME_DELETION_PLAN_SCHEMA_VERSION: 'storytime-deletion-plan-v1',
-    process: { env: { STORYTIME_FIREBASE_ISOLATED: 'true', STORYTIME_BACKUP_RETENTION_POLICY_READY: 'true' } },
-  });
-  vm.runInContext(`${compiled}\nthis.collect = collectAccountRows; this.plan = buildDeletionPlan;`, context);
-  return context;
-}
 
 test('account export inventory includes only the owner ledger records, never global or another user budgets', async () => {
-  const fixtures = Object.fromEntries(ledgerNames.map(name => [name, [
-    { id: 'owned', data: { userId: 'owner-a' } },
-    { id: 'other-user', data: { userId: 'owner-b' } },
-    { id: 'global', data: { scope: 'global_day' } },
-  ]]));
-  const rows = await routines(fixtures).collect('owner-a');
-  for (const name of ledgerNames) assert.deepEqual(Array.from(rows[name] ?? [], row => row.id), ['owned'], name);
+  const f = fixture(); const c = await callables(f); request(f, 'export', 'account');
+  for (const name of ledgerNames) {
+    f.put(`${name}/owned`, { userId: 'owner' });
+    f.put(`${name}/other-user`, { userId: 'owner-b' });
+    f.put(`${name}/global`, { scope: 'global_day' });
+  }
+  await c.processStorytimeExportRequest(ownerRequest({ privacyRequestId: 'privacy' }));
+  const body = JSON.parse([...f.files].find(([path]) => path.endsWith('/storytime-export.json'))[1]);
+  for (const name of ledgerNames) assert.deepEqual(body.collections[name].map(row => row.id), ['owned'], name);
 });
 
 test('account deletion retains safety/spend ledgers and blocks false completion pending governed retention review', async () => {
-  for (const name of ledgerNames) {
-    const { plan } = routines({ [name]: [{ id: 'owned-ledger', data: { userId: 'owner-a' } }], storySessions: [{ id: 'story', data: { userId: 'owner-a' } }] });
-    const result = await plan('privacy-a', { userId: 'owner-a', scope: 'account' });
-    assert.ok(result.retainedData.includes(name), name);
-    assert.equal(result.targets[name], undefined, 'retained ledger must never be a destructive target');
-    assert.ok(result.executionBlockers.includes(`account_ledger_retention_review_required:${name}`), name);
-    assert.deepEqual(Array.from(result.targets.storySessions), ['story']);
-  }
+  const prior = process.env.STORYTIME_FIREBASE_ISOLATED; process.env.STORYTIME_FIREBASE_ISOLATED = 'true';
+  try {
+    for (const name of ledgerNames) {
+      const f = fixture(); const c = await callables(f); request(f, 'deletion', 'account');
+      f.put(`${name}/owned-ledger`, { userId: 'owner' });
+      const result = await c.planStorytimeDeletion(ownerRequest({ privacyRequestId: 'privacy' }));
+      const plan = [...f.records].find(([path]) => path.startsWith('privacyDeletionPlans/'))[1].plan;
+      assert.ok(plan.retainedData.includes(name), name);
+      assert.equal(plan.targets[name], undefined, 'retained ledger must never be a destructive target');
+      assert.ok(result.executionBlockers.includes(`account_ledger_retention_review_required:${name}`), name);
+      assert.deepEqual(plan.targets.storySessions, ['session']);
+      assert.equal(result.readyForAdminExecution, false);
+    }
+  } finally { if (prior === undefined) delete process.env.STORYTIME_FIREBASE_ISOLATED; else process.env.STORYTIME_FIREBASE_ISOLATED = prior; }
 });
 
 test('accounts without ledger records do not acquire a fabricated ledger blocker', async () => {
-  const result = await routines({}).plan('privacy-a', { userId: 'owner-a', scope: 'account' });
-  assert.equal(result.executionBlockers.length, 0);
+  const prior = process.env.STORYTIME_FIREBASE_ISOLATED; process.env.STORYTIME_FIREBASE_ISOLATED = 'true';
+  try {
+    const f = fixture(); const c = await callables(f); request(f, 'deletion', 'account');
+    const result = await c.planStorytimeDeletion(ownerRequest({ privacyRequestId: 'privacy' }));
+    assert.equal(result.executionBlockers.length, 0);
+  } finally { if (prior === undefined) delete process.env.STORYTIME_FIREBASE_ISOLATED; else process.env.STORYTIME_FIREBASE_ISOLATED = prior; }
 });

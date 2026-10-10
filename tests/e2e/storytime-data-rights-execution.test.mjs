@@ -8,7 +8,7 @@ const rules = fs.readFileSync('firestore.rules', 'utf8');
 const env = fs.readFileSync('.env.example', 'utf8');
 const controls = fs.readFileSync('src/components/storytime/PrivacyRequestControls.tsx', 'utf8');
 
-test('Storytime export execution is owner-verified, private, portable, idempotent, and signed-url delivered', () => {
+test('Storytime export execution is owner-verified, private, portable, idempotent, and authenticated', () => {
   for (const marker of [
     'processStorytimeExportRequest',
     'getStorytimeExportDownloadUrl',
@@ -17,8 +17,9 @@ test('Storytime export execution is owner-verified, private, portable, idempoten
     'storytime-export-manifest-v1',
     'complete_for_storytime_owned_data',
     'partial_review_required',
-    'EXPORT_SIGNED_URL_TTL_MS',
-    'getSignedUrl',
+    'EXPORT_DOWNLOAD_URL_TTL_MS',
+    'downloadStorytimeExportPackage',
+    'requiresAuthorization: true',
     'exportPath',
     'exportPackageSha256',
     'Storytime export requires privacy review before download can be authorized',
@@ -27,6 +28,7 @@ test('Storytime export execution is owner-verified, private, portable, idempoten
 
   assert.match(index, /processStorytimeExportRequest/);
   assert.match(index, /getStorytimeExportDownloadUrl/);
+  assert.doesNotMatch(execution, /getSignedUrl/);
   assert.match(controls, /Download private Storytime export/);
   assert.match(controls, /blockers.length === 0/);
 });

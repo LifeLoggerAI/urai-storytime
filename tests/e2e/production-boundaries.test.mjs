@@ -13,6 +13,7 @@ const functions = read('functions/src/storytime.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const functionsIndex = read('functions/src/index.ts');
 const provider = read('functions/src/story-provider.ts');
+const spend = read('functions/src/story-provider-spend.ts');
 const rules = read('firestore.rules');
 const storageRules = read('storage.rules');
 const runtimeReadiness = read('src/runtime-readiness.mjs');
@@ -70,13 +71,14 @@ test('OpenAI provider cannot be claimed live without provider, key, and model ga
     'provider === "openai"',
     'response_format',
     'json_object',
-    'new AbortController()',
+    'executeProtectedStoryProvider',
     'audienceInstruction(input.audienceAgeBand)',
     'assertProviderOutputSafe(output)',
     'storytime-provider-receipt-v1',
     'estimatedMaxCostUsd',
     'actualCostUsd'
   ]);
+  includesAll(spend, ['new AbortController()', 'runtime <= 20', 'gateway("reserve"', 'provider_call_authorized === true', 'RECONCILIATION_REQUIRED']);
   assert.match(provider, /Story provider is not configured/);
   assert.match(proofReadme, /PARTIAL \/ BLOCKED FROM READY/);
 });

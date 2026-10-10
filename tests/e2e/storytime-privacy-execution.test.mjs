@@ -16,14 +16,14 @@ test('Storytime export packages owner data privately with integrity and short-li
     'storytime-export-manifest-v1',
     'packageSha256',
     'private, max-age=0, no-store',
-    'EXPORT_SIGNED_URL_TTL_MS = 15 * 60 * 1000',
+    'EXPORT_DOWNLOAD_URL_TTL_MS = 15 * 60 * 1000',
     'complete_for_storytime_owned_data',
     'partial_review_required',
     'authAccountMetadata'
   ]) assert.ok(execution.includes(marker), `missing export marker: ${marker}`);
   assert.match(index, /processStorytimeExportRequest/);
   assert.match(index, /getStorytimeExportDownloadUrl/);
-  assert.match(execution, /exportCompleteness !== "complete_for_storytime_owned_data"/);
+  assert.match(execution, /data.exportCompleteness !== "complete_for_storytime_owned_data"/);
   assert.match(execution, /requires privacy review before download can be authorized/);
 });
 

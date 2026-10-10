@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto";
 import { initializeApp } from "firebase-admin/app";
-import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { FieldValue, getFirestore, type DocumentData, type DocumentReference, type SetOptions } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
+import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit, type StoryOutputAuthority } from "./story-provider-spend.js";
 import {
   generateStoryWithProvider,
   getStoryProviderCostPreflight,
@@ -72,18 +74,24 @@ const ManageVoiceoverJobSchema = z.object({
 });
 
 const STORYTIME_VOICEOVER_CONSENT_VERSION = "storytime-voiceover-consent-v1";
-const storytimeJobsBridgeTokenSecret = defineSecret("URAI_STORYTIME_JOBS_BRIDGE_TOKEN");
+export const storytimeJobsBridgeTokenSecret = defineSecret("URAI_STORYTIME_JOBS_BRIDGE_TOKEN");
 
-function storytimeJobsBridgeUrl() {
+export function storytimeJobsBridgeUrl() {
   const value = String(process.env.URAI_STORYTIME_JOBS_BRIDGE_URL || "").trim();
   if (!value) throw new HttpsError("failed-precondition", "Storytime narrator worker bridge is not configured.");
   if (process.env.NODE_ENV === "production" && !value.startsWith("https://")) {
     throw new HttpsError("failed-precondition", "Storytime narrator worker bridge must use HTTPS in production.");
   }
+  const endpoint = new URL(value);
+  if (endpoint.username || endpoint.password || endpoint.hash || endpoint.search
+    || (endpoint.protocol !== "https:" && !(process.env.NODE_ENV !== "production"
+      && endpoint.protocol === "http:" && ["localhost", "127.0.0.1"].includes(endpoint.hostname)))) {
+    throw new HttpsError("failed-precondition", "Storytime narrator worker bridge endpoint is invalid.");
+  }
   return value.replace(/\/$/, "");
 }
 
-function storytimeJobsBridgeToken() {
+export function storytimeJobsBridgeToken() {
   try {
     return storytimeJobsBridgeTokenSecret.value() || process.env.URAI_STORYTIME_JOBS_BRIDGE_TOKEN || "";
   } catch {
@@ -104,6 +112,8 @@ async function storytimeJobsBridgeRequest(body: Record<string, unknown>) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify(body),
+      redirect: "error",
+      cache: "no-store",
       signal: controller.signal
     });
     const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
@@ -208,6 +218,14 @@ function roundedUsd(value: number) {
   return Math.round(value * 100_000_000) / 100_000_000;
 }
 
+function checkedBudgetUsd(value: unknown) {
+  if (value === undefined) return 0;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    throw new HttpsError("failed-precondition", "Storytime provider budget counters require reconciliation.");
+  }
+  return value;
+}
+
 function providerInputFromRequest(input: z.infer<typeof GenerateStorySchema>, source: string): StoryProviderInput {
   return {
     title: input.title,
@@ -250,11 +268,12 @@ async function reserveProviderBudget(
       throw new HttpsError("already-exists", "A provider budget reservation already exists for this Storytime request.");
     }
 
-    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
-    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
-    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
-    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
-    const estimate = preflight.estimatedMaxCostUsd;
+    const globalActual = checkedBudgetUsd(globalSnapshot.data()?.actualCostUsd);
+    const globalReserved = checkedBudgetUsd(globalSnapshot.data()?.reservedCostUsd);
+    const userActual = checkedBudgetUsd(userSnapshot.data()?.actualCostUsd);
+    const userReserved = checkedBudgetUsd(userSnapshot.data()?.reservedCostUsd);
+    // Hold the entire local ceiling. The canonical cap must fit inside it.
+    const estimate = preflight.maxGenerationCostUsd;
 
     if (globalActual + globalReserved + estimate > preflight.globalDailyBudgetUsd) {
       throw new HttpsError("resource-exhausted", "Storytime provider daily budget is exhausted.");
@@ -298,54 +317,37 @@ async function reserveProviderBudget(
   return {
     reservationId,
     dayId,
-    estimatedMaxCostUsd: preflight.estimatedMaxCostUsd,
+    estimatedMaxCostUsd: preflight.maxGenerationCostUsd,
     globalDailyBudgetUsd: preflight.globalDailyBudgetUsd,
     userDailyBudgetUsd: preflight.userDailyBudgetUsd
   };
 }
 
-async function settleProviderBudget(
+async function observeProviderBudget(
   userId: string,
   reservation: ProviderBudgetReservation,
-  actualCostUsd: number
+  receipt: StoryProviderReceipt
 ) {
-  const globalRef = db.collection("storytimeProviderBudgetCounters").doc(`global_${reservation.dayId}`);
-  const userRef = db.collection("storytimeProviderBudgetCounters").doc(`user_${userId}_${reservation.dayId}`);
   const reservationRef = db.collection("storytimeProviderBudgetReservations").doc(reservation.reservationId);
-
+  if (receipt.provider !== "openai" || receipt.actualCostUsd !== null || receipt.settlementStatus !== "RECONCILIATION_REQUIRED" || receipt.spend?.status !== "RECONCILIATION_REQUIRED" || receipt.spend.chargesReconciled !== false) {
+    throw new HttpsError("failed-precondition", "Provider usage cannot settle a Storytime charge.");
+  }
   await db.runTransaction(async (transaction) => {
-    const [globalSnapshot, userSnapshot, reservationSnapshot] = await Promise.all([
-      transaction.get(globalRef),
-      transaction.get(userRef),
-      transaction.get(reservationRef)
-    ]);
+    const reservationSnapshot = await transaction.get(reservationRef);
     const reservationData = reservationSnapshot.data() ?? {};
-    if (reservationData.status === "settled") return;
-    if (!reservationSnapshot.exists || reservationData.userId !== userId) {
+    if (!reservationSnapshot.exists || reservationData.userId !== userId || reservationData.dayId !== reservation.dayId || reservationData.estimatedMaxCostUsd !== reservation.estimatedMaxCostUsd || !["reserved", "awaiting_charge_reconciliation"].includes(reservationData.status)) {
       throw new HttpsError("failed-precondition", "Storytime provider budget reservation is unavailable.");
     }
-
-    const globalActual = Number(globalSnapshot.data()?.actualCostUsd || 0);
-    const globalReserved = Number(globalSnapshot.data()?.reservedCostUsd || 0);
-    const userActual = Number(userSnapshot.data()?.actualCostUsd || 0);
-    const userReserved = Number(userSnapshot.data()?.reservedCostUsd || 0);
-    const reserved = Number(reservationData.estimatedMaxCostUsd || reservation.estimatedMaxCostUsd);
     const updatedAt = now();
-
-    transaction.set(globalRef, {
-      actualCostUsd: roundedUsd(globalActual + actualCostUsd),
-      reservedCostUsd: roundedUsd(Math.max(0, globalReserved - reserved)),
-      updatedAt
-    }, { merge: true });
-    transaction.set(userRef, {
-      actualCostUsd: roundedUsd(userActual + actualCostUsd),
-      reservedCostUsd: roundedUsd(Math.max(0, userReserved - reserved)),
-      updatedAt
-    }, { merge: true });
+    // Keep both daily counters reserved. Only independent final-charge reconciliation
+    // may move money; a successful story response is a usage observation.
     transaction.update(reservationRef, {
-      status: "settled",
-      actualCostUsd: roundedUsd(actualCostUsd),
-      settledAt: updatedAt,
+      status: "awaiting_charge_reconciliation",
+      actualCostUsd: null,
+      observedCostUsd: receipt.observedCostUsd,
+      heldCostUsd: reservation.estimatedMaxCostUsd,
+      providerReceipt: receipt,
+      retryAuthorized: false,
       updatedAt
     });
   });
@@ -436,6 +438,8 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       consentVersion: input.consentSnapshot.consentVersion,
       reviewVersion: input.requestReview.reviewVersion,
       reviewedRequestSha256: reviewedRequestSha256(input),
+      providerInputSha256: storySpendHash(storySourceJson(providerInputFromRequest(input, input.sourceText || "A quiet signal became a private URAI story."))),
+      consentSnapshot: input.consentSnapshot,
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
     }, { merge: true });
@@ -539,7 +543,7 @@ async function readOwnedStorySession(sessionId: string, userId: string) {
   return { ref: sessionSnap.ref, data: sessionSnap.data()! };
 }
 
-export const generateStorySession = onCall(async (request) => {
+export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerTokensSecret] }, async (request) => {
   requireAuth(request.auth?.uid);
   requireVerifiedAdultAccount(request.auth?.token.email_verified);
   const userId = request.auth!.uid;
@@ -618,11 +622,15 @@ export const generateStorySession = onCall(async (request) => {
 
   let generated: StoryProviderOutput;
   let providerReceipt: StoryProviderReceipt;
+  let commitPaidOutput: StoryAuthorityCommit | null = null;
+  let confirmPaidOutput: StoryOutputAuthority | null = null;
   try {
     if (readiness.ready) {
-      const providerResult = await generateStoryWithProvider(providerInput);
+      const providerResult = await generateStoryWithProvider(providerInput, { userId, requestId: input.requestId, reviewedRequestSha256: processedRequestSha256 }, db);
       generated = providerResult.output;
       providerReceipt = providerResult.receipt;
+      commitPaidOutput = providerResult.commitWithAuthority;
+      confirmPaidOutput = providerResult.confirmOutputAuthority;
     } else {
       generated = fallbackProviderOutput(input, source);
       providerReceipt = {
@@ -637,6 +645,9 @@ export const generateStorySession = onCall(async (request) => {
         configuredOutputUsdPerMillionTokens: null,
         estimatedMaxCostUsd: 0,
         actualCostUsd: 0,
+        observedCostUsd: null,
+        settlementStatus: "NO_PROVIDER_SPEND",
+        spend: null,
         maxAllowedCostUsd: null,
         attemptCount: 1,
         costStatus: "no_provider_spend"
@@ -654,39 +665,42 @@ export const generateStorySession = onCall(async (request) => {
       });
     }
     await generationRequest.requestRef.set({
-      status: "failed",
+      status: budgetReservation ? "requires_reconciliation" : "failed",
       errorCode: error instanceof Error ? error.name : "unknown",
       providerBudgetStatus: budgetReservation ? "held_after_failure" : "not_reserved",
       updatedAt: now()
     }, { merge: true });
     auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: error instanceof Error ? error.name : "unknown" });
-    throw new HttpsError("internal", "Story generation could not be completed safely. Please try again.");
+    throw new HttpsError("internal", "Story generation could not be confirmed safely. Its budget remains held; do not submit a replacement request.");
   }
 
   if (budgetReservation && providerReceipt.provider === "openai") {
     try {
-      await settleProviderBudget(userId, budgetReservation, providerReceipt.actualCostUsd);
+      await observeProviderBudget(userId, budgetReservation, providerReceipt);
+      await retainProviderDeadLetter({ userId, requestId: input.requestId, reservation: budgetReservation, failureCode: "charge_reconciliation_required" });
       await generationRequest.requestRef.set({
-        providerBudgetStatus: "settled",
-        providerActualCostUsd: providerReceipt.actualCostUsd,
+        providerBudgetStatus: "awaiting_charge_reconciliation",
+        providerActualCostUsd: null,
+        providerObservedCostUsd: providerReceipt.observedCostUsd,
+        providerReceipt,
         updatedAt: now()
       }, { merge: true });
     } catch (error) {
-      await holdProviderBudgetReservation(budgetReservation, "budget_settlement_failed");
+      await holdProviderBudgetReservation(budgetReservation, "budget_observation_failed");
       await retainProviderDeadLetter({
         userId,
         requestId: input.requestId,
         reservation: budgetReservation,
-        failureCode: "budget_settlement_failed"
+        failureCode: "budget_observation_failed"
       });
       await generationRequest.requestRef.set({
-        status: "failed",
-        errorCode: "budget_settlement_failed",
+        status: "requires_reconciliation",
+        errorCode: "budget_observation_failed",
         providerBudgetStatus: "held_after_failure",
         updatedAt: now()
       }, { merge: true });
-      auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_settlement_failed" });
-      throw new HttpsError("internal", "Story generation cost receipt could not be settled safely.");
+      auditLog({ event: "provider_failed", userId, provider: readiness.provider, errorCode: "budget_observation_failed" });
+      throw new HttpsError("internal", "Story generation usage could not be retained safely. Reconcile its held budget before any replacement generation.");
     }
   }
 
@@ -860,24 +874,37 @@ export const generateStorySession = onCall(async (request) => {
     emotionalArc: { id: arcId, arcLabel: arc.arcLabel, summary: arc.summary }
   });
 
-  const batch = db.batch();
-  batch.set(db.collection("storySessions").doc(sessionId), session);
-  batch.set(db.collection("storyChapters").doc(chapterId), chapter);
-  batch.set(db.collection("storyMoments").doc(momentId), moment);
-  batch.set(db.collection("memoryScenes").doc(sceneId), scene);
-  batch.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
-  batch.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
-  batch.set(db.collection("storyVersions").doc(versionId), version);
-  batch.set(generationRequest.requestRef, {
-    status: "succeeded",
-    sessionId,
-    safetyStatus: outputModeration.safetyStatus,
-    provider: session.provider,
-    providerReceipt,
-    updatedAt: createdAt
-  }, { merge: true });
+  const writeStory = (writer: {
+    set(reference: DocumentReference, data: DocumentData): unknown;
+    set(reference: DocumentReference, data: DocumentData, options: SetOptions): unknown;
+  }) => {
+    writer.set(db.collection("storySessions").doc(sessionId), session);
+    writer.set(db.collection("storyChapters").doc(chapterId), chapter);
+    writer.set(db.collection("storyMoments").doc(momentId), moment);
+    writer.set(db.collection("memoryScenes").doc(sceneId), scene);
+    writer.set(db.collection("narratorScripts").doc(scriptId), narratorScript);
+    writer.set(db.collection("emotionalArcSummaries").doc(arcId), arc);
+    writer.set(db.collection("storyVersions").doc(versionId), version);
+    writer.set(generationRequest.requestRef, {
+      status: "succeeded",
+      sessionId,
+      safetyStatus: outputModeration.safetyStatus,
+      provider: session.provider,
+      providerReceipt,
+      updatedAt: createdAt
+    }, { merge: true });
+  };
   try {
-    await batch.commit();
+    if (providerReceipt.provider === "openai") {
+      if (!commitPaidOutput) throw new HttpsError("failed-precondition", "Paid story persistence requires current protected authority.");
+      // Grant/claim reads and every output write share one transaction. Late
+      // cancellation or revocation cannot be overwritten by a blind batch.
+      await commitPaidOutput(writeStory);
+    } else {
+      const batch = db.batch();
+      writeStory(batch);
+      await batch.commit();
+    }
   } catch {
     let persisted = false;
     try {
@@ -902,6 +929,16 @@ export const generateStorySession = onCall(async (request) => {
     if (!persisted) {
       auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "story_persistence_failed" });
       throw new HttpsError("internal", "Story persistence requires reconciliation. This request cannot be regenerated automatically.");
+    }
+  }
+
+  if (providerReceipt.provider === "openai") {
+    try {
+      if (!confirmPaidOutput) throw new HttpsError("failed-precondition", "Paid output requires current protected authority.");
+      await confirmPaidOutput(sessionId);
+    } catch {
+      auditLog({ event: "provider_failed", userId, provider: session.provider, errorCode: "paid_output_authority_unconfirmed" });
+      throw new HttpsError("unavailable", "Story output could not be confirmed within its protected admission. Its charge remains held; do not submit a replacement request.");
     }
   }
 
@@ -1134,6 +1171,17 @@ export const manageVoiceoverJob = onCall({
     narratorScriptId,
     jobId: externalJobId
   });
+
+  if (input.action === "playback") {
+    const playback = bridge.playback as Record<string, unknown> | undefined;
+    const delivery = StorytimeNarratorDeliverySchema.parse(playback?.delivery);
+    if (delivery.jobId !== externalJobId || delivery.sessionId !== sessionId
+      || delivery.narratorScriptId !== narratorScriptId || delivery.expiresAt <= Date.now()) {
+      throw new HttpsError("failed-precondition", "Narrator playback descriptor does not match the current private job.");
+    }
+    auditLog({ event: "voiceover_playback", userId, sessionId });
+    return { ok: true, playback: { delivery } };
+  }
 
   if (input.action === "status" || input.action === "cancel") {
     const job = bridge.job && typeof bridge.job === "object" ? bridge.job as Record<string, unknown> : {};

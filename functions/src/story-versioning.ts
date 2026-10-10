@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore, type WriteBatch } from "firebase-admin/firestore";
+import { getFirestore, type Transaction } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
@@ -87,18 +87,18 @@ function assertSafeEditText(values: string[]) {
   }
 }
 
-async function readOwnedSession(sessionId: string, userId: string) {
+async function readOwnedSession(sessionId: string, userId: string, transaction?: Transaction) {
   const ref = db.collection("storySessions").doc(sessionId);
-  const snapshot = await ref.get();
+  const snapshot = transaction ? await transaction.get(ref) : await ref.get();
   if (!snapshot.exists || snapshot.data()?.userId !== userId) {
     throw new HttpsError("permission-denied", "Story session was not found.");
   }
   return { ref, data: snapshot.data() ?? {} };
 }
 
-async function readOwnedVersion(versionId: string, sessionId: string, userId: string) {
+async function readOwnedVersion(versionId: string, sessionId: string, userId: string, transaction: Transaction) {
   const ref = db.collection("storyVersions").doc(versionId);
-  const snapshot = await ref.get();
+  const snapshot = await transaction.get(ref);
   const data = snapshot.data();
   if (!snapshot.exists || data?.userId !== userId || data?.sessionId !== sessionId) {
     throw new HttpsError("permission-denied", "Story version was not found.");
@@ -110,7 +110,9 @@ async function readOwnedVersion(versionId: string, sessionId: string, userId: st
 }
 
 function currentAuthority(session: Record<string, unknown>, expectedCurrentVersionId: string) {
-  if (typeof session.currentVersionId !== "string" || typeof session.versionNumber !== "number") {
+  if (typeof session.currentVersionId !== "string" || typeof session.versionNumber !== "number"
+    || !Number.isSafeInteger(session.versionNumber) || session.versionNumber < 1
+    || session.versionNumber >= Number.MAX_SAFE_INTEGER) {
     throw new HttpsError("failed-precondition", "This older Storytime session needs a version baseline before editing.");
   }
   if (session.currentVersionId !== expectedCurrentVersionId) {
@@ -166,17 +168,35 @@ function versionRecord(args: {
   };
 }
 
-function writeSnapshot(batch: WriteBatch, snapshot: VersionSnapshot, updatedAt: string) {
-  batch.update(db.collection("storyChapters").doc(snapshot.chapter.id), {
+async function readOwnedStoryRecords(transaction: Transaction, snapshot: VersionSnapshot, sessionId: string, userId: string) {
+  const references = [
+    db.collection("storyChapters").doc(snapshot.chapter.id),
+    db.collection("storyMoments").doc(snapshot.moment.id),
+    db.collection("narratorScripts").doc(snapshot.narrator.id)
+  ];
+  const records = await Promise.all(references.map((ref) => transaction.get(ref)));
+  if (records.some((record) => !record.exists || record.data()?.userId !== userId || record.data()?.sessionId !== sessionId)) {
+    throw new HttpsError("permission-denied", "Story revision records are unavailable.");
+  }
+}
+
+function assertCurrentVersionNumber(data: Record<string, unknown>, versionNumber: number) {
+  if (data.versionNumber !== versionNumber) {
+    throw new HttpsError("failed-precondition", "Story session and immutable version authority disagree.");
+  }
+}
+
+function writeSnapshot(transaction: Transaction, snapshot: VersionSnapshot, updatedAt: string) {
+  transaction.update(db.collection("storyChapters").doc(snapshot.chapter.id), {
     summary: snapshot.chapter.summary,
     updatedAt
   });
-  batch.update(db.collection("storyMoments").doc(snapshot.moment.id), {
+  transaction.update(db.collection("storyMoments").doc(snapshot.moment.id), {
     title: snapshot.moment.title,
     body: snapshot.moment.body,
     updatedAt
   });
-  batch.update(db.collection("narratorScripts").doc(snapshot.narrator.id), {
+  transaction.update(db.collection("narratorScripts").doc(snapshot.narrator.id), {
     text: snapshot.narrator.text,
     updatedAt
   });
@@ -187,33 +207,36 @@ export const saveStoryRevision = onCall(async (request) => {
   const parsed = SaveRevisionSchema.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Provide a valid bounded Storytime edit.");
   const input = parsed.data;
-  const session = await readOwnedSession(input.sessionId, userId);
-  const authority = currentAuthority(session.data, input.expectedCurrentVersionId);
-  const current = await readOwnedVersion(authority.currentVersionId, input.sessionId, userId);
-  const snapshot = editedSnapshot(current.snapshot, input);
   const versionRef = db.collection("storyVersions").doc();
-  const record = versionRecord({
-    id: versionRef.id,
-    userId,
-    sessionId: input.sessionId,
-    versionNumber: authority.versionNumber + 1,
-    parentVersionId: authority.currentVersionId,
-    reason: "user_edit",
-    editReason: input.editReason,
-    snapshot
-  });
+  const record = await db.runTransaction(async (transaction) => {
+    const session = await readOwnedSession(input.sessionId, userId, transaction);
+    const authority = currentAuthority(session.data, input.expectedCurrentVersionId);
+    const current = await readOwnedVersion(authority.currentVersionId, input.sessionId, userId, transaction);
+    assertCurrentVersionNumber(current.data, authority.versionNumber);
+    const snapshot = editedSnapshot(current.snapshot, input);
+    await readOwnedStoryRecords(transaction, snapshot, input.sessionId, userId);
+    const record = versionRecord({
+      id: versionRef.id,
+      userId,
+      sessionId: input.sessionId,
+      versionNumber: authority.versionNumber + 1,
+      parentVersionId: authority.currentVersionId,
+      reason: "user_edit",
+      editReason: input.editReason,
+      snapshot
+    });
 
-  const batch = db.batch();
-  writeSnapshot(batch, snapshot, record.updatedAt);
-  batch.set(versionRef, record);
-  batch.update(session.ref, {
-    title: snapshot.title,
-    currentVersionId: versionRef.id,
-    versionNumber: record.versionNumber,
-    "provenance.edited": true,
-    updatedAt: record.updatedAt
+    writeSnapshot(transaction, snapshot, record.updatedAt);
+    transaction.create(versionRef, record);
+    transaction.update(session.ref, {
+      title: snapshot.title,
+      currentVersionId: versionRef.id,
+      versionNumber: record.versionNumber,
+      "provenance.edited": true,
+      updatedAt: record.updatedAt
+    });
+    return record;
   });
-  await batch.commit();
 
   auditLog({ event: "story_revision_saved", userId, sessionId: input.sessionId });
   return { status: "completed", versionId: versionRef.id, versionNumber: record.versionNumber };
@@ -224,42 +247,45 @@ export const restoreStoryVersion = onCall(async (request) => {
   const parsed = RestoreRevisionSchema.safeParse(request.data);
   if (!parsed.success) throw new HttpsError("invalid-argument", "Provide a valid Storytime restore request.");
   const input = parsed.data;
-  const session = await readOwnedSession(input.sessionId, userId);
-  const authority = currentAuthority(session.data, input.expectedCurrentVersionId);
-  const target = await readOwnedVersion(input.targetVersionId, input.sessionId, userId);
-  assertSafeEditText([
-    target.snapshot.title,
-    target.snapshot.chapter.title,
-    target.snapshot.chapter.summary,
-    target.snapshot.moment.title,
-    target.snapshot.moment.body,
-    target.snapshot.narrator.text
-  ]);
-
   const versionRef = db.collection("storyVersions").doc();
-  const record = versionRecord({
-    id: versionRef.id,
-    userId,
-    sessionId: input.sessionId,
-    versionNumber: authority.versionNumber + 1,
-    parentVersionId: authority.currentVersionId,
-    reason: "restored_version",
-    editReason: `Restored version ${target.data.versionNumber ?? input.targetVersionId}`,
-    snapshot: target.snapshot,
-    restoredFromVersionId: input.targetVersionId
-  });
+  const record = await db.runTransaction(async (transaction) => {
+    const session = await readOwnedSession(input.sessionId, userId, transaction);
+    const authority = currentAuthority(session.data, input.expectedCurrentVersionId);
+    const current = await readOwnedVersion(authority.currentVersionId, input.sessionId, userId, transaction);
+    assertCurrentVersionNumber(current.data, authority.versionNumber);
+    const target = await readOwnedVersion(input.targetVersionId, input.sessionId, userId, transaction);
+    assertSafeEditText([
+      target.snapshot.title,
+      target.snapshot.chapter.title,
+      target.snapshot.chapter.summary,
+      target.snapshot.moment.title,
+      target.snapshot.moment.body,
+      target.snapshot.narrator.text
+    ]);
+    await readOwnedStoryRecords(transaction, target.snapshot, input.sessionId, userId);
+    const record = versionRecord({
+      id: versionRef.id,
+      userId,
+      sessionId: input.sessionId,
+      versionNumber: authority.versionNumber + 1,
+      parentVersionId: authority.currentVersionId,
+      reason: "restored_version",
+      editReason: `Restored version ${target.data.versionNumber ?? input.targetVersionId}`,
+      snapshot: target.snapshot,
+      restoredFromVersionId: input.targetVersionId
+    });
 
-  const batch = db.batch();
-  writeSnapshot(batch, target.snapshot, record.updatedAt);
-  batch.set(versionRef, record);
-  batch.update(session.ref, {
-    title: target.snapshot.title,
-    currentVersionId: versionRef.id,
-    versionNumber: record.versionNumber,
-    "provenance.edited": true,
-    updatedAt: record.updatedAt
+    writeSnapshot(transaction, target.snapshot, record.updatedAt);
+    transaction.create(versionRef, record);
+    transaction.update(session.ref, {
+      title: target.snapshot.title,
+      currentVersionId: versionRef.id,
+      versionNumber: record.versionNumber,
+      "provenance.edited": true,
+      updatedAt: record.updatedAt
+    });
+    return record;
   });
-  await batch.commit();
 
   auditLog({ event: "story_version_restored", userId, sessionId: input.sessionId });
   return {
@@ -278,6 +304,8 @@ export const listStoryVersions = onCall(async (request) => {
   const snapshot = await db.collection("storyVersions")
     .where("sessionId", "==", parsed.data.sessionId)
     .where("userId", "==", userId)
+    .orderBy("versionNumber", "desc")
+    .limit(MAX_VERSION_HISTORY)
     .get();
   const versions = snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -289,3 +317,4 @@ export const listStoryVersions = onCall(async (request) => {
   })).sort((a, b) => b.versionNumber - a.versionNumber).slice(0, MAX_VERSION_HISTORY);
   return { status: "ready", versions };
 });
+
