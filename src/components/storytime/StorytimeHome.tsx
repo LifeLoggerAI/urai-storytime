@@ -112,6 +112,8 @@ export function StorytimeHome() {
     }
 
     let active = true;
+    let authEpoch = 0;
+    const auth = getFirebaseAuth();
     const clearResumedDraft = () => {
       setTitle("");
       setTheme("");
@@ -127,8 +129,10 @@ export function StorytimeHome() {
       setDraftRevision(0);
       setLastSavedDraftFingerprint(null);
     };
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!active) return;
+      const epoch = ++authEpoch;
+      const isCurrentAccount = () => active && epoch === authEpoch && auth.currentUser === user;
       clearResumedDraft();
       if (!user) {
         setDraftStatus("Sign in to resume this private draft.");
@@ -136,12 +140,16 @@ export function StorytimeHome() {
       }
       try {
         const snapshot = await getDoc(doc(getFirebaseDb(), "storyDrafts", requestedDraftId));
-        if (!active) return;
+        if (!isCurrentAccount()) return;
         if (!snapshot.exists()) {
           setDraftStatus("That private draft is unavailable.");
           return;
         }
         const data = snapshot.data();
+        if (snapshot.id !== requestedDraftId || data.userId !== user.uid) {
+          setDraftStatus("That private draft is unavailable.");
+          return;
+        }
         setTitle(typeof data.title === "string" ? data.title : "");
         setTheme(typeof data.theme === "string" ? data.theme : "");
         setAudienceAgeBand(AUDIENCE_AGE_BANDS.includes(data.audienceAgeBand) ? data.audienceAgeBand : "family");
@@ -163,12 +171,13 @@ export function StorytimeHome() {
         }));
         setDraftStatus("Private draft resumed. Generation and provider consent were not restored.");
       } catch {
-        if (active) setDraftStatus("That private draft could not be loaded.");
+        if (isCurrentAccount()) setDraftStatus("That private draft could not be loaded.");
       }
     });
 
     return () => {
       active = false;
+      authEpoch += 1;
       unsubscribe();
     };
   }, [cloudReady]);
