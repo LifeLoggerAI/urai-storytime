@@ -156,7 +156,7 @@ export function PrivacyRequestControls() {
 
   async function downloadExport() {
     const { actor: user, lease } = captureLease();
-    if (!downloadAuthorization || !lease.isCurrent() || downloadActor.current !== user) return;
+    if (!user || !downloadAuthorization || !lease.isCurrent() || downloadActor.current !== user) return;
     setWorking("download");
     try {
       const blob = await fetchAuthorizedStorytimeExport({
