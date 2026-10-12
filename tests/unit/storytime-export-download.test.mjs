@@ -20,7 +20,9 @@ test('actual Storytime browser client sends fresh Bearer fetch with private tran
     isCurrentAccount: () => true, getIdToken: async () => { tokenCalls++; return 'synthetic-current-token'; },
     fetcher: async (url, options) => { observed = { url, options }; return new Response(body, { headers: { 'content-type': 'application/json' } }); } });
   assert.equal(tokenCalls, 1); assert.equal(await blob.text(), body);
-  assert.deepEqual(observed.options, { method: 'GET', headers: { Authorization: 'Bearer synthetic-current-token' },
+  assert.ok(observed.options.signal instanceof AbortSignal, 'bound private export transport requires a deadline');
+  const { signal, ...transport } = observed.options;
+  assert.deepEqual(transport, { method: 'GET', headers: { Authorization: 'Bearer synthetic-current-token' },
     cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer' });
 });
 
