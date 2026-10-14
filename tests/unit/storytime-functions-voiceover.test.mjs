@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('functions/src/storytime.ts', 'utf8');
 const index = fs.readFileSync('functions/src/index.ts', 'utf8');
+const admission = fs.readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8');
 
 test('prepareVoiceoverJob validates request shape and auth-owned source records', () => {
   assert.match(source, /const PrepareVoiceoverJobSchema = z\.object/);
@@ -17,9 +18,9 @@ test('prepareVoiceoverJob validates request shape and auth-owned source records'
 test('prepareVoiceoverJob binds explicit voiceover consent to a durable receipt', () => {
   assert.match(source, /consentSnapshot\?\.voiceover !== true/);
   assert.match(source, /STORYTIME_VOICEOVER_CONSENT_VERSION/);
-  assert.match(source, /consentDecisionReceipts/);
-  assert.match(source, /purpose: "storytime\.voiceover"/);
-  assert.match(source, /decision: "authorized"/);
+  assert.match(admission, /consentDecisionReceipts/);
+  assert.match(admission, /purpose: "storytime\.voiceover"/);
+  assert.match(admission, /decision: "authorized"/);
   assert.match(source, /decisionReceiptId: consentReceiptId/);
 });
 
@@ -41,4 +42,13 @@ test('voiceover lifecycle exposes bounded status cancel playback and deletion th
   assert.match(source, /export const manageVoiceoverJob = onCall/);
   assert.match(source, /Voiceover job is missing governed worker binding/);
   assert.match(index, /manageVoiceoverJob/);
+});
+
+test('source consent commits before governed narrator dispatch', () => {
+  const prepare = source.slice(source.indexOf('export const prepareVoiceoverJob'), source.indexOf('export const manageVoiceoverJob'));
+  const staged = prepare.indexOf('await stageStorytimeVoiceoverConsent(db');
+  const dispatched = prepare.indexOf('const bridge = await storytimeJobsBridgeRequest(');
+  assert.ok(staged >= 0 && dispatched > staged);
+  assert.doesNotMatch(prepare, /batch\.set\(consentRef/);
+  assert.match(admission, /receipt\.decision !== "authorized"/);
 });

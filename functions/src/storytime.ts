@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
+import { stageStorytimeVoiceoverConsent, StorytimeVoiceoverAdmissionDenied } from "./storytime-voiceover-consent-admission.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
 import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit, type StoryOutputAuthority } from "./story-provider-spend.js";
@@ -1048,12 +1049,26 @@ export const prepareVoiceoverJob = onCall({
     STORYTIME_VOICEOVER_CONSENT_VERSION,
     String(session.data.consentSnapshot?.consentVersion || "")
   ].join("|")).slice(0, 48)}`;
-  const consentRef = db.collection("consentDecisionReceipts").doc(consentReceiptId);
   const idempotencyKey = `storytime-voiceover-${contentFingerprint([
     userId, input.sessionId, narratorScriptId, input.provider, input.voiceId || input.voice || "default"
   ].join("|")).slice(0, 32)}`;
 
   const provider = input.provider === "elevenlabs" ? "elevenlabs" : "google";
+  const createdAt = now();
+  // Persist current, versioned source authority before any Jobs queue admission.
+  try {
+    await stageStorytimeVoiceoverConsent(db, {
+      userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
+      policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
+      sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
+      narratorText, createdAt,
+    });
+  } catch (error) {
+    if (error instanceof StorytimeVoiceoverAdmissionDenied) {
+      throw new HttpsError("failed-precondition", "Current Storytime voiceover consent or source authority is unavailable.");
+    }
+    throw error;
+  }
   const bridge = await storytimeJobsBridgeRequest({
     action: "create",
     userId,
@@ -1080,24 +1095,10 @@ export const prepareVoiceoverJob = onCall({
     throw new HttpsError("unavailable", "Narrator worker did not return a job identifier.");
   }
 
-  const createdAt = now();
   const voiceoverJobId = `voiceoverJob_${externalJobId}`;
   const exportId = `storyExport_${externalJobId}`;
   const timelineEventId = id("timelineReplayEvent");
   const batch = db.batch();
-  batch.set(consentRef, {
-    schemaVersion: "storytime-consent-decision-receipt-v1",
-    id: consentReceiptId,
-    userId,
-    purpose: "storytime.voiceover",
-    policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
-    decision: "authorized",
-    sourceSessionId: input.sessionId,
-    narratorScriptId,
-    sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
-    createdAt,
-    updatedAt: createdAt
-  }, { merge: true });
   batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), {
     id: voiceoverJobId,
     userId,
