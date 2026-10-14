@@ -434,6 +434,9 @@ export async function recoverStorytimeVoiceoverIntent(
   }
   try {
     if (!remoteId) {
+      // Recheck current authority after leasing and immediately before remote
+      // dispatch; the lease alone never grants permission to create new work.
+      await stageStorytimeVoiceoverConsent(db, admission);
       const d = admission.dispatch;
       const created = await bridge({
         action: "create", ...identity, idempotencyKey: admission.idempotencyKey,
