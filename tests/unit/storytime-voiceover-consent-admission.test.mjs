@@ -4,13 +4,14 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8');
-const { stageStorytimeVoiceoverConsent, StorytimeVoiceoverAdmissionDenied } =
+const { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied } =
   await import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
 const input = () => ({
   userId:'synthetic-owner',sessionId:'session-a',narratorScriptId:'script-a',
   consentReceiptId:'stvc_synthetic-001',policyVersion:'storytime-voiceover-consent-v1',
   sourceConsentVersion:'story-generation-consent-v1',
-  narratorText:'Synthetic voiceover only.',createdAt:'2026-10-14T22:30:00.000Z'
+  narratorText:'Synthetic voiceover only.',createdAt:'2026-10-14T22:30:00.000Z',
+  idempotencyKey:'synthetic-replay-key-01', requestFingerprint:'a'.repeat(64)
 });
 const receiptPath='consentDecisionReceipts/stvc_synthetic-001';
 function fixture() {
@@ -27,7 +28,8 @@ function fixture() {
             assert.equal(writes.length,0,'reads must precede writes');
             reads.set(ref.path,versions.get(ref.path)||0);return snapshot(ref.path);
           },
-          create(ref,value) {writes.push([ref.path,value])}
+          create(ref,value) {writes.push([ref.path,value,false])},
+          update(ref,value) {writes.push([ref.path,value,true])}
         };
         const result=await callback(tx);
         const concurrent=observations.beforeCommit;observations.beforeCommit=null;
@@ -35,8 +37,9 @@ function fixture() {
         if([...reads].some(([path,v])=>(versions.get(path)||0)!==v)){
           observations.conflicts++;continue;
         }
-        for(const [path,value] of writes){
-          assert.equal(docs.has(path),false,'receipt must not overwrite');set(path,value);
+        for(const [path,value,merge] of writes){
+          if(!merge) assert.equal(docs.has(path),false,'receipt must not overwrite');
+          set(path,merge?{...(docs.get(path)||{}),...value}:value);
         }
         observations.commits++;return result;
       }
@@ -105,4 +108,44 @@ test('revocation racing the transaction commit forces retry and denial',async()=
   await assert.rejects(stageStorytimeVoiceoverConsent(h.db,input()),StorytimeVoiceoverAdmissionDenied);
   assert.equal(h.observations.conflicts,1);
   assert.equal(h.docs.has(receiptPath),false);
+});
+
+test('Jobs identity materializes job, export, event and reconciled intent atomically',async()=>{
+  const h=fixture(),arg=input();
+  await stageStorytimeVoiceoverConsent(h.db,arg);
+  const result=await completeStorytimeVoiceoverDispatch(h.db,{
+    ...arg,externalJobId:'synthetic-job-001',provider:'google',updatedAt:'later'
+  });
+  assert.equal(result.voiceoverJobId,'voiceoverJob_synthetic-job-001');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+arg.idempotencyKey).state,'queued');
+  assert.equal(h.docs.get('voiceoverJobs/'+result.voiceoverJobId).userId,arg.userId);
+  assert.equal(h.docs.get('storyExports/'+result.exportId).private,true);
+  assert.equal(h.docs.get('timelineReplayEvents/timelineReplayEvent_'+arg.idempotencyKey).userId,arg.userId);
+});
+test('idempotent replay does not duplicate local event or job metadata',async()=>{
+  const h=fixture(),arg=input(),completion={...arg,externalJobId:'synthetic-job-001',provider:'google',updatedAt:'later'};
+  await stageStorytimeVoiceoverConsent(h.db,arg);
+  const first=await completeStorytimeVoiceoverDispatch(h.db,completion);
+  const second=await completeStorytimeVoiceoverDispatch(h.db,completion);
+  assert.equal(first.reused,false);assert.equal(second.reused,true);
+  assert.equal([...h.docs.keys()].filter(x=>x.startsWith('voiceoverJobs/')).length,1);
+  assert.equal([...h.docs.keys()].filter(x=>x.startsWith('timelineReplayEvents/')).length,1);
+});
+test('uncertain remote dispatch records retryable state without losing receipt',async()=>{
+  const h=fixture(),arg=input();
+  await stageStorytimeVoiceoverConsent(h.db,arg);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,arg,{state:'reconciliation_required',updatedAt:'later'});
+  const intent=h.docs.get('storytimeVoiceoverDispatchIntents/'+arg.idempotencyKey);
+  assert.equal(intent.state,'reconciliation_required');
+  assert.equal(h.docs.get(receiptPath).decision,'authorized');
+});
+test('revoked consent after remote admission forbids local job materialization',async()=>{
+  const h=fixture(),arg=input();
+  await stageStorytimeVoiceoverConsent(h.db,arg);
+  const sess=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...sess,consentSnapshot:{...sess.consentSnapshot,voiceover:false}});
+  await assert.rejects(completeStorytimeVoiceoverDispatch(h.db,{
+    ...arg,externalJobId:'synthetic-job-001',provider:'google',updatedAt:'later'
+  }),StorytimeVoiceoverAdmissionDenied);
+  assert.equal([...h.docs.keys()].filter(x=>x.startsWith('voiceoverJobs/')).length,0);
 });

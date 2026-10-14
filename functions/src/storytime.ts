@@ -6,7 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
-import { stageStorytimeVoiceoverConsent, StorytimeVoiceoverAdmissionDenied } from "./storytime-voiceover-consent-admission.js";
+import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied } from "./storytime-voiceover-consent-admission.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
 import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit, type StoryOutputAuthority } from "./story-provider-spend.js";
@@ -1055,21 +1055,29 @@ export const prepareVoiceoverJob = onCall({
 
   const provider = input.provider === "elevenlabs" ? "elevenlabs" : "google";
   const createdAt = now();
+  const requestFingerprint = contentFingerprint(JSON.stringify({
+    userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
+    text: narratorText, provider, locale: input.locale,
+    voice: input.voice || null, voiceId: input.voiceId || null, format: "MP3"
+  }));
+  const admission = {
+    userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
+    policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
+    sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
+    narratorText, createdAt, idempotencyKey, requestFingerprint
+  };
   // Persist current, versioned source authority before any Jobs queue admission.
   try {
-    await stageStorytimeVoiceoverConsent(db, {
-      userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
-      policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
-      sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
-      narratorText, createdAt,
-    });
+    await stageStorytimeVoiceoverConsent(db, admission);
   } catch (error) {
     if (error instanceof StorytimeVoiceoverAdmissionDenied) {
       throw new HttpsError("failed-precondition", "Current Storytime voiceover consent or source authority is unavailable.");
     }
     throw error;
   }
-  const bridge = await storytimeJobsBridgeRequest({
+  let bridge: Record<string, unknown>;
+  try {
+    bridge = await storytimeJobsBridgeRequest({
     action: "create",
     userId,
     sessionId: input.sessionId,
@@ -1090,50 +1098,29 @@ export const prepareVoiceoverJob = onCall({
     }
   });
 
+  } catch (error) {
+    await markStorytimeVoiceoverDispatchUncertain(db, admission, {
+      state: "reconciliation_required", updatedAt: now()
+    });
+    throw error;
+  }
   const externalJobId = typeof bridge.jobId === "string" ? bridge.jobId : "";
   if (!externalJobId) {
     throw new HttpsError("unavailable", "Narrator worker did not return a job identifier.");
   }
 
-  const voiceoverJobId = `voiceoverJob_${externalJobId}`;
-  const exportId = `storyExport_${externalJobId}`;
-  const timelineEventId = id("timelineReplayEvent");
-  const batch = db.batch();
-  batch.set(db.collection("voiceoverJobs").doc(voiceoverJobId), {
-    id: voiceoverJobId,
-    userId,
-    sessionId: input.sessionId,
-    narratorScriptId,
-    provider,
-    externalSystem: "urai-jobs",
-    externalJobId,
-    consentReceiptId,
-    status: "queued",
-    createdAt,
-    updatedAt: createdAt
-  });
-  batch.set(db.collection("storyExports").doc(exportId), {
-    id: exportId,
-    userId,
-    sessionId: input.sessionId,
-    voiceoverJobId,
-    externalJobId,
-    exportType: "voiceover",
-    status: "queued",
-    private: true,
-    createdAt,
-    updatedAt: createdAt
-  });
-  batch.set(db.collection("timelineReplayEvents").doc(timelineEventId), {
-    id: timelineEventId,
-    userId,
-    sessionId: input.sessionId,
-    eventType: "voiceover_queued",
-    voiceoverJobId,
-    externalJobId,
-    createdAt
-  });
-  await batch.commit();
+  let materialized;
+  try {
+    materialized = await completeStorytimeVoiceoverDispatch(db, {
+      ...admission, externalJobId, provider, updatedAt: now()
+    });
+  } catch (error) {
+    await markStorytimeVoiceoverDispatchUncertain(db, admission, {
+      state: "reconciliation_required", externalJobId, updatedAt: now()
+    });
+    throw error;
+  }
+  const { voiceoverJobId, exportId } = materialized;
 
   auditLog({ event: "voiceover_job_queued", userId, sessionId: input.sessionId, provider });
   return {

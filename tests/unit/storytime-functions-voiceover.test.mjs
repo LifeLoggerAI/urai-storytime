@@ -52,3 +52,11 @@ test('source consent commits before governed narrator dispatch', () => {
   assert.doesNotMatch(prepare, /batch\.set\(consentRef/);
   assert.match(admission, /receipt\.decision !== "authorized"/);
 });
+
+test('narrator dispatch is locally recoverable and binds metadata transactionally', () => {
+  const prepare=source.slice(source.indexOf('export const prepareVoiceoverJob'),source.indexOf('export const manageVoiceoverJob'));
+  assert.match(prepare,/await stageStorytimeVoiceoverConsent\(db, admission\)/);
+  assert.match(prepare,/await completeStorytimeVoiceoverDispatch\(db/);
+  assert.match(prepare,/markStorytimeVoiceoverDispatchUncertain\(db, admission/);
+  assert.doesNotMatch(prepare,/batch\.set\(db\.collection\("voiceoverJobs"/);
+});
