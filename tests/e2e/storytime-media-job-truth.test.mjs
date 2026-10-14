@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const index = fs.readFileSync('functions/src/index.ts', 'utf8');
 const functions = fs.readFileSync('functions/src/storytime.ts', 'utf8');
+const narratorAdmission = fs.readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8');
 const narrator = fs.readFileSync('functions/src/generate-narrator-script.ts', 'utf8');
 const arc = fs.readFileSync('functions/src/generate-emotional-arc-summary.ts', 'utf8');
 const weekly = fs.readFileSync('functions/src/generate-weekly-story-scroll.ts', 'utf8');
@@ -15,10 +16,10 @@ test('voiceover queue is consumed by the governed Jobs bridge and exported as a 
   assert.match(index, /prepareVoiceoverJob/);
   assert.match(index, /manageVoiceoverJob/);
   assert.match(functions, /storytimeJobsBridgeRequest/);
-  assert.match(functions, /externalSystem: "urai-jobs"/);
-  assert.match(functions, /voiceoverJobs/);
-  assert.match(functions, /storyExports/);
-  assert.match(functions, /private: true/);
+  assert.match(narratorAdmission, /externalSystem: "urai-jobs"/);
+  assert.match(narratorAdmission, /voiceoverJobs/);
+  assert.match(narratorAdmission, /storyExports/);
+  assert.match(narratorAdmission, /private: true/);
   assert.match(functions, /delete-output/);
   assert.doesNotMatch(functions, /media_worker_not_implemented/);
 });

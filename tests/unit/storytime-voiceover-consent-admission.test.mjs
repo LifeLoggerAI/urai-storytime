@@ -225,3 +225,71 @@ test('revoked source with known remote identity requires cancellation, not reaut
   assert.equal(calls[0].action,'cancel');
   assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancelled');
 });
+
+test('expired recovery lease can be reclaimed, but stale worker cannot settle it', async () => {
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const first=await claimStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,t,'worker-a');
+  assert.ok(first?.token);
+  assert.equal(await claimStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,t+60_000,'worker-b'),null);
+  const second=await claimStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,t+120_001,'worker-b');
+  assert.ok(second?.token);
+  assert.notEqual(first.token,second.token);
+  assert.equal(await settleStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,first.token,t+120_001,'reconciliation_required','bridge_unavailable'),false);
+  assert.equal(await settleStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,second.token,t+120_001,'reconciliation_required','bridge_unavailable'),true);
+});
+test('five failed remote attempts escalate without a sixth provider call', async () => {
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  let attempts=0;
+  for(let i=0;i<5;i++) {
+    assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{
+      attempts++; throw new Error('synthetic-outage');
+    },t+i*3_600_000,'worker-a'),'retry');
+  }
+  const state=h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey);
+  assert.equal(attempts,5);
+  assert.equal(state.state,'operator_reconciliation_required');
+  assert.equal(state.lastErrorCode,'retry_limit_reached');
+  assert.equal(state.nextAttemptAt,null);
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{
+    throw Error('unexpected sixth call');
+  },t+6*3_600_000),'skipped');
+});
+test('failed cancellation is retried and later completes after downstream recovery', async () => {
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:'synthetic-job-001',updatedAt:a.createdAt
+  });
+  const sess=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...sess,consentSnapshot:{...sess.consentSnapshot,voiceover:false}});
+  let attempts=0;
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{
+    attempts++;throw new Error('synthetic-cancel-outage');
+  },t),'retry');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    attempts++;assert.equal(body.action,'cancel');return {ok:true,job:{status:'CANCELLED'}};
+  },t+61_000),'cancelled');
+  assert.equal(attempts,2);
+});
+test('consent revoked immediately after lease prevents remote create', async () => {
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const real=h.db.runTransaction;let txCount=0;
+  h.db.runTransaction=async callback=>{
+    const result=await real(callback);
+    if(++txCount===1) {
+      const sess=h.docs.get('storySessions/session-a');
+      h.set('storySessions/session-a',{...sess,consentSnapshot:{...sess.consentSnapshot,voiceover:false}});
+    }
+    return result;
+  };
+  let remote=0;
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{
+    remote++;return {jobId:'synthetic-job-001'};
+  },t),'needs_review');
+  assert.equal(remote,0);
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'operator_reconciliation_required');
+});

@@ -1064,7 +1064,12 @@ export const prepareVoiceoverJob = onCall({
     userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
     policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
     sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
-    narratorText, createdAt, idempotencyKey, requestFingerprint
+    narratorText, createdAt, idempotencyKey, requestFingerprint,
+    dispatch: {
+      provider, locale: input.locale, voice: input.voice || null,
+      voiceId: input.voiceId || null,
+      textSha256: createHash("sha256").update(narratorText).digest("hex")
+    }
   };
   // Persist current, versioned source authority before any Jobs queue admission.
   try {

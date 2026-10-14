@@ -10,6 +10,7 @@ const cloudSession = read('src/components/storytime/CloudSession.tsx');
 const shareStory = read('src/components/storytime/ShareStory.tsx');
 const shareControls = read('src/components/storytime/ShareControls.tsx');
 const functions = read('functions/src/storytime.ts');
+const narratorAdmission = read('functions/src/storytime-voiceover-consent-admission.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const functionsIndex = read('functions/src/index.ts');
 const provider = read('functions/src/story-provider.ts');
@@ -163,16 +164,16 @@ test('voiceover media execution stays fail-closed behind the governed Jobs bridg
     'URAI_STORYTIME_JOBS_BRIDGE_TOKEN',
     'URAI_STORYTIME_JOBS_BRIDGE_URL',
     'storytime.voiceover',
-    'consentDecisionReceipts',
-    'externalSystem: "urai-jobs"',
-    'voiceoverJobs',
-    'storyExports',
     'delete-output'
+  ]);
+  includesAll(narratorAdmission, [
+    'consentDecisionReceipts', 'externalSystem: "urai-jobs"',
+    'voiceoverJobs', 'storyExports', 'private: true'
   ]);
 
   assert.match(functions, /if \(!token\) throw new HttpsError\("failed-precondition"/);
   assert.match(functions, /NODE_ENV === "production" && !value\.startsWith\("https:\/\/"\)/);
-  assert.match(functions, /private: true/);
+  assert.match(narratorAdmission, /private: true/);
   assert.doesNotMatch(functions, /media_worker_not_implemented/);
   assert.doesNotMatch(functions, /voiceover_execution_blocked/);
   assert.doesNotMatch(functions, /ELEVENLABS_API_KEY|GOOGLE_TTS_CREDENTIAL|providerApiKey/);

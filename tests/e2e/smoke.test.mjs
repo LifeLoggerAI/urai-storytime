@@ -22,6 +22,7 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const narratorAdmission = read('functions/src/storytime-voiceover-consent-admission.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const auditLog = read('functions/src/audit-log.ts');
 const functionsIndex = read('functions/src/index.ts');
@@ -189,8 +190,8 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(weeklyFunction, /status: "completed"/);
   assert.match(functions, /URAI_STORYTIME_JOBS_BRIDGE_TOKEN/);
   assert.match(functions, /storytimeJobsBridgeRequest/);
-  assert.match(functions, /consentDecisionReceipts/);
-  assert.match(functions, /externalSystem: "urai-jobs"/);
+  assert.match(narratorAdmission, /consentDecisionReceipts/);
+  assert.match(narratorAdmission, /externalSystem: "urai-jobs"/);
   assert.match(functions, /export const manageVoiceoverJob/);
   assert.match(functionsIndex, /prepareVoiceoverJob/);
   assert.match(functionsIndex, /manageVoiceoverJob/);
