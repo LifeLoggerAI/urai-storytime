@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8');
-const { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied } =
+const { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, claimStorytimeVoiceoverRecovery, settleStorytimeVoiceoverRecovery, recoverStorytimeVoiceoverIntent, StorytimeVoiceoverAdmissionDenied } =
   await import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
 const input = () => ({
   userId:'synthetic-owner',sessionId:'session-a',narratorScriptId:'script-a',
@@ -150,4 +150,78 @@ test('revoked consent after remote admission forbids local job materialization',
     ...arg,externalJobId:'synthetic-job-001',provider:'google',updatedAt:'later'
   }),StorytimeVoiceoverAdmissionDenied);
   assert.equal([...h.docs.keys()].filter(x=>x.startsWith('voiceoverJobs/')).length,0);
+});
+
+
+test('automatic recovery recreates a missing remote job and its local records',async()=>{
+  const h=fixture(),a=input(),calls=[];
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const outcome=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls.push(body);
+    return {ok:true,jobId:'synthetic-job-001'};
+  },Date.parse('2026-10-14T22:31:00Z'),'worker-a');
+  assert.equal(outcome,'queued');
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].idempotencyKey,a.idempotencyKey);
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'queued');
+  assert.equal(h.docs.get('voiceoverJobs/voiceoverJob_synthetic-job-001').userId,a.userId);
+});
+test('leased outbox cannot be claimed by a competing recovery worker',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const first=await claimStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,t,'worker-a');
+  assert.ok(first?.token);
+  assert.equal(await claimStorytimeVoiceoverRecovery(h.db,a.idempotencyKey,t,'worker-b'),null);
+});
+test('network timeout after remote Jobs persistence retries same idempotency identity',async()=>{
+  const h=fixture(),a=input(),calls=[];
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const t=Date.parse('2026-10-14T22:31:00Z');
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls.push(body);throw new Error('network-timeout');
+  },t,'worker-a'),'retry');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'reconciliation_required');
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls.push(body);return {ok:true,jobId:'synthetic-job-001'};
+  },t+61_000,'worker-b'),'queued');
+  assert.equal(calls[0].idempotencyKey,calls[1].idempotencyKey);
+  assert.equal([...h.docs.keys()].filter(x=>x.startsWith('voiceoverJobs/')).length,1);
+});
+test('revoked source during leased recovery prevents remote creation',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const prior=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...prior,consentSnapshot:{...prior.consentSnapshot,voiceover:false}});
+  let calls=0;
+  const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{calls++;return {jobId:'synthetic-job-001'}},t);
+  assert.equal(result,'skipped');
+  assert.equal(calls,0);
+});
+test('known remote identity can be materialized without dispatching duplicate remote work',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:'synthetic-job-001',updatedAt:a.createdAt
+  });
+  let calls=0;
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{calls++;return {}},t),'queued');
+  assert.equal(calls,0);
+  assert.equal(h.docs.get('voiceoverJobs/voiceoverJob_synthetic-job-001').externalJobId,'synthetic-job-001');
+});
+test('revoked source with known remote identity requires cancellation, not reauthorization',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:'synthetic-job-001',updatedAt:a.createdAt
+  });
+  const sess=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...sess,consentSnapshot:{...sess.consentSnapshot,voiceover:false}});
+  const calls=[];
+  const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls.push(body);return {ok:true,job:{status:'CANCELLED'}};
+  },t);
+  assert.equal(result,'cancelled');
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].action,'cancel');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancelled');
 });
