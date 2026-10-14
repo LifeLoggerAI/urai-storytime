@@ -43,7 +43,7 @@ export async function fetchAuthorizedStorytimeExport(args: {
     throw new Error("The export is unavailable. Confirm current account and export authority or create a new request.");
   }
   const declared = response.headers.get("content-length");
-  if (declared !== null && (!/^\\d+$/.test(declared) || !Number.isSafeInteger(Number(declared))
+  if (declared !== null && (!/^\d+$/.test(declared) || !Number.isSafeInteger(Number(declared))
     || Number(declared) > STORYTIME_EXPORT_BROWSER_MAX_BYTES)) {
     await response.body.cancel().catch(() => undefined);
     throw new Error("The private export exceeds the safe browser size limit. Request a governed larger export.");
@@ -62,7 +62,7 @@ export async function fetchAuthorizedStorytimeExport(args: {
       }
       if (next.done) break;
       size += next.value.byteLength;
-      if (size > STORYTIME_EXPORT_BROWSER_MAX_BYTES) {
+      if (size > STORYTIME_EXPORT_BROWSER_MAX_BYTES || (declared !== null && size > Number(declared))) {
         throw new Error("The private export exceeds the safe browser size limit. Request a governed larger export.");
       }
       chunks.push(next.value);
@@ -74,6 +74,9 @@ export async function fetchAuthorizedStorytimeExport(args: {
     reader.releaseLock();
   }
   if (!size) throw new Error("The private export contains no bytes.");
+  if (declared !== null && size !== Number(declared)) {
+    throw new Error("The private export is incomplete or inconsistent with the declared length.");
+  }
   const bytes = new Uint8Array(size);
   let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }

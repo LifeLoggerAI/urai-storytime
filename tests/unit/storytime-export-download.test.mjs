@@ -48,6 +48,34 @@ test('wrong package digest is rejected after authenticated response', async () =
   await assert.rejects(fetchAuthorizedStorytimeExport({ authorization: authorization(), projectId: 'urai-storytime-test',
     isCurrentAccount: () => true, getIdToken: async () => 'synthetic', fetcher: async () => new Response('{"changed":true}', { headers: { 'content-type': 'application/json' } }) }), /integrity/);
 });
+test('valid numeric Content-Length is accepted for an intact authorized export', async () => {
+  const blob = await fetchAuthorizedStorytimeExport({
+    authorization: authorization(), projectId: 'urai-storytime-test',
+    isCurrentAccount: () => true, getIdToken: async () => 'synthetic',
+    fetcher: async () => new Response(body, { headers: {
+      'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body))
+    } })
+  });
+  assert.equal(await blob.text(), body);
+});
+
+for (const [caseName, declared] of [
+  ['malformed declared length', 'not-an-integer'],
+  ['oversized declared length', String(128 * 1024 * 1024 + 1)],
+  ['body longer than declared length', '1'],
+  ['body shorter than declared length', String(Buffer.byteLength(body) + 100)]
+]) {
+  test(caseName + ' refuses a private export even with valid matching package hash', async () => {
+    await assert.rejects(fetchAuthorizedStorytimeExport({
+      authorization: authorization(), projectId: 'urai-storytime-test',
+      isCurrentAccount: () => true, getIdToken: async () => 'synthetic',
+      fetcher: async () => new Response(body, { headers: {
+        'content-type': 'application/json', 'content-length': declared
+      } })
+    }), /safe browser size limit|incomplete|inconsistent/);
+  });
+}
+
 test('a browser auth epoch change withholds an export even when the owner identity is unchanged', async () => {
  let current = true;
  await assert.rejects(fetchAuthorizedStorytimeExport({ authorization: authorization(), projectId: 'urai-storytime-test',
