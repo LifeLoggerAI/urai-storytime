@@ -21,6 +21,7 @@ test('browser narrator adapter posts only the nonsecret descriptor to the pinned
   assert.deepEqual(JSON.parse(observed.options.body), { voiceoverJobId: 'voiceover-a', delivery: d });
   assert.equal(observed.options.redirect, 'error'); assert.equal(observed.options.cache, 'no-store');
   assert.equal(observed.options.credentials, 'omit'); assert.equal(observed.options.referrerPolicy, 'no-referrer');
+  assert.ok(observed.options.signal instanceof AbortSignal, 'audio download must have a bounded abort signal');
   assert.equal(observed.options.body.includes('BRIDGE_TOKEN'), false);
 });
 
@@ -44,4 +45,57 @@ test('a browser auth epoch change during audio delivery withholds the downloaded
  await assert.rejects(fetchAuthorizedStorytimeNarrator({ projectId: 'urai-storytime-test', voiceoverJobId: 'voiceover-a', delivery: descriptor(),
   getIdToken: async () => 'synthetic-firebase-token', isCurrentAccount: () => current,
   fetcher: async () => { current = false; return new Response('synthetic-audio', { headers: { 'content-type': 'audio/ogg' } }); } }));
+});
+
+
+test('valid numeric audio length accepts an intact private response', async () => {
+  const body = 'synthetic-audio';
+  const blob = await fetchAuthorizedStorytimeNarrator({ projectId: 'urai-storytime-test', voiceoverJobId: 'voiceover-a',
+    delivery: descriptor(), getIdToken: async () => 'synthetic', isCurrentAccount: () => true,
+    fetcher: async () => new Response(body, { headers: {
+      'content-type': 'audio/mpeg', 'content-length': String(Buffer.byteLength(body))
+    } }) });
+  assert.equal(await blob.text(), body);
+});
+
+for (const [caseName, declared] of [
+  ['malformed length', 'invalid'],
+  ['oversized declaration', String(64 * 1024 * 1024 + 1)],
+  ['shorter declaration than bytes', '1'],
+  ['truncated body', '999']
+]) {
+  test(caseName + ' rejects protected narrator audio before returning any blob', async () => {
+    await assert.rejects(fetchAuthorizedStorytimeNarrator({
+      projectId: 'urai-storytime-test', voiceoverJobId: 'voiceover-a', delivery: descriptor(),
+      getIdToken: async () => 'synthetic', isCurrentAccount: () => true,
+      fetcher: async () => new Response('synthetic-audio', { headers: {
+        'content-type': 'audio/ogg', 'content-length': declared
+      } })
+    }), /safe browser|incomplete|inconsistent/);
+  });
+}
+
+test('account changing after the first audio chunk denies remaining private audio', async () => {
+  let current = true, polls = 0;
+  const byte = new TextEncoder();
+  await assert.rejects(fetchAuthorizedStorytimeNarrator({
+    projectId: 'urai-storytime-test', voiceoverJobId: 'voiceover-a', delivery: descriptor(),
+    getIdToken: async () => 'synthetic', isCurrentAccount: () => current,
+    fetcher: async () => new Response(new ReadableStream({
+      pull(controller) {
+        polls++;
+        if (polls === 1) { controller.enqueue(byte.encode('first')); return; }
+        current = false; controller.enqueue(byte.encode('second')); controller.close();
+      }
+    }, { highWaterMark: 0 }), { headers: { 'content-type': 'audio/mpeg' } })
+  }), /account|authority/);
+  assert.ok(polls >= 1);
+});
+
+test('empty successful narrator audio response is never accepted', async () => {
+  await assert.rejects(fetchAuthorizedStorytimeNarrator({
+    projectId: 'urai-storytime-test', voiceoverJobId: 'voiceover-a', delivery: descriptor(),
+    getIdToken: async () => 'synthetic', isCurrentAccount: () => true,
+    fetcher: async () => new Response('', { headers: { 'content-type': 'audio/mpeg' } })
+  }), /incomplete/);
 });
