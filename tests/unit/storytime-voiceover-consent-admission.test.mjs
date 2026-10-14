@@ -11,7 +11,9 @@ const input = () => ({
   consentReceiptId:'stvc_synthetic-001',policyVersion:'storytime-voiceover-consent-v1',
   sourceConsentVersion:'story-generation-consent-v1',
   narratorText:'Synthetic voiceover only.',createdAt:'2026-10-14T22:30:00.000Z',
-  idempotencyKey:'synthetic-replay-key-01', requestFingerprint:'a'.repeat(64)
+  idempotencyKey:'synthetic-replay-key-01', requestFingerprint:'a'.repeat(64),
+  dispatch:{provider:'google',locale:'en-US',voice:null,voiceId:null,
+    textSha256:'eb8af340c3371daf20f751621696c6a3072bf475bcc703888908d7b0e8bd4f28'}
 });
 const receiptPath='consentDecisionReceipts/stvc_synthetic-001';
 function fixture() {

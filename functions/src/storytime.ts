@@ -100,7 +100,7 @@ export function storytimeJobsBridgeToken() {
   }
 }
 
-async function storytimeJobsBridgeRequest(body: Record<string, unknown>) {
+export async function storytimeJobsBridgeRequest(body: Record<string, unknown>) {
   const token = storytimeJobsBridgeToken();
   if (!token) throw new HttpsError("failed-precondition", "Storytime narrator worker bridge authorization is not configured.");
   const controller = new AbortController();

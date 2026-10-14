@@ -44,3 +44,5 @@ export { saveStoryDraft, deleteStoryDraft } from "./story-drafts.js";
 
 export { saveStoryRevision, restoreStoryVersion, listStoryVersions } from "./story-versioning.js";
 export { deliverStorytimeVoiceover } from "./storytime-voiceover-delivery.js";
+
+export { reconcileStorytimeNarratorDispatches } from "./storytime-narrator-reconciliation.js";

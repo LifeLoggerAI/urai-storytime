@@ -28,10 +28,10 @@ test('prepareVoiceoverJob queues the governed Jobs narrator worker instead of a 
   assert.match(source, /storytimeJobsBridgeRequest/);
   assert.match(source, /URAI_STORYTIME_JOBS_BRIDGE_TOKEN/);
   assert.match(source, /URAI_STORYTIME_JOBS_BRIDGE_URL/);
-  assert.match(source, /externalSystem: "urai-jobs"/);
+  assert.match(admission, /externalSystem: "urai-jobs"/);
   assert.match(source, /externalJobId/);
-  assert.match(source, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
-  assert.match(source, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
+  assert.match(admission, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
+  assert.match(admission, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
   assert.doesNotMatch(source, /media_worker_not_implemented/);
   assert.doesNotMatch(source, /voiceover_execution_blocked/);
 });
@@ -47,7 +47,7 @@ test('voiceover lifecycle exposes bounded status cancel playback and deletion th
 test('source consent commits before governed narrator dispatch', () => {
   const prepare = source.slice(source.indexOf('export const prepareVoiceoverJob'), source.indexOf('export const manageVoiceoverJob'));
   const staged = prepare.indexOf('await stageStorytimeVoiceoverConsent(db');
-  const dispatched = prepare.indexOf('const bridge = await storytimeJobsBridgeRequest(');
+  const dispatched = prepare.indexOf('bridge = await storytimeJobsBridgeRequest(');
   assert.ok(staged >= 0 && dispatched > staged);
   assert.doesNotMatch(prepare, /batch\.set\(consentRef/);
   assert.match(admission, /receipt\.decision !== "authorized"/);
