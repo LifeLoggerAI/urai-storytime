@@ -503,3 +503,56 @@ test('remote deletion followed by transient local commit failure remains retryab
   assert.equal(h.docs.get(key).lastErrorCode,null);
   assert.equal(h.docs.get('voiceoverJobs/voiceoverJob_'+remote).status,'output_deleted');
 });
+
+test('late Jobs acknowledgment cannot materialize a cancelled or leased Storytime intent',async()=>{
+  for(const state of ['cancel_required','cancelling']){
+    const h=fixture(),a=input(),remote='synthetic-job-001';
+    await stageStorytimeVoiceoverConsent(h.db,a);
+    const path='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+    h.set(path,{...h.docs.get(path),state,externalJobId:remote});
+    await assert.rejects(completeStorytimeVoiceoverDispatch(h.db,{
+      ...a,externalJobId:remote,provider:'google',updatedAt:'late'
+    }),StorytimeVoiceoverAdmissionDenied);
+    assert.equal(h.docs.get(path).state,state);
+    assert.equal(h.docs.has('voiceoverJobs/voiceoverJob_'+remote),false);
+    assert.equal(h.docs.has('storyExports/storyExport_'+remote),false);
+  }
+});
+
+test('concurrent cancellation wins over late Jobs response after transaction conflict',async()=>{
+  const h=fixture(),a=input(),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const path='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  h.observations.beforeCommit=()=>{
+    h.set(path,{...h.docs.get(path),state:'cancel_required',externalJobId:remote});
+  };
+  await assert.rejects(completeStorytimeVoiceoverDispatch(h.db,{
+    ...a,externalJobId:remote,provider:'google',updatedAt:'late'
+  }),StorytimeVoiceoverAdmissionDenied);
+  assert.equal(h.observations.conflicts,1);
+  assert.equal(h.docs.get(path).state,'cancel_required');
+  assert.equal(h.docs.has('voiceoverJobs/voiceoverJob_'+remote),false);
+});
+
+test('idempotent completion refuses a tombstoned private output',async()=>{
+  const h=fixture(),a=input(),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const completion={...a,externalJobId:remote,provider:'google',updatedAt:'later'};
+  const first=await completeStorytimeVoiceoverDispatch(h.db,completion);
+  const job='voiceoverJobs/'+first.voiceoverJobId;
+  h.set(job,{...h.docs.get(job),status:'output_deleted',outputDeletedAt:'synthetic-time'});
+  await assert.rejects(completeStorytimeVoiceoverDispatch(h.db,completion),StorytimeVoiceoverAdmissionDenied);
+  assert.equal(h.docs.get(job).status,'output_deleted');
+});
+
+test('late cancel request cannot downgrade active cancellation lease',async()=>{
+  const h=fixture(),a=input(),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  const path='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  h.set(path,{...h.docs.get(path),state:'cancelling',externalJobId:remote,leaseToken:'worker-token'});
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:'late'
+  });
+  assert.equal(h.docs.get(path).state,'cancelling');
+  assert.equal(h.docs.get(path).leaseToken,'worker-token');
+});
