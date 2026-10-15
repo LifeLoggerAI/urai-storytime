@@ -271,7 +271,10 @@ test('failed cancellation is retried and later completes after downstream recove
   },t),'retry');
   assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
   assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
-    attempts++;assert.equal(body.action,'cancel');return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}};
+    attempts++;
+    if (body.action === 'cancel') return {ok:true,job:{status:'CANCELLED'}};
+    assert.equal(body.action, 'delete-output');
+    return {ok:true,deletion:{deleted:true}};
   },t+61_000),'cancelled');
   assert.equal(attempts,3);
 });
