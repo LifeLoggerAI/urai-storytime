@@ -7,6 +7,7 @@ const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 const home = read('src/components/storytime/StorytimeHome.tsx');
 const functions = read('functions/src/storytime.ts');
 const provider = read('functions/src/story-provider.ts');
+const spend = read('functions/src/story-provider-spend.ts');
 const index = read('functions/src/index.ts');
 
 test('Storytime requires explicit adult/guardian and generation/provider consent', () => {
@@ -41,17 +42,21 @@ test('server enforces canonical audience, operator, consent version and idempote
 test('provider execution is bounded, age-aware and post-checked without leaking raw provider bodies', () => {
   for (const marker of [
     'audienceInstruction(input.audienceAgeBand)',
-    'new AbortController()',
-    '20_000',
+    'executeProtectedStoryProvider',
     'assertProviderOutputSafe(output)',
     'Story provider request failed with status'
   ]) {
     assert.match(provider, new RegExp(marker.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&')));
   }
+  assert.match(spend, /new AbortController\(\)/);
+  assert.match(spend, /runtime <= 20/);
+  assert.match(spend, /await decode\(response\); current\(\)/);
+  assert.match(spend, /signal: controller\.signal/);
   assert.doesNotMatch(provider, /response\.text\(\)/);
   assert.match(functions, /providerOutputText\(generated\)/);
   assert.match(functions, /generation_blocked_output_safety/);
-  assert.match(functions, /Story generation could not be completed safely/);
+  assert.match(functions, /Story generation could not be confirmed safely/);
+  assert.match(functions, /do not submit a replacement request/);
 });
 
 test('only the hardened public-share lifecycle is exported', () => {

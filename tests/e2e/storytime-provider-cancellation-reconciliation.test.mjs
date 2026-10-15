@@ -17,7 +17,7 @@ test("generation cancellation is owner-authenticated and blocks completed result
 });
 
 test("cancelled provider output is never persisted as a story", () => {
-  const providerCall = storytime.indexOf("generateStoryWithProvider(providerInput)");
+  const providerCall = storytime.indexOf("generateStoryWithProvider(providerInput,");
   const cancellationCheck = storytime.indexOf("isGenerationCancellationRequested(userId, input.requestId)", providerCall);
   const storyBatch = storytime.indexOf('db.collection("storySessions").doc(sessionId)', cancellationCheck);
   assert.ok(providerCall > -1);

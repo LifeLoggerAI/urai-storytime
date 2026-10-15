@@ -23,7 +23,7 @@ function routine({ session, moderation, denied = false }) {
     },
     sessionScalarCollections: [],
     sessionArrayCollections: [],
-    listByField: async (...query) => { queries.push(query); return moderation; },
+    listByField: async (collection, field, value) => { queries.push([collection, field, value]); return moderation; },
     listByArrayContains: async () => [],
     db: { collection: () => { throw new Error('unexpected datastore lookup'); } },
   });

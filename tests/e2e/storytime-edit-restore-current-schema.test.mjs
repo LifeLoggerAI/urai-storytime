@@ -25,8 +25,8 @@ test('restore creates another immutable version and never mutates target history
   assert.match(backend, /restoreStoryVersion/);
   assert.match(backend, /reason: "restored_version"/);
   assert.match(backend, /restoredFromVersionId: input\.targetVersionId/);
-  assert.match(backend, /batch\.set\(versionRef, record\)/);
-  assert.doesNotMatch(backend, /batch\.update\(target\.ref/);
+  assert.match(backend, /transaction\.create\(versionRef, record\)/);
+  assert.doesNotMatch(backend, /transaction\.update\(target\.ref/);
 });
 
 test('edit and restore are provider-free and audited', () => {
@@ -53,3 +53,4 @@ test('version documents remain client immutable', () => {
   assert.match(block, /allow read: if ownerOnlyReadWrite\(resource\.data\.userId\)/);
   assert.match(block, /allow create, update, delete: if false/);
 });
+

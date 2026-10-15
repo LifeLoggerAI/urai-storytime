@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync('functions/src/storytime.ts', 'utf8');
 const index = fs.readFileSync('functions/src/index.ts', 'utf8');
+const admission = fs.readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8');
 
 test('prepareVoiceoverJob validates request shape and auth-owned source records', () => {
   assert.match(source, /const PrepareVoiceoverJobSchema = z\.object/);
@@ -17,9 +18,9 @@ test('prepareVoiceoverJob validates request shape and auth-owned source records'
 test('prepareVoiceoverJob binds explicit voiceover consent to a durable receipt', () => {
   assert.match(source, /consentSnapshot\?\.voiceover !== true/);
   assert.match(source, /STORYTIME_VOICEOVER_CONSENT_VERSION/);
-  assert.match(source, /consentDecisionReceipts/);
-  assert.match(source, /purpose: "storytime\.voiceover"/);
-  assert.match(source, /decision: "authorized"/);
+  assert.match(admission, /consentDecisionReceipts/);
+  assert.match(admission, /purpose: "storytime\.voiceover"/);
+  assert.match(admission, /decision: "authorized"/);
   assert.match(source, /decisionReceiptId: consentReceiptId/);
 });
 
@@ -27,10 +28,10 @@ test('prepareVoiceoverJob queues the governed Jobs narrator worker instead of a 
   assert.match(source, /storytimeJobsBridgeRequest/);
   assert.match(source, /URAI_STORYTIME_JOBS_BRIDGE_TOKEN/);
   assert.match(source, /URAI_STORYTIME_JOBS_BRIDGE_URL/);
-  assert.match(source, /externalSystem: "urai-jobs"/);
+  assert.match(admission, /externalSystem: "urai-jobs"/);
   assert.match(source, /externalJobId/);
-  assert.match(source, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
-  assert.match(source, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
+  assert.match(admission, /db\.collection\("voiceoverJobs"\)\.doc\(voiceoverJobId\)/);
+  assert.match(admission, /db\.collection\("storyExports"\)\.doc\(exportId\)/);
   assert.doesNotMatch(source, /media_worker_not_implemented/);
   assert.doesNotMatch(source, /voiceover_execution_blocked/);
 });
@@ -41,4 +42,21 @@ test('voiceover lifecycle exposes bounded status cancel playback and deletion th
   assert.match(source, /export const manageVoiceoverJob = onCall/);
   assert.match(source, /Voiceover job is missing governed worker binding/);
   assert.match(index, /manageVoiceoverJob/);
+});
+
+test('source consent commits before governed narrator dispatch', () => {
+  const prepare = source.slice(source.indexOf('export const prepareVoiceoverJob'), source.indexOf('export const manageVoiceoverJob'));
+  const staged = prepare.indexOf('await stageStorytimeVoiceoverConsent(db');
+  const dispatched = prepare.indexOf('bridge = await storytimeJobsBridgeRequest(');
+  assert.ok(staged >= 0 && dispatched > staged);
+  assert.doesNotMatch(prepare, /batch\.set\(consentRef/);
+  assert.match(admission, /receipt\.decision !== "authorized"/);
+});
+
+test('narrator dispatch is locally recoverable and binds metadata transactionally', () => {
+  const prepare=source.slice(source.indexOf('export const prepareVoiceoverJob'),source.indexOf('export const manageVoiceoverJob'));
+  assert.match(prepare,/await stageStorytimeVoiceoverConsent\(db, admission\)/);
+  assert.match(prepare,/await completeStorytimeVoiceoverDispatch\(db/);
+  assert.match(prepare,/markStorytimeVoiceoverDispatchUncertain\(db, admission/);
+  assert.doesNotMatch(prepare,/batch\.set\(db\.collection\("voiceoverJobs"/);
 });

@@ -137,6 +137,18 @@ jobs:
           set -euo pipefail
           npm --prefix functions run build 2>&1 | tee /tmp/storytime-functions-build.log
 
+      - name: Verify compiled deletion recovery and retained privacy contracts
+        env:
+          STORYTIME_PRIVACY_CONTRACT_SOURCE: functions/lib/privacy-execution.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test --test-concurrency=1 \
+            tests/e2e/storytime-deletion-recovery.test.mjs \
+            tests/e2e/storytime-private-version-privacy.test.mjs \
+            tests/e2e/privacy-account-ledger-inventory.test.mjs \
+            2>&1 | tee /tmp/storytime-functions-deletion-recovery.log
+
       - name: Upload exact-head Functions evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -145,6 +157,7 @@ jobs:
           path: |
             /tmp/storytime-functions-install.log
             /tmp/storytime-functions-build.log
+            /tmp/storytime-functions-deletion-recovery.log
           if-no-files-found: warn
           retention-days: 90
 
@@ -197,3 +210,4 @@ jobs:
       - run: node scripts/validate-live-production-config.mjs
       - run: npm run test:production-evidence
       - run: npm run test:production-smoke
+

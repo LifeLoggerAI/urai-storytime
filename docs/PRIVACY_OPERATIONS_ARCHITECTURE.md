@@ -2,7 +2,7 @@
 
 ## Current State
 
-Storytime now has a bounded source implementation for privacy requests, private export packaging, short-lived signed export retrieval, deletion dry-run planning, admin-only destructive execution, and post-delete verification.
+Storytime now has a bounded source implementation for privacy requests, private export packaging, authenticated export delivery, deletion dry-run planning, admin-only destructive execution, and post-delete verification.
 
 This is **not production certification**. Runtime completion still depends on exact-head CI, isolated Firebase staging/production authority, authenticated emulator/staging proof, reviewed retention/legal-hold policy, and cross-system provider/media cleanup evidence.
 
@@ -20,7 +20,7 @@ This is **not production certification**. Runtime completion still depends on ex
 3. Sensitive secret/token-style fields are scrubbed.
 4. The JSON package and integrity manifest are written to private Storage.
 5. An operation receipt records package and manifest hashes; the privacy request itself is marked complete only when no export blockers remain.
-6. The owner may request a short-lived signed URL through `getStorytimeExportDownloadUrl`.
+6. The owner may request a short-lived authenticated Function URL through `getStorytimeExportDownloadUrl`. No Storage signed URL is minted. `downloadStorytimeExportPackage` requires a revocation-checked Firebase Bearer token and current confirmed request, completion receipt, package identity, source inventory and deletion authority before delivery and before each 64 KiB chunk. `revokeStorytimeExportRequest` cancels that request; already-issued URLs cannot authorize another chunk after withdrawal.
 7. If family/shared authority or external provider artifact cleanup remains unresolved, the export is labeled `partial_review_required` and the request remains in review rather than being falsely marked complete.
 
 ## Deletion lifecycle
@@ -65,7 +65,7 @@ Production privacy readiness still requires:
 - exact-head app and Functions CI;
 - emulator/staging owner/non-owner/admin behavior;
 - isolated Storytime Firebase identity;
-- real Storage package/signed-URL receipt;
+- real Storage package/authenticated-download receipt;
 - deletion dry-run and execute receipt with synthetic data;
 - legal-hold negative/positive proof;
 - media/provider cleanup proof where enabled;

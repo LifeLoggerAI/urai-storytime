@@ -37,12 +37,13 @@ test('global and per-user daily ceilings fail before provider execution', () => 
   assert.match(storytime, /generation_blocked_budget/);
 });
 
-test('successful provider usage settles reservation to actual receipt cost', () => {
-  assert.match(storytime, /settleProviderBudget\(userId, budgetReservation, providerReceipt\.actualCostUsd\)/);
-  assert.match(storytime, /reservedCostUsd: roundedUsd\(Math\.max\(0, globalReserved - reserved\)\)/);
-  assert.match(storytime, /actualCostUsd: roundedUsd\(globalActual \+ actualCostUsd\)/);
-  assert.match(storytime, /status: "settled"/);
-  assert.match(storytime, /providerBudgetStatus: "settled"/);
+test('successful provider usage retains full daily reservation pending independent charge reconciliation', () => {
+  assert.match(storytime, /observeProviderBudget\(userId, budgetReservation, providerReceipt\)/);
+  assert.match(storytime, /const estimate = preflight\.maxGenerationCostUsd/);
+  assert.match(storytime, /status: "awaiting_charge_reconciliation"/);
+  assert.match(storytime, /providerActualCostUsd: null/);
+  assert.match(storytime, /providerObservedCostUsd: providerReceipt\.observedCostUsd/);
+  assert.doesNotMatch(storytime, /settleProviderBudget|globalReserved - reserved|userReserved - reserved/);
 });
 
 test('uncertain failures retain conservative reservation instead of undercounting spend', () => {
@@ -50,7 +51,8 @@ test('uncertain failures retain conservative reservation instead of undercountin
   assert.match(storytime, /status: "held_after_failure"/);
   assert.match(storytime, /heldCostUsd: reservation\.estimatedMaxCostUsd/);
   assert.match(storytime, /providerBudgetStatus: budgetReservation \? "held_after_failure" : "not_reserved"/);
-  assert.match(storytime, /budget_settlement_failed/);
+  assert.match(storytime, /budget_observation_failed/);
+  assert.match(storytime, /status: budgetReservation \? "requires_reconciliation" : "failed"/);
 });
 
 test('provider budget ledgers are server-only', () => {

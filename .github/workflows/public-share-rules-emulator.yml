@@ -12,6 +12,9 @@ on:
       - 'functions/src/public-story-share-lifecycle.ts'
       - 'functions/src/index.ts'
       - 'src/components/storytime/ShareStory.tsx'
+      - 'src/components/storytime/CloudSession.tsx'
+      - 'src/lib/storytime/current-session-records.ts'
+      - 'firestore.indexes.json'
   push:
     branches: [main]
     paths:
@@ -24,6 +27,9 @@ on:
       - 'functions/src/public-story-share-lifecycle.ts'
       - 'functions/src/index.ts'
       - 'src/components/storytime/ShareStory.tsx'
+      - 'src/components/storytime/CloudSession.tsx'
+      - 'src/lib/storytime/current-session-records.ts'
+      - 'firestore.indexes.json'
   workflow_dispatch:
 
 permissions:
@@ -106,7 +112,7 @@ jobs:
             --config firebase.authorization-rules-emulator.json \
             --project urai-storytime-authorization-rules-test \
             --only firestore,storage \
-            "node --test --test-concurrency=1 tests/rules-emulator/public-share-lifecycle.test.mjs tests/rules-emulator/authorization-matrix.test.mjs" \
+            "node --test --test-concurrency=1 tests/rules-emulator/public-share-lifecycle.test.mjs tests/rules-emulator/authorization-matrix.test.mjs tests/rules-emulator/cloud-session-queries.test.mjs" \
             2>&1 | tee "$evidence_dir/emulator.log"
           status=${PIPESTATUS[0]}
           printf '%s\n' "$status" > "$evidence_dir/exit-code.txt"
@@ -149,6 +155,8 @@ jobs:
               'all owner control client writes denied',
               'private session owner read allowed',
               'cross-user private bundle reads denied',
+              'actual mounted owner/session bundle queries allowed; foreign and neighboring records excluded',
+              'session-only private bundle queries denied by unchanged Rules',
               'client moderation-field escalation denied',
               'server-only counters and receipts denied to every client',
               'moderation Firestore reads admin-only; every client write denied',

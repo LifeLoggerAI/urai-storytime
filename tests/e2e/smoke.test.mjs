@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const read = (filePath) => fs.readFileSync(filePath, 'utf8');
 
 const packageJson = JSON.parse(read('package.json'));
+const packageLock = JSON.parse(read('package-lock.json'));
 const storytimeHome = read('src/components/storytime/StorytimeHome.tsx');
 const authPanel = read('src/components/storytime/AuthPanel.tsx');
 const storytimeSessionRoute = read('src/app/storytime/[sessionId]/page.tsx');
@@ -21,6 +22,7 @@ const rules = read('firestore.rules');
 const indexes = read('firestore.indexes.json');
 const firebaseConfig = read('firebase.json');
 const functions = read('functions/src/storytime.ts');
+const narratorAdmission = read('functions/src/storytime-voiceover-consent-admission.ts');
 const shareLifecycle = read('functions/src/public-story-share-lifecycle.ts');
 const auditLog = read('functions/src/audit-log.ts');
 const functionsIndex = read('functions/src/index.ts');
@@ -37,7 +39,10 @@ test('Next and Firebase scripts are present', () => {
   assert.equal(packageJson.scripts.build, 'next build');
   assert.equal(packageJson.scripts.typecheck, 'tsc --noEmit');
   assert.match(packageJson.scripts['deploy:rules'], /firestore:rules/);
-  assert.match(packageJson.dependencies.next, /^\^15/);
+  assert.equal(packageJson.dependencies.next, '15.5.27');
+  assert.equal(packageLock.packages[''].dependencies.next, packageJson.dependencies.next);
+  assert.equal(packageLock.packages['node_modules/next'].version, packageJson.dependencies.next);
+  assert.match(packageLock.packages['node_modules/next'].integrity, /^sha512-/);
   assert.match(packageJson.dependencies.firebase, /^\^11/);
 });
 
@@ -185,8 +190,8 @@ test('Callable functions cover private Storytime lifecycle, provider wiring, quo
   assert.match(weeklyFunction, /status: "completed"/);
   assert.match(functions, /URAI_STORYTIME_JOBS_BRIDGE_TOKEN/);
   assert.match(functions, /storytimeJobsBridgeRequest/);
-  assert.match(functions, /consentDecisionReceipts/);
-  assert.match(functions, /externalSystem: "urai-jobs"/);
+  assert.match(narratorAdmission, /consentDecisionReceipts/);
+  assert.match(narratorAdmission, /externalSystem: "urai-jobs"/);
   assert.match(functions, /export const manageVoiceoverJob/);
   assert.match(functionsIndex, /prepareVoiceoverJob/);
   assert.match(functionsIndex, /manageVoiceoverJob/);
