@@ -6,7 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
-import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied } from "./storytime-voiceover-consent-admission.js";
+import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, type StorytimeVoiceoverAdmission } from "./storytime-voiceover-consent-admission.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
 import { storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, type StoryAuthorityCommit, type StoryOutputAuthority } from "./story-provider-spend.js";
@@ -1060,7 +1060,7 @@ export const prepareVoiceoverJob = onCall({
     text: narratorText, provider, locale: input.locale,
     voice: input.voice || null, voiceId: input.voiceId || null, format: "MP3"
   }));
-  const admission = {
+  const admission: StorytimeVoiceoverAdmission = {
     userId, sessionId: input.sessionId, narratorScriptId, consentReceiptId,
     policyVersion: STORYTIME_VOICEOVER_CONSENT_VERSION,
     sourceConsentVersion: session.data.consentSnapshot?.consentVersion || null,
