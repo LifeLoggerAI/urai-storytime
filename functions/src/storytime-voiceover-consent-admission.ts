@@ -259,7 +259,22 @@ export async function markStorytimeVoiceoverDispatchUncertain(
       || record.consentReceiptId !== input.consentReceiptId) {
       throw new StorytimeVoiceoverAdmissionDenied();
     }
-    if (record.state === "queued") return;
+    // A completed dispatch can still be revoked. Once Jobs identity is known,
+    // allow only an explicit cancellation request against that exact remote job.
+    // Ordinary uncertain-dispatch reports must not reopen a queued job.
+    if (record.state === "queued") {
+      if (options.state !== "cancel_requested") return;
+      if (typeof record.externalJobId !== "string"
+        || !/^[A-Za-z0-9_-]{10,64}$/.test(record.externalJobId)
+        || options.externalJobId !== record.externalJobId) {
+        throw new StorytimeVoiceoverAdmissionDenied();
+      }
+    }
+    // Delayed acknowledgements must never downgrade a cancellation or reopen
+    // a terminal, deletion-verified recovery result.
+    if (record.state === "cancelled" || record.state === "operator_reconciliation_required") return;
+    if (["cancel_requested", "cancel_required", "cancelling"].includes(record.state)
+      && options.state === "reconciliation_required") return;
     if (record.externalJobId && options.externalJobId
       && record.externalJobId !== options.externalJobId) {
       throw new StorytimeVoiceoverAdmissionDenied();

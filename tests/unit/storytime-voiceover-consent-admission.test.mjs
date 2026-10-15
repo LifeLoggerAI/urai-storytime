@@ -386,3 +386,50 @@ test('foreign local metadata prevents false cancellation completion after remote
   assert.equal(h.docs.get(jobPath).userId,'foreign-owner');
   assert.equal(h.docs.get(jobPath).outputDeletedAt,undefined);
 });
+
+test('queued dispatch revocation requires the exact bound remote job identity',async()=>{
+  const h=fixture(),a=input(),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  const path='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  await assert.rejects(markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:'synthetic-job-foreign',updatedAt:a.createdAt
+  }),StorytimeVoiceoverAdmissionDenied);
+  assert.equal(h.docs.get(path).state,'queued');
+  await assert.rejects(markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',updatedAt:a.createdAt
+  }),StorytimeVoiceoverAdmissionDenied);
+  assert.equal(h.docs.get(path).state,'queued');
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:remote,updatedAt:a.createdAt
+  });
+  assert.equal(h.docs.get(path).state,'queued');
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  assert.equal(h.docs.get(path).state,'cancel_requested');
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:remote,updatedAt:a.createdAt
+  });
+  assert.equal(h.docs.get(path).state,'cancel_requested');
+});
+
+test('a delayed dispatch acknowledgement cannot resurrect verified cancellation',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const path='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  const session=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...session,consentSnapshot:{...session.consentSnapshot,voiceover:false}});
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>
+    body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}},t),'cancelled');
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:remote,updatedAt:a.createdAt
+  });
+  assert.equal(h.docs.get(path).state,'cancelled');
+  assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async()=>{
+    throw Error('unwanted redispatch');
+  },t+61_000),'skipped');
+});
