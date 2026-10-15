@@ -187,10 +187,25 @@ export async function completeStorytimeVoiceoverDispatch(
     requireCurrentSource(sessionSnapshot, scriptSnapshot, input);
     requireMatchingReceipt(receiptSnapshot, input);
     const outbox = requireMatchingIntent(outboxSnapshot, input);
+    // A cancellation may be requested after remote Jobs accepted a job but
+    // before its delayed response can be materialized in Storytime. Never
+    // reinterpret that response as permission to reopen the local intent.
+    if (["cancel_requested", "cancel_required", "cancelling", "cancelled",
+      "operator_reconciliation_required"].includes(outbox.state)) {
+      throw new StorytimeVoiceoverAdmissionDenied();
+    }
     if (outbox.externalJobId && outbox.externalJobId !== input.externalJobId) {
       throw new StorytimeVoiceoverAdmissionDenied();
     }
     const job = jobSnapshot.data() || {}, exported = exportSnapshot.data() || {};
+    // Replays must not rematerialize a previously revoked/deleted private
+    // output if the local tombstone was written by a concurrent actor.
+    if ((jobSnapshot.exists && (job.status === "output_deleted" || job.status === "cancelled"
+        || job.outputDeletedAt != null))
+      || (exportSnapshot.exists && (exported.status === "cancelled"
+        || exported.outputDeletedAt != null))) {
+      throw new StorytimeVoiceoverAdmissionDenied();
+    }
     if (jobSnapshot.exists && (job.userId !== input.userId
       || job.sessionId !== input.sessionId || job.narratorScriptId !== input.narratorScriptId
       || job.externalJobId !== input.externalJobId || job.consentReceiptId !== input.consentReceiptId)) {
@@ -272,7 +287,11 @@ export async function markStorytimeVoiceoverDispatchUncertain(
     }
     // Delayed acknowledgements must never downgrade a cancellation or reopen
     // a terminal, deletion-verified recovery result.
-    if (record.state === "cancelled" || record.state === "operator_reconciliation_required") return;
+    if (record.state === "cancelled" || record.state === "operator_reconciliation_required"
+      || record.state === "cancelling") return;
+    // A late repeated cancel request cannot regress mandatory cleanup back
+    // to its earlier request-only state.
+    if (record.state === "cancel_required" && options.state === "cancel_requested") return;
     if (["cancel_requested", "cancel_required", "cancelling"].includes(record.state)
       && options.state === "reconciliation_required") return;
     if (record.externalJobId && options.externalJobId
