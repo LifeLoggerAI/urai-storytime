@@ -150,15 +150,21 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
     evidence.classification=mode==="staging"?"STAGING_AUTH_AND_DENIAL_ONLY":"EMULATOR_AUTH_AND_DENIAL_ONLY";
     return evidence;
   }
+  const expectedRemoteId=jobId.slice("voiceoverJob_".length);
   const status=await manage(fetchImpl,cfg,owner.token,jobId,"status");
-  if (!status.success || !status.result.job?.status) fail("owner_fixture_status_missing");
-  evidence.checks.push("owner_status_verified");
+  // Never invoke destructive actions against an identity inferred only from
+  // the user's fixture variable. Confirm the Jobs status projection agrees.
+  if (!status.success || !status.result.job?.status
+    || status.result.job.jobId!==expectedRemoteId)
+    fail("owner_fixture_remote_job_identity_mismatch");
+  evidence.checks.push("owned_fixture_remote_job_identity_verified");
   expectDenied(await manage(fetchImpl,cfg,owner.token,jobId,"playback"),
     "predeletion_playback_not_denied",true);
   evidence.checks.push("predeletion_playback_denied");
   const cancelled=await manage(fetchImpl,cfg,owner.token,jobId,"cancel");
-  if (!cancelled.success || !["CANCELLED","SUCCESS","FAILED","DEAD"].includes(
-    String(cancelled.result.job?.status||""))) fail("remote_job_cancellation_unconfirmed");
+  if (!cancelled.success || cancelled.result.job?.jobId!==expectedRemoteId
+    || !["CANCELLED","SUCCESS","FAILED","DEAD"].includes(
+      String(cancelled.result.job?.status||""))) fail("bound_remote_job_cancellation_unconfirmed");
   evidence.checks.push("bound_job_terminal_cancel_response");
   const del=await manage(fetchImpl,cfg,owner.token,jobId,"delete-output");
   if (!del.success || del.result.deletion?.deleted!==true) fail("remote_deletion_response_unconfirmed");
@@ -179,15 +185,16 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
   return evidence;
 }
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
-  const args=process.argv.slice(2);
-  if (args.some(s=>!/^--(mode|phase)=[a-z]+$/.test(s))) fail("unsupported_arguments");
-  const get=(k,f)=>args.find(s=>s.startsWith("--"+k+"="))?.split("=")[1]||f;
-  runAcceptance({mode:get("mode","staging"),phase:get("phase","preflight")})
-    .then(proof=>process.stdout.write(JSON.stringify(proof,null,2)+"\n"))
-    .catch(e=>{
-      // No URLs, request bodies, IDs, passwords, bearer tokens or private data.
-      process.stderr.write("acceptance_denied:"+
-        String(e?.message||"unknown").replace(/[^A-Za-z0-9_-]/g,"").slice(0,110)+"\n");
-      process.exitCode=1;
-    });
+  (async()=>{
+    const args=process.argv.slice(2);
+    if (args.some(s=>!/^--(mode|phase)=[a-z]+$/.test(s))) fail("unsupported_arguments");
+    const get=(k,f)=>args.find(s=>s.startsWith("--"+k+"="))?.split("=")[1]||f;
+    const receipt=await runAcceptance({mode:get("mode","staging"),phase:get("phase","preflight")});
+    process.stdout.write(JSON.stringify(receipt,null,2)+"\n");
+  })().catch(e=>{
+    // No URLs, request bodies, IDs, passwords, bearer tokens or private data.
+    process.stderr.write("acceptance_denied:"+
+      String(e?.message||"unknown").replace(/[^A-Za-z0-9_-]/g,"").slice(0,110)+"\n");
+    process.exitCode=1;
+  });
 }

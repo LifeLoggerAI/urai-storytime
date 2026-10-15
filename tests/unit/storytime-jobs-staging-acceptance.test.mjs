@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {runAcceptance,validateTarget} from "../../scripts/storytime-jobs-staging-acceptance.mjs";
 
 const project="urai-storytime-staging-approved";
@@ -28,7 +30,7 @@ const fakeToken=(uid,proj=project)=>{
   return enc({alg:"none"})+"."+enc({sub:uid,aud:proj,
     iss:"https://securetoken.google.com/"+proj})+".fake";
 };
-function fakeFetch({malformed=false,wrongAudience=false}={}) {
+function fakeFetch({malformed=false,wrongAudience=false,wrongJobId=false,wrongCancelId=false}={}) {
   const calls=[];
   const answer=(status,data)=>({ok:status>=200&&status<300,status,async json(){return data}});
   const fetchImpl=async(url,options)=>{
@@ -50,9 +52,13 @@ function fakeFetch({malformed=false,wrongAudience=false}={}) {
     if (uid==="test-other") return answer(403,{error:{status:"PERMISSION_DENIED"}});
     if (action==="status" && calls.includes("test-owner:delete-output"))
       return answer(400,{error:{status:"FAILED_PRECONDITION"}});
-    if (action==="status") return answer(200,{result:{ok:true,job:{status:"CANCELLED"}}});
+    if (action==="status") return answer(200,{result:{ok:true,job:{
+      status:"CANCELLED",jobId:wrongJobId?"foreign-job-009":"synthetic-job-001"
+    }}});
     if (action==="playback") return answer(400,{error:{status:"FAILED_PRECONDITION"}});
-    if (action==="cancel") return answer(200,{result:{ok:true,job:{status:"CANCELLED"}}});
+    if (action==="cancel") return answer(200,{result:{ok:true,job:{
+      status:"CANCELLED",jobId:wrongCancelId?"foreign-job-009":"synthetic-job-001"
+    }}});
     if (action==="delete-output") return answer(200,{result:{ok:true,deletion:{
       deleted:malformed?"true":true,alreadyDeleted:calls.filter(s=>s==="test-owner:delete-output").length>1
     }}});
@@ -116,4 +122,51 @@ test("bad token audience and unapproved or real-user fixtures fail closed",async
   await assert.rejects(runAcceptance({env:env(),mode:"staging",phase:"verify",
     fetchImpl:fakeFetch({wrongAudience:true}).fetchImpl}),/firebase_audience_or_issuer_mismatch/);
   assert.deepEqual(mock.calls,[]);
+});
+
+test("real Node CLI runs isolated demo preflight with redacted JSON and zero network",()=>{
+  const executable=fileURLToPath(new URL("../../scripts/storytime-jobs-staging-acceptance.mjs",import.meta.url));
+  const result=spawnSync(process.execPath,[executable,"--mode=emulator","--phase=preflight"],{
+    env:{...process.env,URAI_STORYTIME_FIREBASE_PROJECT_ID:"demo-urai-storytime",
+      FIREBASE_AUTH_EMULATOR_HOST:"127.0.0.1:9099",FIRESTORE_EMULATOR_HOST:"127.0.0.1:8080"},
+    timeout:10000,encoding:"utf8"
+  });
+  assert.equal(result.status,0,result.stderr);
+  const receipt=JSON.parse(result.stdout);
+  assert.equal(receipt.mode,"emulator");
+  assert.equal(receipt.phase,"preflight");
+  assert.equal(receipt.remoteCloudDeletionIndependentlyVerified,false);
+  assert.equal(receipt.cleanupPerformed,false);
+  assert.deepEqual(receipt.checks,["strict_staging_or_emulator_identity_preflight"]);
+  assert.equal(result.stdout.includes("demo-urai-storytime"),false);
+});
+test("real Node CLI returns nonzero and redacted denial for missing project and unknown flags",()=>{
+  const executable=fileURLToPath(new URL("../../scripts/storytime-jobs-staging-acceptance.mjs",import.meta.url));
+  for (const [args,envVars,expected] of [
+    [["--mode=staging","--phase=preflight"],
+      {...process.env,URAI_STORYTIME_FIREBASE_PROJECT_ID:""},
+      "missing_urai_storytime_firebase_project_id"],
+    [["--mode=staging","--phase=preflight","--deploy=true"],
+      {...process.env,URAI_STORYTIME_FIREBASE_PROJECT_ID:""},
+      "unsupported_arguments"]
+  ]) {
+    const result=spawnSync(process.execPath,[executable,...args],{
+      env:envVars,timeout:10000,encoding:"utf8"
+    });
+    assert.equal(result.status,1);
+    assert.match(result.stderr,new RegExp("acceptance_denied:"+expected));
+    assert.equal(result.stdout,"");
+    assert.doesNotMatch(result.stderr,/at file:|Error:|https?:\\/\\//);
+  }
+});
+test("fixture mismatch is rejected before destructive remote cancel or delete",async()=>{
+  const wrong=fakeFetch({wrongJobId:true});
+  await assert.rejects(runAcceptance({env:env(),mode:"staging",phase:"exercise",
+    fetchImpl:wrong.fetchImpl}),/owner_fixture_remote_job_identity_mismatch/);
+  assert.deepEqual(wrong.calls,["test-other:status","test-owner:status"]);
+  const cancel=fakeFetch({wrongCancelId:true});
+  await assert.rejects(runAcceptance({env:env(),mode:"staging",phase:"exercise",
+    fetchImpl:cancel.fetchImpl}),/bound_remote_job_cancellation_unconfirmed/);
+  assert.equal(cancel.calls.includes("test-owner:cancel"),true);
+  assert.equal(cancel.calls.some(s=>s==="test-owner:delete-output"),false);
 });
