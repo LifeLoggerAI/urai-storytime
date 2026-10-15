@@ -476,8 +476,14 @@ export async function scanStorytimeVoiceoverRecovery(
 ): Promise<{ checked: number; queued: number; cancelled: number; retried: number; review: number }> {
   const states = ["pending_dispatch", "reconciliation_required", "dispatching",
     "cancel_required", "cancelling", "cancel_requested"];
+  // Query only due work *before* the bounded limit. Otherwise forty
+  // future-dated attempts can permanently starve an eligible later intent.
+  // The matching composite index is declared in firestore.indexes.json.
   const docs = await db.collection("storytimeVoiceoverDispatchIntents")
-    .where("state", "in", states).limit(40).get();
+    .where("state", "in", states)
+    .where("nextAttemptAt", "<=", new Date(clockMs).toISOString())
+    .orderBy("nextAttemptAt", "asc")
+    .limit(40).get();
   const output = { checked: 0, queued: 0, cancelled: 0, retried: 0, review: 0 };
   for (const snap of docs.docs) {
     output.checked++;
