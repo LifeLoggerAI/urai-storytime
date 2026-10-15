@@ -204,3 +204,18 @@ test("synthetic transports never produce live Firebase acceptance receipts",asyn
     assert.equal(proof.remoteCloudDeletionIndependentlyVerified,false);
   }
 });
+
+
+test("native emulator Auth phase is explicitly demo-only and approved",()=>{
+  const demo={...env(),URAI_STORYTIME_FIREBASE_PROJECT_ID:"demo-urai-storytime",
+    FIREBASE_AUTH_EMULATOR_HOST:"127.0.0.1:9099",FIRESTORE_EMULATOR_HOST:"127.0.0.1:8080"};
+  assert.throws(()=>validateTarget(demo,"emulator","emulator-auth"),/disposable_emulator_authority_missing/);
+  assert.equal(validateTarget({...demo,STORYTIME_ACCEPTANCE_EMULATOR_AUTH_APPROVED:"true"},"emulator","emulator-auth").phase,"emulator-auth");
+  assert.throws(()=>validateTarget({...env(),STORYTIME_ACCEPTANCE_EMULATOR_AUTH_APPROVED:"true"},"staging","emulator-auth"),/emulator_auth_requires_demo_project/);
+});
+test("native single-service acceptance preserves actual cleanup and excludes Jobs certification",async()=>{
+  const {readFileSync}=await import("node:fs");
+  const source=readFileSync(new URL("../../scripts/storytime-jobs-staging-acceptance.mjs",import.meta.url),"utf8");
+  for(const marker of ["auth.createUser(","auth.setCustomUserClaims(","await ref.create(","await auth.deleteUser(","sourceDispatchExercised:false","remoteCloudDeletionIndependentlyVerified:false"])
+    assert.ok(source.includes(marker),marker);
+});

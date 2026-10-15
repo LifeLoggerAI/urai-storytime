@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
 const modes = new Set(["staging", "emulator"]);
-const phases = new Set(["preflight", "verify", "exercise"]);
+const phases = new Set(["preflight", "verify", "exercise", "emulator-auth"]);
 class AcceptanceDenial extends Error {}
 const fail = code => { throw new AcceptanceDenial(code); };
 // Provider/network exceptions are not safe to print: their messages may contain
@@ -26,6 +26,7 @@ const disposable = s => /^urai-wave31-(owner|other)-[a-z0-9-]+@(example\.com|exa
 
 export function validateTarget(env, mode, phase) {
   if (!modes.has(mode) || !phases.has(phase)) fail("invalid_mode_or_phase");
+  if (phase==="emulator-auth" && mode!=="emulator") fail("emulator_auth_requires_demo_project");
   const project = value(env,"URAI_STORYTIME_FIREBASE_PROJECT_ID");
   if (!/^[a-z][a-z0-9-]{4,35}$/.test(project) || project.includes("REPLACE")) fail("invalid_project");
   if (mode === "staging") {
@@ -63,6 +64,8 @@ export function validateTarget(env, mode, phase) {
       || !/^wave31-[A-Za-z0-9_-]{8,100}$/.test(session) || !session.includes(runId))
       fail("disposable_fixture_required");
   }
+  if (phase==="emulator-auth" && env.STORYTIME_ACCEPTANCE_EMULATOR_AUTH_APPROVED!=="true")
+    fail("disposable_emulator_authority_missing");
   if (phase === "exercise" && (env.STORYTIME_ACCEPTANCE_MUTATION_APPROVED !== "true"
     || env.STORYTIME_ACCEPTANCE_REVOKED_FIXTURE_APPROVED !== "true"))
     fail("protected_fixture_mutation_approval_missing");
@@ -141,6 +144,64 @@ function expectDenied(result,reason,owner=false) {
     ["PERMISSION_DENIED","permission-denied","UNAUTHENTICATED"];
   if (result.success || !allowed.includes(result.code)) fail(reason);
 }
+
+/** Native disposable Auth/Firestore/Functions owner denial. This does NOT
+ * simulate a Jobs backend or certify cross-repository job acceptance. */
+async function runNativeEmulatorAuth({env,cfg,fetchImpl}) {
+  const {initializeApp,deleteApp}=await import("firebase-admin/app");
+  const {getAuth}=await import("firebase-admin/auth");
+  const {getFirestore}=await import("firebase-admin/firestore");
+  const app=initializeApp({projectId:cfg.project},"urai-disposable-emulator-acceptance");
+  const auth=getAuth(app),db=getFirestore(app);
+  const id=value(env,"STORYTIME_ACCEPTANCE_VOICEOVER_JOB_ID");
+  const sessionId=value(env,"STORYTIME_ACCEPTANCE_SESSION_ID");
+  const ref=db.collection("voiceoverJobs").doc(id);
+  const uids=[];
+  let seeded=false,receipt;
+  try {
+    for (const role of ["owner","other"]) {
+      const email=value(env,"STORYTIME_ACCEPTANCE_"+role.toUpperCase()+"_EMAIL");
+      const password=value(env,"STORYTIME_ACCEPTANCE_"+role.toUpperCase()+"_PASSWORD");
+      const user=await auth.createUser({email,password,emailVerified:true});
+      try { await auth.setCustomUserClaims(user.uid,{acceptanceRunId:cfg.runId}); }
+      catch(error) { await auth.deleteUser(user.uid); throw error; }
+      uids.push(user.uid);
+    }
+    if ((await ref.get()).exists) fail("fixture_already_exists");
+    await ref.create({userId:uids[0],acceptanceRunId:cfg.runId,
+      acceptanceFixture:true,sessionId,narratorScriptId:sessionId+"-script",
+      externalSystem:"urai-jobs",externalJobId:id.slice("voiceoverJob_".length),
+      status:"cancelled",safeOutput:null});
+    seeded=true;
+    receipt=await runAcceptance({env,mode:"emulator",phase:"verify",fetchImpl});
+    if (receipt.transport!=="network" || receipt.classification!=="EMULATOR_AUTH_AND_DENIAL_ONLY"
+      || !receipt.checks.includes("foreign_status_denied")) fail("native_emulator_denial_unverified");
+  } finally {
+    let failed=false;
+    try {
+      if (seeded) {
+        const current=await ref.get(),row=current.data();
+        if (!current.exists || row?.userId!==uids[0] || row?.acceptanceRunId!==cfg.runId
+          || row?.acceptanceFixture!==true || row?.sessionId!==sessionId)
+          throw Error("changed_fixture");
+        await ref.delete();
+      }
+      for (const uid of uids) {
+        const user=await auth.getUser(uid);
+        if (user.customClaims?.acceptanceRunId!==cfg.runId) throw Error("changed_user");
+        await auth.deleteUser(uid);
+      }
+    } catch { failed=true; }
+    await deleteApp(app).catch(()=>{failed=true;});
+    if (failed) fail("emulator_cleanup_failed");
+  }
+  if (!receipt) fail("emulator_receipt_missing");
+  return {...receipt,phase:"emulator-auth",classification:"EMULATOR_AUTH_AND_DENIAL_ONLY",
+    checks:["native_disposable_fixture_created",...receipt.checks,"disposable_fixture_deleted","both_users_deleted"],
+    authenticatedStagingVerified:false,sourceDispatchExercised:false,
+    remoteCloudDeletionIndependentlyVerified:false,cleanupPerformed:true};
+}
+
 export async function runAcceptance({env=process.env,mode="staging",phase="preflight",fetchImpl=fetch}={}) {
   const cfg=validateTarget(env,mode,phase);
   // An injected transport is useful for offline tests, but its simulated
@@ -158,6 +219,7 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
   if (phase==="preflight") {
     evidence.checks.push("strict_staging_or_emulator_identity_preflight");return evidence;
   }
+  if (phase==="emulator-auth") return runNativeEmulatorAuth({env,cfg,fetchImpl});
   const [owner,other]=await Promise.all([
     signIn(fetchImpl,env,cfg,"owner"),signIn(fetchImpl,env,cfg,"other")
   ]);

@@ -211,3 +211,81 @@ jobs:
       - run: npm run test:production-evidence
       - run: npm run test:production-smoke
 
+
+
+  disposable-auth-functions-emulator:
+    name: Native disposable Storytime Auth Firestore Functions
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 96
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      URAI_STORYTIME_FIREBASE_PROJECT_ID: demo-urai-storytime
+      FIREBASE_AUTH_EMULATOR_HOST: 127.0.0.1:9099
+      FIRESTORE_EMULATOR_HOST: 127.0.0.1:8080
+      STORYTIME_ACCEPTANCE_EMULATOR_AUTH_APPROVED: 'true'
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Prove exact source
+        run: |
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+      - name: Setup Java 21
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install exact dependencies and Functions
+        run: |
+          set -euo pipefail
+          npm ci --no-audit
+          npm --prefix functions ci --no-audit
+          npm --prefix functions run build
+      - name: Execute existing acceptance with real Firebase emulators
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/storytime-native"
+          export STORYTIME_ACCEPTANCE_RUN_ID="wave31-ci-$GITHUB_RUN_ID"
+          export STORYTIME_ACCEPTANCE_SESSION_ID="$STORYTIME_ACCEPTANCE_RUN_ID-session"
+          export STORYTIME_ACCEPTANCE_VOICEOVER_JOB_ID="voiceoverJob_$STORYTIME_ACCEPTANCE_RUN_ID-job"
+          export STORYTIME_ACCEPTANCE_OWNER_EMAIL="urai-wave31-owner-$GITHUB_RUN_ID@example.test"
+          export STORYTIME_ACCEPTANCE_OTHER_EMAIL="urai-wave31-other-$GITHUB_RUN_ID@example.test"
+          export STORYTIME_ACCEPTANCE_OWNER_PASSWORD="$(openssl rand -hex 24)"
+          export STORYTIME_ACCEPTANCE_OTHER_PASSWORD="$(openssl rand -hex 24)"
+          echo "::add-mask::$STORYTIME_ACCEPTANCE_OWNER_PASSWORD"
+          echo "::add-mask::$STORYTIME_ACCEPTANCE_OTHER_PASSWORD"
+          printf '%s\n' 'URAI_STORYTIME_JOBS_BRIDGE_TOKEN=emulator-only-unused-synthetic' > functions/.secret.local
+          node scripts/storytime-jobs-staging-acceptance.mjs --mode=emulator --phase=preflight | tee "$RUNNER_TEMP/storytime-native/preflight.json"
+          npx --yes firebase-tools@15.23.0 emulators:exec --config firebase.json \
+            --only auth,firestore,functions --project demo-urai-storytime \
+            "node scripts/storytime-jobs-staging-acceptance.mjs --mode=emulator --phase=emulator-auth" \
+            2>&1 | tee "$RUNNER_TEMP/storytime-native/native-emulator.log"
+          sha256sum scripts/storytime-jobs-staging-acceptance.mjs functions/src/storytime.ts > "$RUNNER_TEMP/storytime-native/source-sha256.txt"
+      - name: Retain native emulator logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: storytime-native-firebase-${{ env.TARGET_SHA }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/storytime-native/
+          if-no-files-found: warn
+          retention-days: 90
+      - name: Cleanup isolated runner and preserve source
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -f functions/.secret.local
+          git reset --hard "$TARGET_SHA"
+          git clean -ffd
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
