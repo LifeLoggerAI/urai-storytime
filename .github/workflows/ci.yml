@@ -267,7 +267,17 @@ jobs:
           echo "::add-mask::$STORYTIME_ACCEPTANCE_OTHER_PASSWORD"
           printf '%s\n' 'URAI_STORYTIME_JOBS_BRIDGE_TOKEN=emulator-only-unused-synthetic' > functions/.secret.local
           node scripts/storytime-jobs-staging-acceptance.mjs --mode=emulator --phase=preflight | tee "$RUNNER_TEMP/storytime-native/preflight.json"
-          npx --yes firebase-tools@15.23.0 emulators:exec --config firebase.json \
+          # Exclude Hosting's Next.js frameworks backend. This acceptance tests
+          # only native Auth, Firestore and Functions, with production firebase.json untouched.
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const original=JSON.parse(fs.readFileSync("firebase.json","utf8"));
+            const cfg={firestore:original.firestore,functions:original.functions,
+              emulators:{auth:original.emulators.auth,firestore:original.emulators.firestore,
+                functions:original.emulators.functions,singleProjectMode:true}};
+            fs.writeFileSync(".firebase-storytime-native-acceptance.json",JSON.stringify(cfg));
+          '
+          npx --yes firebase-tools@15.23.0 emulators:exec --config .firebase-storytime-native-acceptance.json \
             --only auth,firestore,functions --project demo-urai-storytime \
             "node scripts/storytime-jobs-staging-acceptance.mjs --mode=emulator --phase=emulator-auth" \
             2>&1 | tee "$RUNNER_TEMP/storytime-native/native-emulator.log"
