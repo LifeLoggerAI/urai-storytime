@@ -435,8 +435,11 @@ export async function settleStorytimeVoiceoverRecovery(
     }
     tx.update(ref, {
       state: terminal && state !== "cancelled" ? "operator_reconciliation_required" : state,
-      lastErrorCode: terminal && state !== "cancelled" && attempt >= STORYTIME_VOICEOVER_RECOVERY_MAX_ATTEMPTS
-        ? "retry_limit_reached" : errorCode,
+      // A completed, deletion-verified cancellation must not retain a stale
+      // failure marker. Remote confirmation and local settlement are distinct.
+      lastErrorCode: state === "cancelled" ? null :
+        terminal && attempt >= STORYTIME_VOICEOVER_RECOVERY_MAX_ATTEMPTS
+          ? "retry_limit_reached" : errorCode,
       externalJobId: externalJobId || current.externalJobId || null,
       leaseToken: null, leaseExpiresAt: null, updatedAt: new Date(clockMs).toISOString(),
       nextAttemptAt: terminal ? null : new Date(clockMs + backoffMillis(attempt)).toISOString(),
@@ -476,9 +479,12 @@ export async function recoverStorytimeVoiceoverIntent(
         (deletion.deletion as Record<string, unknown>).deleted !== true) {
         throw new Error("unconfirmed_audio_deletion");
       }
-      await settleStorytimeVoiceoverRecovery(db, key, token, clockMs,
+      const persisted = await settleStorytimeVoiceoverRecovery(db, key, token, clockMs,
         "cancelled", "cancellation_unconfirmed", remoteId);
-      return "cancelled";
+      // An expired/stolen recovery lease cannot certify local completion,
+      // even if Jobs has already deleted its output. The next owner retries
+      // the same idempotent cancel/delete sequence and commits its tombstones.
+      return persisted ? "cancelled" : "retry";
     } catch {
       await settleStorytimeVoiceoverRecovery(db, key, token, clockMs,
         "cancel_required", "cancellation_unconfirmed", remoteId);

@@ -433,3 +433,73 @@ test('a delayed dispatch acknowledgement cannot resurrect verified cancellation'
     throw Error('unwanted redispatch');
   },t+61_000),'skipped');
 });
+
+test('verified remote deletion with stolen lease does not falsely certify local cancellation',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const prior=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...prior,consentSnapshot:{...prior.consentSnapshot,voiceover:false}});
+  const key='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  const jobPath='voiceoverJobs/voiceoverJob_'+remote;
+  const actions=[];
+  const first=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    actions.push(body.action);
+    if(body.action==='cancel')return {ok:true,job:{status:'CANCELLED'}};
+    h.set(key,{...h.docs.get(key),leaseToken:'other-worker-lease',
+      leaseOwner:'worker-b',leaseExpiresAt:new Date(t+90_000).toISOString()});
+    return {ok:true,deletion:{deleted:true}};
+  },t,'worker-a');
+  assert.equal(first,'retry');
+  assert.deepEqual(actions,['cancel','delete-output']);
+  assert.equal(h.docs.get(key).state,'cancelling');
+  assert.equal(h.docs.get(jobPath).status,'queued');
+  assert.equal(h.docs.get(jobPath).outputDeletedAt,undefined);
+  const second=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    actions.push(body.action);
+    return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true,alreadyDeleted:true}};
+  },t+120_001,'worker-c');
+  assert.equal(second,'cancelled');
+  assert.deepEqual(actions,['cancel','delete-output','cancel','delete-output']);
+  assert.equal(h.docs.get(key).state,'cancelled');
+  assert.equal(h.docs.get(key).lastErrorCode,null);
+  assert.equal(h.docs.get(jobPath).status,'output_deleted');
+  assert.ok(h.docs.get(jobPath).outputDeletedAt);
+});
+
+test('remote deletion followed by transient local commit failure remains retryable',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const prior=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...prior,consentSnapshot:{...prior.consentSnapshot,voiceover:false}});
+  const real=h.db.runTransaction;
+  let transactions=0, attempts=0;
+  h.db.runTransaction=async cb=>{
+    if(++transactions===2)throw Error('synthetic-local-commit-outage');
+    return real(cb);
+  };
+  const first=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    attempts++;
+    return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}};
+  },t);
+  assert.equal(first,'retry');
+  const key='storytimeVoiceoverDispatchIntents/'+a.idempotencyKey;
+  assert.equal(h.docs.get(key).state,'cancel_required');
+  assert.equal(h.docs.get('voiceoverJobs/voiceoverJob_'+remote).status,'queued');
+  const second=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    attempts++;
+    return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true,alreadyDeleted:true}};
+  },t+61_000);
+  assert.equal(second,'cancelled');
+  assert.equal(attempts,4);
+  assert.equal(h.docs.get(key).state,'cancelled');
+  assert.equal(h.docs.get(key).lastErrorCode,null);
+  assert.equal(h.docs.get('voiceoverJobs/voiceoverJob_'+remote).status,'output_deleted');
+});
