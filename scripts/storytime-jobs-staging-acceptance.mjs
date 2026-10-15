@@ -273,7 +273,7 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
 if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
   (async()=>{
     const args=process.argv.slice(2);
-    if (args.some(s=>!/^--(mode|phase)=[a-z]+$/.test(s))) fail("unsupported_arguments");
+    if (args.some(s=>!/^--(?:mode=(?:staging|emulator)|phase=(?:preflight|verify|exercise|emulator-auth))$/.test(s))) fail("unsupported_arguments");
     const get=(k,f)=>args.find(s=>s.startsWith("--"+k+"="))?.split("=")[1]||f;
     const receipt=await runAcceptance({mode:get("mode","staging"),phase:get("phase","preflight")});
     process.stdout.write(JSON.stringify(receipt,null,2)+"\n");

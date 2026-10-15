@@ -219,3 +219,24 @@ test("native single-service acceptance preserves actual cleanup and excludes Job
   for(const marker of ["auth.createUser(","auth.setCustomUserClaims(","await ref.create(","await auth.deleteUser(","sourceDispatchExercised:false","remoteCloudDeletionIndependentlyVerified:false"])
     assert.ok(source.includes(marker),marker);
 });
+
+test("native emulator-auth CLI phase reaches guarded target validation, not unsupported_arguments",()=>{
+  const executable=fileURLToPath(new URL("../../scripts/storytime-jobs-staging-acceptance.mjs",import.meta.url));
+  const result=spawnSync(process.execPath,[executable,"--mode=emulator","--phase=emulator-auth"],{
+    env:{...process.env,URAI_STORYTIME_FIREBASE_PROJECT_ID:"demo-urai-storytime",
+      FIREBASE_AUTH_EMULATOR_HOST:"127.0.0.1:9099",
+      FIRESTORE_EMULATOR_HOST:"127.0.0.1:8080",
+      STORYTIME_ACCEPTANCE_RUN_ID:"",STORYTIME_ACCEPTANCE_EMULATOR_AUTH_APPROVED:"false"},
+    timeout:10000,encoding:"utf8"
+  });
+  assert.equal(result.status,1);
+  assert.match(result.stderr,/acceptance_denied:missing_storytime_acceptance_run_id/);
+  assert.doesNotMatch(result.stderr,/acceptance_denied:unsupported_arguments/);
+  assert.equal(result.stdout,"");
+  const unsupported=spawnSync(process.execPath,[executable,"--mode=emulator","--phase=emulator/auth"],{
+    env:{...process.env,URAI_STORYTIME_FIREBASE_PROJECT_ID:"demo-urai-storytime"},
+    timeout:10000,encoding:"utf8"
+  });
+  assert.equal(unsupported.status,1);
+  assert.match(unsupported.stderr,/acceptance_denied:unsupported_arguments/);
+});
