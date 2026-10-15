@@ -72,6 +72,7 @@ test("offline staging preflight never makes requests and refuses shared identiti
   const mock=fakeFetch();
   const result=await runAcceptance({env:env(),mode:"staging",phase:"preflight",fetchImpl:mock.fetchImpl});
   assert.deepEqual(result.checks,["strict_staging_or_emulator_identity_preflight"]);
+  assert.equal(result.transport,"offline");
   assert.deepEqual(mock.calls,[]);
   for(const v of ["urai-staging","urai-4dc1d","urai-jobs","urai-storytime-production"]){
     const e={...env(),URAI_STORYTIME_FIREBASE_PROJECT_ID:v,
@@ -94,7 +95,10 @@ test("verify authenticates two distinct disposable identities and denies foreign
   const mock=fakeFetch();
   const result=await runAcceptance({env:env(),mode:"staging",phase:"verify",fetchImpl:mock.fetchImpl});
   assert.deepEqual(mock.calls,["test-other:status"]);
-  assert.equal(result.classification,"STAGING_AUTH_AND_DENIAL_ONLY");
+  assert.equal(result.classification,"SYNTHETIC_AUTH_AND_DENIAL_ONLY");
+  assert.equal(result.transport,"synthetic");
+  assert.equal(result.authenticatedStagingVerified,false);
+  assert.equal(result.checks.includes("provider_verified_two_disposable_auth_identities"),false);
   assert.equal(result.remoteCloudDeletionIndependentlyVerified,false);
   assert.equal(JSON.stringify(result).includes("synthetic-secret"),false);
 });
@@ -104,7 +108,9 @@ test("exercise verifies cancellation, deletion retry, tombstone and cross-owner 
   assert.deepEqual(mock.calls,["test-other:status","test-owner:status","test-owner:playback",
     "test-owner:cancel","test-owner:delete-output","test-owner:delete-output",
     "test-owner:playback","test-owner:status","test-other:delete-output"]);
-  assert.equal(result.classification,"STAGING_DISPOSABLE_CALLABLE_RESPONSES");
+  assert.equal(result.classification,"SYNTHETIC_DISPOSABLE_CALLABLE_RESPONSES");
+  assert.equal(result.transport,"synthetic");
+  assert.equal(result.authenticatedStagingVerified,false);
   assert.equal(result.cleanupRequired,true);
   assert.equal(result.remoteCloudDeletionIndependentlyVerified,false);
   assert.equal(result.paidProviderGenerationTriggered,false);
@@ -186,4 +192,15 @@ test("unexpected provider exceptions never leak secrets through CLI failure mapp
     "unexpected_execution_failure");
   assert.equal(safeDenialCode({message:"Bearer sk-secret-abc123"}),
     "unexpected_execution_failure");
+});
+
+test("synthetic transports never produce live Firebase acceptance receipts",async()=>{
+  for(const phase of ["verify","exercise"]){
+    const mock=fakeFetch();
+    const proof=await runAcceptance({env:env(),mode:"staging",phase,fetchImpl:mock.fetchImpl});
+    assert.equal(proof.transport,"synthetic");
+    assert.equal(proof.authenticatedStagingVerified,false);
+    assert.match(proof.classification,/^SYNTHETIC_/);
+    assert.equal(proof.remoteCloudDeletionIndependentlyVerified,false);
+  }
 });

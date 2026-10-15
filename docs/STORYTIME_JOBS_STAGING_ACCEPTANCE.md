@@ -46,3 +46,7 @@ GCS object-generation deletion proof, nor evidence of the original consent-write
 actual Cloud Run deployed revision, verified recovery lease, provider output
 generation, full cleanup, cross-repository WIF, or Gold Master launch.
 The operator must perform governed cleanup separately and retain its receipts.
+
+## Evidence-integrity safeguard (Wave 35)
+
+Direct Node CLI runs use the native network transport when testing a real approved staging environment. Programmatic tests that inject a fetch transport **always** yield `transport: synthetic` and `SYNTHETIC_*` classifications, even when their configured `mode` is `staging`. Offline preflight reports `transport: offline` and never claims authenticated staging. Only successful native-network staging identity/tenant checks set `authenticatedStagingVerified: true`; all code paths retain `remoteCloudDeletionIndependentlyVerified: false`. These are classification guarantees, not independent deployed-service acceptance.

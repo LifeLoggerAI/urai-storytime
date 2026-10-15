@@ -143,10 +143,15 @@ function expectDenied(result,reason,owner=false) {
 }
 export async function runAcceptance({env=process.env,mode="staging",phase="preflight",fetchImpl=fetch}={}) {
   const cfg=validateTarget(env,mode,phase);
+  // An injected transport is useful for offline tests, but its simulated
+  // HTTP replies must never be reported as live Firebase acceptance.
+  const injectedTransport=fetchImpl!==fetch;
   const evidence={
     schemaVersion:"urai-storytime-jobs-acceptance-v1",
     mode,phase,classification:"PREFLIGHT_ONLY",projectFingerprint:hash(cfg.project),
     runFingerprint:cfg.runId?hash(cfg.runId):null,checks:[],
+    transport:phase==="preflight"?"offline":injectedTransport?"synthetic":"network",
+    authenticatedStagingVerified:false,
     remoteCloudDeletionIndependentlyVerified:false,
     sourceDispatchExercised:false,paidProviderGenerationTriggered:false,cleanupPerformed:false
   };
@@ -157,12 +162,15 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
     signIn(fetchImpl,env,cfg,"owner"),signIn(fetchImpl,env,cfg,"other")
   ]);
   if (owner.uid===other.uid) fail("test_users_not_distinct");
-  evidence.checks.push("provider_verified_two_disposable_auth_identities");
+  evidence.checks.push(injectedTransport?"synthetic_disposable_identity_fixture":
+    "provider_verified_two_disposable_auth_identities");
   const jobId=value(env,"STORYTIME_ACCEPTANCE_VOICEOVER_JOB_ID");
   expectDenied(await manage(fetchImpl,cfg,other.token,jobId,"status"),"foreign_status_not_denied");
   evidence.checks.push("foreign_status_denied");
+  evidence.authenticatedStagingVerified=!injectedTransport && mode==="staging";
   if (phase==="verify") {
-    evidence.classification=mode==="staging"?"STAGING_AUTH_AND_DENIAL_ONLY":"EMULATOR_AUTH_AND_DENIAL_ONLY";
+    evidence.classification=injectedTransport?"SYNTHETIC_AUTH_AND_DENIAL_ONLY":
+      mode==="staging"?"STAGING_AUTH_AND_DENIAL_ONLY":"EMULATOR_AUTH_AND_DENIAL_ONLY";
     return evidence;
   }
   const expectedRemoteId=jobId.slice("voiceoverJob_".length);
@@ -194,7 +202,8 @@ export async function runAcceptance({env=process.env,mode="staging",phase="prefl
   expectDenied(await manage(fetchImpl,cfg,other.token,jobId,"delete-output"),
     "foreign_deletion_not_denied");
   evidence.checks.push("postdeletion_playback_denied","stale_status_denied","foreign_deletion_denied");
-  evidence.classification=mode==="staging"?"STAGING_DISPOSABLE_CALLABLE_RESPONSES":
+  evidence.classification=injectedTransport?"SYNTHETIC_DISPOSABLE_CALLABLE_RESPONSES":
+    mode==="staging"?"STAGING_DISPOSABLE_CALLABLE_RESPONSES":
     "EMULATOR_DISPOSABLE_CALLABLE_RESPONSES";
   evidence.cleanupRequired=true;
   return evidence;
