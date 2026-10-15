@@ -381,6 +381,43 @@ export async function settleStorytimeVoiceoverRecovery(
     const attempt = Number.isSafeInteger(current.attemptCount) ? current.attemptCount : 1;
     const terminal = state === "cancelled" || state === "operator_reconciliation_required" ||
       attempt >= STORYTIME_VOICEOVER_RECOVERY_MAX_ATTEMPTS;
+    const confirmedRemoteId = externalJobId || current.externalJobId || null;
+    const timestamp = new Date(clockMs).toISOString();
+    if (state === "cancelled") {
+      // Jobs has explicitly confirmed downstream output erasure. Fence any
+      // already-materialized Storytime job and private export in this SAME
+      // lease-checked transaction, so local metadata cannot appear live.
+      if (typeof confirmedRemoteId !== "string" || !/^[A-Za-z0-9_-]{10,64}$/.test(confirmedRemoteId)) {
+        throw new StorytimeVoiceoverAdmissionDenied();
+      }
+      const jobId = "voiceoverJob_" + confirmedRemoteId;
+      const exportId = "storyExport_" + confirmedRemoteId;
+      const jobRef = db.collection("voiceoverJobs").doc(jobId);
+      const exportRef = db.collection("storyExports").doc(exportId);
+      const [jobSnapshot, exportSnapshot] = await Promise.all([
+        tx.get(jobRef), tx.get(exportRef)
+      ]);
+      const job = jobSnapshot.data() || {}, exported = exportSnapshot.data() || {};
+      if (jobSnapshot.exists && (job.userId !== current.userId
+        || job.sessionId !== current.sessionId || job.narratorScriptId !== current.narratorScriptId
+        || job.consentReceiptId !== current.consentReceiptId
+        || job.externalJobId !== confirmedRemoteId)) {
+        throw new StorytimeVoiceoverAdmissionDenied();
+      }
+      if (exportSnapshot.exists && (exported.userId !== current.userId
+        || exported.sessionId !== current.sessionId || exported.voiceoverJobId !== jobId
+        || exported.externalJobId !== confirmedRemoteId)) {
+        throw new StorytimeVoiceoverAdmissionDenied();
+      }
+      if (jobSnapshot.exists) tx.update(jobRef, {
+        status: "output_deleted", safeOutput: null, outputDeletedAt: timestamp,
+        updatedAt: timestamp
+      });
+      if (exportSnapshot.exists) tx.update(exportRef, {
+        status: "cancelled", private: true, outputDeletedAt: timestamp,
+        updatedAt: timestamp
+      });
+    }
     tx.update(ref, {
       state: terminal && state !== "cancelled" ? "operator_reconciliation_required" : state,
       lastErrorCode: terminal && state !== "cancelled" && attempt >= STORYTIME_VOICEOVER_RECOVERY_MAX_ATTEMPTS

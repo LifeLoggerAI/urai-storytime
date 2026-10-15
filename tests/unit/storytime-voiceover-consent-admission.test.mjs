@@ -322,3 +322,67 @@ test('revocation does not certify terminal cancellation without an output deleti
   assert.equal(second,'cancelled');
   assert.equal(calls,4);
 });
+
+test('confirmed recovery deletion tombstones already-materialized Storytime job and export atomically',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  const jobPath='voiceoverJobs/voiceoverJob_'+remote;
+  const expPath='storyExports/storyExport_'+remote;
+  h.set(jobPath,{...h.docs.get(jobPath),status:'success',safeOutput:{artifactPath:'synthetic-private-location'}});
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const session=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...session,consentSnapshot:{...session.consentSnapshot,voiceover:false}});
+  const actions=[];
+  const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    actions.push(body.action);
+    return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}};
+  },t);
+  assert.equal(result,'cancelled');
+  assert.deepEqual(actions,['cancel','delete-output']);
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancelled');
+  assert.equal(h.docs.get(jobPath).status,'output_deleted');
+  assert.equal(h.docs.get(jobPath).safeOutput,null);
+  assert.ok(h.docs.get(jobPath).outputDeletedAt);
+  assert.equal(h.docs.get(expPath).status,'cancelled');
+  assert.equal(h.docs.get(expPath).private,true);
+});
+
+test('missing downstream deletion receipt cannot mark existing local outputs deleted',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  const jobPath='voiceoverJobs/voiceoverJob_'+remote;
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const session=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...session,consentSnapshot:{...session.consentSnapshot,voiceover:false}});
+  const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>
+    body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:false}},t);
+  assert.equal(result,'retry');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
+  assert.equal(h.docs.get(jobPath).status,'queued');
+  assert.equal(h.docs.get(jobPath).outputDeletedAt,undefined);
+});
+
+test('foreign local metadata prevents false cancellation completion after remote deletion',async()=>{
+  const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z'),remote='synthetic-job-001';
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await completeStorytimeVoiceoverDispatch(h.db,{...a,externalJobId:remote,provider:'google',updatedAt:a.createdAt});
+  const jobPath='voiceoverJobs/voiceoverJob_'+remote;
+  h.set(jobPath,{...h.docs.get(jobPath),userId:'foreign-owner'});
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'cancel_requested',externalJobId:remote,updatedAt:a.createdAt
+  });
+  const session=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...session,consentSnapshot:{...session.consentSnapshot,voiceover:false}});
+  const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>
+    body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}},t);
+  assert.equal(result,'retry');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
+  assert.equal(h.docs.get(jobPath).userId,'foreign-owner');
+  assert.equal(h.docs.get(jobPath).outputDeletedAt,undefined);
+});
