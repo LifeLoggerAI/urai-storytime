@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
+import { confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone } from "./storytime-voiceover-result-guard.js";
 import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, type StorytimeVoiceoverAdmission } from "./storytime-voiceover-consent-admission.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
@@ -1157,6 +1158,13 @@ export const manageVoiceoverJob = onCall({
     throw new HttpsError("failed-precondition", "Voiceover job is missing governed worker binding.");
   }
 
+  // A confirmed local tombstone can never be reopened by a stale Jobs status
+  // or playback descriptor. Cancellation/deletion remain available for cleanup.
+  if ((input.action === "status" || input.action === "playback")
+    && hasStorytimeOutputTombstone(record)) {
+    throw new HttpsError("failed-precondition", "Voiceover output is no longer available.");
+  }
+
   const bridge = await storytimeJobsBridgeRequest({
     action: input.action,
     userId,
@@ -1166,6 +1174,20 @@ export const manageVoiceoverJob = onCall({
   });
 
   if (input.action === "playback") {
+    // The bridge may have replied before a concurrent deletion or revocation.
+    const [fresh, session] = await Promise.all([
+      voiceoverRef.get(),
+      db.collection("storySessions").doc(sessionId).get()
+    ]);
+    const latest = fresh.data() || {}, sourceSession = session.data() || {};
+    if (!fresh.exists || latest.userId !== userId || latest.externalJobId !== externalJobId
+      || hasStorytimeOutputTombstone(latest)
+      || !session.exists || sourceSession.userId !== userId
+      || sourceSession.consentSnapshot?.voiceover !== true
+      || sourceSession.deleted === true || sourceSession.retired === true
+      || sourceSession.revoked === true) {
+      throw new HttpsError("failed-precondition", "Current voiceover playback authority is unavailable.");
+    }
     const playback = bridge.playback as Record<string, unknown> | undefined;
     const delivery = StorytimeNarratorDeliverySchema.parse(playback?.delivery);
     if (delivery.jobId !== externalJobId || delivery.sessionId !== sessionId
@@ -1179,18 +1201,43 @@ export const manageVoiceoverJob = onCall({
   if (input.action === "status" || input.action === "cancel") {
     const job = bridge.job && typeof bridge.job === "object" ? bridge.job as Record<string, unknown> : {};
     const status = typeof job.status === "string" ? job.status : "unknown";
-    await voiceoverRef.set({
-      status: status.toLowerCase(),
-      safeOutput: job.output && typeof job.output === "object" ? job.output : null,
-      updatedAt: now()
-    }, { merge: true });
+    // The remote reply is not a lease on local authority. Re-read in the
+    // transaction so an in-flight status/cancel cannot resurrect deleted media.
+    const updated = await db.runTransaction(async transaction => {
+      const fresh = await transaction.get(voiceoverRef);
+      const current = fresh.data() || {};
+      if (!fresh.exists || current.userId !== userId || current.externalJobId !== externalJobId
+        || current.sessionId !== sessionId || current.narratorScriptId !== narratorScriptId) {
+        throw new HttpsError("permission-denied", "Voiceover job is unavailable.");
+      }
+      if (hasStorytimeOutputTombstone(current)) return false;
+      transaction.update(voiceoverRef, {
+        status: status.toLowerCase(),
+        safeOutput: job.output && typeof job.output === "object" ? job.output : null,
+        updatedAt: now()
+      });
+      return true;
+    });
+    if (!updated) return { ok: true, job: { status: "OUTPUT_DELETED", output: null } };
   } else if (input.action === "delete-output") {
-    await voiceoverRef.set({
-      status: "output_deleted",
-      safeOutput: null,
-      outputDeletedAt: now(),
-      updatedAt: now()
-    }, { merge: true });
+    // HTTP 200 / ok:true does not prove private bytes were deleted by Jobs.
+    if (!confirmedStorytimeOutputDeletion(bridge)) {
+      throw new HttpsError("failed-precondition", "Downstream narrator output deletion is not confirmed.");
+    }
+    await db.runTransaction(async transaction => {
+      const fresh = await transaction.get(voiceoverRef);
+      const current = fresh.data() || {};
+      if (!fresh.exists || current.userId !== userId || current.externalJobId !== externalJobId
+        || current.sessionId !== sessionId || current.narratorScriptId !== narratorScriptId) {
+        throw new HttpsError("permission-denied", "Voiceover job is unavailable.");
+      }
+      transaction.update(voiceoverRef, {
+        status: "output_deleted",
+        safeOutput: null,
+        outputDeletedAt: now(),
+        updatedAt: now()
+      });
+    });
   }
 
   auditLog({ event: `voiceover_${input.action}`, userId, sessionId });
