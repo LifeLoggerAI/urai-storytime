@@ -156,7 +156,7 @@ test("real Node CLI returns nonzero and redacted denial for missing project and 
     assert.equal(result.status,1);
     assert.match(result.stderr,new RegExp("acceptance_denied:"+expected));
     assert.equal(result.stdout,"");
-    assert.doesNotMatch(result.stderr,/at file:|Error:|https?:\\/\\//);
+    assert.doesNotMatch(result.stderr,/at file:|Error:|https?:\/\//);
   }
 });
 test("fixture mismatch is rejected before destructive remote cancel or delete",async()=>{
