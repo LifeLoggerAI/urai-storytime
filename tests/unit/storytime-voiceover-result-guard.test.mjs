@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 
 const guardSource = readFileSync("functions/src/storytime-voiceover-result-guard.ts", "utf8");
-const { confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone } = await import(
+const { boundStorytimeRemoteJob, confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone, preservedStorytimeTerminalStatus } = await import(
   "data:text/javascript;base64," + Buffer.from(stripTypeScriptTypes(guardSource)).toString("base64")
 );
 const source = readFileSync("functions/src/storytime.ts", "utf8");
@@ -35,7 +35,37 @@ test("callable checks the deletion receipt before writing a local output tombsto
   assert.ok(receipt >= 0 && write > receipt);
   assert.match(manage,/Downstream narrator output deletion is not confirmed/);
   assert.match(manage,/transaction\.get\(voiceoverRef\)/);
-  assert.match(manage,/hasStorytimeOutputTombstone\(current\)\) return false/);
+  assert.match(manage,/hasStorytimeOutputTombstone\(current\)\) return "OUTPUT_DELETED"/);
   assert.match(manage,/Current voiceover playback authority is unavailable/);
   assert.doesNotMatch(manage,/await voiceoverRef\.set\(/);
+});
+
+test("status/cancel projections must match exactly the original Jobs identity", () => {
+  const expected = "01JXBOUNDVOICE001";
+  const projection = { jobId: expected, status: "CANCELLED", output: { mimeType: "audio/mpeg" } };
+  assert.deepEqual(boundStorytimeRemoteJob({ ok: true, job: projection }, expected), projection);
+  for (const response of [
+    { ok: true }, { ok: true, job: null }, { ok: true, job: [] },
+    { ok: true, job: { status: "CANCELLED" } },
+    { ok: true, job: { ...projection, jobId: "foreign-worker-job" } },
+    { ok: true, job: { ...projection, status: "" } },
+    { ok: true, job: { ...projection, status: 1 } }
+  ]) assert.equal(boundStorytimeRemoteJob(response, expected), null);
+  const identity = manage.indexOf("const job = boundStorytimeRemoteJob(bridge, externalJobId);");
+  const write = manage.indexOf("transaction.update(voiceoverRef", identity);
+  assert.ok(identity >= 0 && write > identity);
+  assert.match(manage, /Remote narrator job identity is unavailable/);
+});
+
+test("a delayed status cannot regress a local terminal job", () => {
+  assert.equal(preservedStorytimeTerminalStatus({ status: "cancelled" }, "RUNNING"), "CANCELLED");
+  assert.equal(preservedStorytimeTerminalStatus({ status: "failed" }, "PENDING"), "FAILED");
+  assert.equal(preservedStorytimeTerminalStatus({ status: "success" }, "RUNNING"), "SUCCESS");
+  assert.equal(preservedStorytimeTerminalStatus({ status: "completed" }, "SUCCESS"), null);
+  assert.equal(preservedStorytimeTerminalStatus({ status: "cancellation_requested" }, "RUNNING"), "CANCELLATION_REQUESTED");
+  assert.equal(preservedStorytimeTerminalStatus({ status: "cancelled" }, "CANCELLED"), null);
+  assert.equal(preservedStorytimeTerminalStatus({ status: "queued" }, "RUNNING"), null);
+  const fence = manage.indexOf("preservedStorytimeTerminalStatus(current, status)");
+  const write = manage.indexOf("transaction.update(voiceoverRef", fence);
+  assert.ok(fence >= 0 && write > fence);
 });
