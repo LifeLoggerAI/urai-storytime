@@ -218,11 +218,12 @@ test('revoked source with known remote identity requires cancellation, not reaut
   h.set('storySessions/session-a',{...sess,consentSnapshot:{...sess.consentSnapshot,voiceover:false}});
   const calls=[];
   const result=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
-    calls.push(body);return {ok:true,job:{status:'CANCELLED'}};
+    calls.push(body);return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}};
   },t);
   assert.equal(result,'cancelled');
-  assert.equal(calls.length,1);
+  assert.equal(calls.length,2);
   assert.equal(calls[0].action,'cancel');
+  assert.equal(calls[1].action,'delete-output');
   assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancelled');
 });
 
@@ -270,9 +271,9 @@ test('failed cancellation is retried and later completes after downstream recove
   },t),'retry');
   assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
   assert.equal(await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
-    attempts++;assert.equal(body.action,'cancel');return {ok:true,job:{status:'CANCELLED'}};
+    attempts++;assert.equal(body.action,'cancel');return body.action==='cancel' ? {ok:true,job:{status:'CANCELLED'}} : {ok:true,deletion:{deleted:true}};
   },t+61_000),'cancelled');
-  assert.equal(attempts,2);
+  assert.equal(attempts,3);
 });
 test('consent revoked immediately after lease prevents remote create', async () => {
   const h=fixture(),a=input(),t=Date.parse('2026-10-14T22:31:00Z');
@@ -292,4 +293,29 @@ test('consent revoked immediately after lease prevents remote create', async () 
   },t),'needs_review');
   assert.equal(remote,0);
   assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'operator_reconciliation_required');
+});
+
+test('revocation does not certify terminal cancellation without an output deletion receipt',async()=>{
+  const h=fixture(),a=input(),now=Date.parse('2026-10-14T22:31:00Z');
+  await stageStorytimeVoiceoverConsent(h.db,a);
+  await markStorytimeVoiceoverDispatchUncertain(h.db,a,{
+    state:'reconciliation_required',externalJobId:'synthetic-job-001',updatedAt:a.createdAt
+  });
+  const prior=h.docs.get('storySessions/session-a');
+  h.set('storySessions/session-a',{...prior,consentSnapshot:{...prior.consentSnapshot,voiceover:false}});
+  let calls=0;
+  const first=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls++;
+    if(body.action==='cancel')return {ok:true,job:{status:'CANCELLED'}};
+    return {ok:false};
+  },now);
+  assert.equal(first,'retry');
+  assert.equal(h.docs.get('storytimeVoiceoverDispatchIntents/'+a.idempotencyKey).state,'cancel_required');
+  const second=await recoverStorytimeVoiceoverIntent(h.db,a.idempotencyKey,async body=>{
+    calls++;
+    if(body.action==='cancel')return {ok:true,job:{status:'CANCELLED'}};
+    return {ok:true,deletion:{deleted:true}};
+  },now+61_000);
+  assert.equal(second,'cancelled');
+  assert.equal(calls,4);
 });

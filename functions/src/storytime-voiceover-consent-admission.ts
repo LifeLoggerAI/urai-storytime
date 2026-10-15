@@ -414,14 +414,15 @@ export async function recoverStorytimeVoiceoverIntent(
     try {
       const result = await bridge({ action: "cancel", ...identity, jobId: remoteId });
       const status = String((result.job as Record<string, unknown> | undefined)?.status || "");
-      if (status === "SUCCESS") {
-        const deletion = await bridge({ action: "delete-output", ...identity, jobId: remoteId });
-        if (!deletion.deletion || typeof deletion.deletion !== "object" ||
-          (deletion.deletion as Record<string, unknown>).deleted !== true) {
-          throw new Error("unconfirmed_audio_deletion");
-        }
-      } else if (!["CANCELLED", "FAILED", "DEAD"].includes(status)) {
+      if (!["SUCCESS", "CANCELLED", "FAILED", "DEAD"].includes(status)) {
         throw new Error("cancellation_unconfirmed");
+      }
+      // Every terminal state can retain private output. Completion requires
+      // an explicit Jobs deletion receipt, including confirmed absence.
+      const deletion = await bridge({ action: "delete-output", ...identity, jobId: remoteId });
+      if (!deletion.deletion || typeof deletion.deletion !== "object" ||
+        (deletion.deletion as Record<string, unknown>).deleted !== true) {
+        throw new Error("unconfirmed_audio_deletion");
       }
       await settleStorytimeVoiceoverRecovery(db, key, token, clockMs,
         "cancelled", "cancellation_unconfirmed", remoteId);
