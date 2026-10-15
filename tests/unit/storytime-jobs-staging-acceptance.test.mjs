@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import {runAcceptance,validateTarget} from "../../scripts/storytime-jobs-staging-acceptance.mjs";
+import {runAcceptance,validateTarget,safeDenialCode} from "../../scripts/storytime-jobs-staging-acceptance.mjs";
 
 const project="urai-storytime-staging-approved";
 const env=()=>({
@@ -25,19 +25,21 @@ const env=()=>({
   STORYTIME_ACCEPTANCE_MUTATION_APPROVED:"true",
   STORYTIME_ACCEPTANCE_REVOKED_FIXTURE_APPROVED:"true"
 });
-const fakeToken=(uid,proj=project)=>{
+const fakeToken=(uid,proj=project,{expired=false,missingExpiration=false}={})=>{
   const enc=o=>Buffer.from(JSON.stringify(o)).toString("base64url");
+  const now=Math.floor(Date.now()/1000);
   return enc({alg:"none"})+"."+enc({sub:uid,aud:proj,
-    iss:"https://securetoken.google.com/"+proj})+".fake";
+    iss:"https://securetoken.google.com/"+proj,iat:now-5,
+    ...(!missingExpiration?{exp:expired?now-60:now+3600}:{})})+".fake";
 };
-function fakeFetch({malformed=false,wrongAudience=false,wrongJobId=false,wrongCancelId=false}={}) {
+function fakeFetch({malformed=false,wrongAudience=false,wrongJobId=false,wrongCancelId=false,expiredToken=false,missingExpiration=false}={}) {
   const calls=[];
   const answer=(status,data)=>({ok:status>=200&&status<300,status,async json(){return data}});
   const fetchImpl=async(url,options)=>{
     const data=JSON.parse(options.body);
     if (url.includes("signInWithPassword")) return answer(200,{
       idToken:fakeToken(data.email.includes("owner")?"test-owner":"test-other",
-        wrongAudience?"urai-4dc1d":project)
+        wrongAudience?"urai-4dc1d":project,{expired:expiredToken,missingExpiration})
     });
     if (url.includes("accounts:lookup")) {
       const claims=JSON.parse(Buffer.from(data.idToken.split(".")[1],"base64url").toString());
@@ -169,4 +171,19 @@ test("fixture mismatch is rejected before destructive remote cancel or delete",a
     fetchImpl:cancel.fetchImpl}),/bound_remote_job_cancellation_unconfirmed/);
   assert.equal(cancel.calls.includes("test-owner:cancel"),true);
   assert.equal(cancel.calls.some(s=>s==="test-owner:delete-output"),false);
+});
+
+test("expired or missing-expiry Firebase identity tokens fail before access checks",async()=>{
+  for (const input of [{expiredToken:true},{missingExpiration:true}]) {
+    const mock=fakeFetch(input);
+    await assert.rejects(runAcceptance({env:env(),mode:"staging",phase:"verify",
+      fetchImpl:mock.fetchImpl}),/firebase_token_expiration_invalid/);
+    assert.deepEqual(mock.calls,[]);
+  }
+});
+test("unexpected provider exceptions never leak secrets through CLI failure mapping",()=>{
+  assert.equal(safeDenialCode(new Error("https://example.com/?token=secretBearerToken123")),
+    "unexpected_execution_failure");
+  assert.equal(safeDenialCode({message:"Bearer sk-secret-abc123"}),
+    "unexpected_execution_failure");
 });

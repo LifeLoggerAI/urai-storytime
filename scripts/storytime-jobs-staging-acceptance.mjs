@@ -7,7 +7,15 @@ import { pathToFileURL } from "node:url";
 
 const modes = new Set(["staging", "emulator"]);
 const phases = new Set(["preflight", "verify", "exercise"]);
-const fail = code => { throw new Error(code); };
+class AcceptanceDenial extends Error {}
+const fail = code => { throw new AcceptanceDenial(code); };
+// Provider/network exceptions are not safe to print: their messages may contain
+// service URLs, credentials, or other request data.
+export function safeDenialCode(error) {
+  return error instanceof AcceptanceDenial
+    ? error.message.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 110)
+    : "unexpected_execution_failure";
+}
 const value = (env, key) => {
   const v = String(env[key] || "").trim();
   if (!v) fail("missing_" + key.toLowerCase());
@@ -77,6 +85,13 @@ function tokenClaims(token,project) {
   catch { fail("unreadable_firebase_id_token"); }
   if (claims.aud!==project || claims.iss!=="https://securetoken.google.com/"+project
     || !claims.sub) fail("firebase_audience_or_issuer_mismatch");
+  // A correctly scoped but expired (or undated) token must not authorize even
+  // a disposable staging operation. Firebase lookup remains the authority.
+  const now=Math.floor(Date.now()/1000);
+  if (!Number.isSafeInteger(claims.iat) || !Number.isSafeInteger(claims.exp)
+    || claims.iat>now+30 || claims.iat<now-7200
+    || claims.exp<=now+30 || claims.exp>now+7200 || claims.exp<=claims.iat)
+    fail("firebase_token_expiration_invalid");
   return claims;
 }
 async function post(fetchImpl,url,data,token) {
@@ -193,8 +208,7 @@ if (process.argv[1] && import.meta.url===pathToFileURL(process.argv[1]).href) {
     process.stdout.write(JSON.stringify(receipt,null,2)+"\n");
   })().catch(e=>{
     // No URLs, request bodies, IDs, passwords, bearer tokens or private data.
-    process.stderr.write("acceptance_denied:"+
-      String(e?.message||"unknown").replace(/[^A-Za-z0-9_-]/g,"").slice(0,110)+"\n");
+    process.stderr.write("acceptance_denied:"+safeDenialCode(e)+"\n");
     process.exitCode=1;
   });
 }
