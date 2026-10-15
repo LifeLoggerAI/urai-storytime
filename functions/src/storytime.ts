@@ -6,7 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
-import { confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone } from "./storytime-voiceover-result-guard.js";
+import { boundStorytimeRemoteJob, confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone, preservedStorytimeTerminalStatus } from "./storytime-voiceover-result-guard.js";
 import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, type StorytimeVoiceoverAdmission } from "./storytime-voiceover-consent-admission.js";
 import { reconcileStoryPersistence } from "./story-persistence.js";
 import { buildInitialStoryVersionRecord } from "./story-version.js";
@@ -1199,8 +1199,9 @@ export const manageVoiceoverJob = onCall({
   }
 
   if (input.action === "status" || input.action === "cancel") {
-    const job = bridge.job && typeof bridge.job === "object" ? bridge.job as Record<string, unknown> : {};
-    const status = typeof job.status === "string" ? job.status : "unknown";
+    const job = boundStorytimeRemoteJob(bridge, externalJobId);
+    if (!job) throw new HttpsError("failed-precondition", "Remote narrator job identity is unavailable.");
+    const status = job.status as string;
     // The remote reply is not a lease on local authority. Re-read in the
     // transaction so an in-flight status/cancel cannot resurrect deleted media.
     const updated = await db.runTransaction(async transaction => {
@@ -1210,15 +1211,17 @@ export const manageVoiceoverJob = onCall({
         || current.sessionId !== sessionId || current.narratorScriptId !== narratorScriptId) {
         throw new HttpsError("permission-denied", "Voiceover job is unavailable.");
       }
-      if (hasStorytimeOutputTombstone(current)) return false;
+      if (hasStorytimeOutputTombstone(current)) return "OUTPUT_DELETED";
+      const preserved = preservedStorytimeTerminalStatus(current, status);
+      if (preserved) return preserved;
       transaction.update(voiceoverRef, {
         status: status.toLowerCase(),
         safeOutput: job.output && typeof job.output === "object" ? job.output : null,
         updatedAt: now()
       });
-      return true;
+      return null;
     });
-    if (!updated) return { ok: true, job: { status: "OUTPUT_DELETED", output: null } };
+    if (updated !== null) return { ok: true, job: { jobId: externalJobId, status: updated, output: null } };
   } else if (input.action === "delete-output") {
     // HTTP 200 / ok:true does not prove private bytes were deleted by Jobs.
     if (!confirmedStorytimeOutputDeletion(bridge)) {
