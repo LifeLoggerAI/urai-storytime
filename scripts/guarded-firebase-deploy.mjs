@@ -51,6 +51,9 @@ export function attestStorytimeTarget(firebaseRc, env = {}) {
     if (typeof id !== 'string' || !firebaseProjectId.test(id) || !id.startsWith('urai-storytime')) {
       throw new FirebaseTargetHold(`Unapproved Firebase alias target for ${alias}`);
     }
+    if (id !== configured) {
+      throw new FirebaseTargetHold(`Firebase alias ${alias} must use the exact configured Storytime project`);
+    }
   }
   if (firebaseRc.targets !== undefined) {
     if (!isRecord(firebaseRc.targets)) {
@@ -60,6 +63,19 @@ export function attestStorytimeTarget(firebaseRc, env = {}) {
     for (const [targetId, data] of Object.entries(firebaseRc.targets)) {
       if (!approved.has(targetId) || !isRecord(data)) {
         throw new FirebaseTargetHold(`Unbound Firebase target for ${targetId}`);
+      }
+      // Firebase target aliases select Hosting sites *inside* the project. The
+      // project match alone is not sufficient to approve another site's identity.
+      if (Object.keys(data).length !== 1 || !isRecord(data.hosting)
+        || Object.keys(data.hosting).length === 0) {
+        throw new FirebaseTargetHold(`Invalid Storytime Hosting target configuration for ${targetId}`);
+      }
+      for (const [targetName, sites] of Object.entries(data.hosting)) {
+        if (!/^[a-z][a-z0-9-]{0,62}$/.test(targetName) || !Array.isArray(sites)
+          || sites.length === 0 || new Set(sites).size !== sites.length
+          || sites.some(site => typeof site !== 'string' || !/^urai-storytime-[a-z0-9][a-z0-9-]{0,62}$/.test(site))) {
+          throw new FirebaseTargetHold(`Invalid Storytime Hosting target ${targetName}`);
+        }
       }
     }
   }

@@ -54,6 +54,42 @@ test('invalid project identity is rejected', () => {
 });
 test('invalid configuration structure is rejected', () =>
   assert.throws(() => attestStorytimeTarget({projects:[]},env), /invalid Firebase projects/));
+test('second alias cannot silently point to another Storytime Firebase project', () => {
+  const config=valid();config.projects.production='urai-storytime-other';
+  assert.throws(() => attestStorytimeTarget(config,env), /alias.*project|same.*project/i);
+});
+test('same-project aliases remain valid before release authorization', () => {
+  const config=valid();config.projects.production=projectId;
+  assert.equal(attestStorytimeTarget(config,env),projectId);
+});
+test('Hosting site must remain Storytime-scoped', () => {
+  const config=valid();config.targets[projectId].hosting.web=['urai-web-prod'];
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
+test('empty Hosting site list is rejected', () => {
+  const config=valid();config.targets[projectId].hosting.web=[];
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
+test('null Hosting configuration cannot pass target attestation', () => {
+  const config=valid();config.targets[projectId].hosting=null;
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
+test('duplicate Hosting site entries are rejected', () => {
+  const config=valid();config.targets[projectId].hosting.web=['urai-storytime-staging','urai-storytime-staging'];
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
+test('unexpected non-Hosting target types require separate source review', () => {
+  const config=valid();config.targets[projectId].storage={images:['urai-storytime-media']};
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
+test('multiple valid Storytime Hosting sites are allowed only within pinned project', () => {
+  const config=valid();config.targets[projectId].hosting.web=['urai-storytime-staging','urai-storytime-preview'];
+  assert.equal(attestStorytimeTarget(config,env),projectId);
+});
+test('Hosting target names reject malformed or nonstring sites', () => {
+  const config=valid();config.targets[projectId].hosting.web=[false];
+  assert.throws(() => attestStorytimeTarget(config,env), /Hosting target/);
+});
 test('additional flags and --project override are rejected', () => {
   assert.throws(() => parseDeployArgs(['--project','urai-4dc1d']), /override/);
   assert.throws(() => parseDeployArgs(['--only','functions','--project','urai-4dc1d']), /override/);
