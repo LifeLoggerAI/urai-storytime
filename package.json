@@ -31,13 +31,14 @@
     "emulators:start": "firebase emulators:start --only auth,firestore,storage --project demo-urai-storytime",
     "emulators:test": "firebase emulators:exec --only auth,firestore,storage --project demo-urai-storytime \"npm run test:security-rules && npm run test:emulator-runtime && npm run test:emulator-behavior-spec\"",
     "firebase:emulators": "firebase emulators:start",
-    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes",
-    "deploy:functions": "firebase deploy --only functions",
-    "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:staging": "npm run build && npm run test:production-config && firebase deploy --only firestore:rules,firestore:indexes,functions,hosting",
-    "deploy:production": "npm run build && npm run validate:release-promotion && firebase deploy --only firestore:rules,firestore:indexes,functions,hosting",
-    "deploy": "npm run build && firebase deploy",
-    "format": "node scripts/format-check.mjs"
+    "deploy:rules": "node scripts/guarded-firebase-deploy.mjs --only firestore:rules,firestore:indexes",
+    "deploy:functions": "node scripts/guarded-firebase-deploy.mjs --only functions",
+    "deploy:hosting": "node scripts/guarded-firebase-deploy.mjs --only hosting",
+    "deploy:staging": "npm run test:firebase-target && npm run build && npm run test:production-config && node scripts/guarded-firebase-deploy.mjs --only firestore:rules,firestore:indexes,functions,hosting",
+    "deploy:production": "npm run test:firebase-target && npm run build && npm run validate:release-promotion && node scripts/guarded-firebase-deploy.mjs --only firestore:rules,firestore:indexes,functions,hosting",
+    "deploy": "npm run test:firebase-target && npm run build && node scripts/guarded-firebase-deploy.mjs",
+    "format": "node scripts/format-check.mjs",
+    "test:firebase-target": "node scripts/guarded-firebase-deploy.mjs --check-only"
   },
   "dependencies": {
     "firebase": "^11.10.0",
