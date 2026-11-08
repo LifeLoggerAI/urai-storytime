@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { stripTypeScriptTypes } from 'node:module';
 
 const source = readFileSync('functions/src/storytime-request-binding.ts', 'utf8');
-const { sameStorytimeGenerationBinding, isReusableStorytimeSession } = await import(
+const { sameStorytimeGenerationBinding, isReusableStorytimeSession, isValidStorytimeSessionId } = await import(
   'data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(source)).toString('base64')
 );
 
@@ -27,14 +27,32 @@ test('unverified or malformed historical fingerprints fail closed', () => {
   assert.equal(sameStorytimeGenerationBinding({ reviewedRequestSha256: reviewed, providerInputSha256: 'x' }, exact), false);
 });
 
-test('retry returns only a ready, nonrevoked story with exact owner and request', () => {
-  const session = { userId: 'owner-a', requestId: 'request-123', status: 'ready', revoked: false };
-  assert.equal(isReusableStorytimeSession(session, 'owner-a', 'request-123'), true);
-  assert.equal(isReusableStorytimeSession(session, 'owner-b', 'request-123'), false);
-  assert.equal(isReusableStorytimeSession(session, 'owner-a', 'request-999'), false);
-  assert.equal(isReusableStorytimeSession({ ...session, status: 'deleted' }, 'owner-a', 'request-123'), false);
-  assert.equal(isReusableStorytimeSession({ ...session, revoked: true }, 'owner-a', 'request-123'), false);
-  assert.equal(isReusableStorytimeSession(null, 'owner-a', 'request-123'), false);
+test('retry returns only the exact owner, request, approved source and creative derivative', () => {
+  const session = {
+    userId: 'owner-a', requestId: 'request-123', status: 'ready', safetyStatus: 'approved', revoked: false,
+    requestReview: { processedRequestSha256: reviewed },
+    provenance: { factualStatus: 'creative_derivative_not_source_evidence' }
+  };
+  const reusable = (value, owner = 'owner-a', id = 'request-123', hash = reviewed) =>
+    isReusableStorytimeSession(value, owner, id, hash);
+  assert.equal(reusable(session), true);
+  assert.equal(reusable(session, 'owner-b'), false);
+  assert.equal(reusable(session, 'owner-a', 'request-other'), false);
+  assert.equal(reusable(session, 'owner-a', 'request-123', 'c'.repeat(64)), false);
+  assert.equal(reusable({ ...session, requestReview: { processedRequestSha256: 'd'.repeat(64) } }), false);
+  assert.equal(reusable({ ...session, requestReview: null }), false);
+  assert.equal(reusable({ ...session, status: 'deleted' }), false);
+  assert.equal(reusable({ ...session, safetyStatus: 'needs_review' }), false);
+  assert.equal(reusable({ ...session, revoked: true }), false);
+  assert.equal(reusable({ ...session, provenance: { factualStatus: 'recorded_source_truth' } }), false);
+  assert.equal(reusable(null), false);
+});
+
+test('missing or malformed completed story IDs are never eligible for transactional reuse', () => {
+  for (const invalid of [null, undefined, '', 'a', '../x', 'x/y', 'x '.repeat(10), 'a'.repeat(129)]) {
+    assert.equal(isValidStorytimeSessionId(invalid), false);
+  }
+  assert.equal(isValidStorytimeSessionId('storySession_1000000000000_fixture'), true);
 });
 
 test('generation callable performs binding check before transactional owner story reuse', () => {
@@ -47,7 +65,12 @@ test('generation callable performs binding check before transactional owner stor
   const reuse = claim.indexOf('if (data.status === "succeeded"');
   assert.ok(binding > -1 && reuse > binding, 'fingerprint must precede reuse');
   assert.match(claim, /transaction\.get\(db\.collection\("storySessions"\)\.doc\(data\.sessionId\)\)/);
-  assert.match(claim, /isReusableStorytimeSession\(original\.data\(\), userId, input\.requestId\)/);
+  assert.match(claim, /isReusableStorytimeSession\(original\.data\(\), userId, input\.requestId, expectedReviewedRequestSha256\)/);
   assert.match(claim, /reviewedRequestSha256: expectedReviewedRequestSha256/);
   assert.match(claim, /providerInputSha256: expectedProviderInputSha256/);
+  assert.match(claim, /if \(!isValidStorytimeSessionId\(data\.sessionId\)\)/);
+  assert.match(claim, /if \(data\.cancellationRequested === true/);
+  assert.match(claim, /throw new HttpsError\("failed-precondition", "This Storytime request requires reconciliation before any further generation\."\)/);
+  assert.ok(claim.indexOf('if (data.status === "succeeded")') > claim.indexOf('if (data.cancellationRequested === true'));
+  assert.ok(claim.indexOf('throw new HttpsError("failed-precondition", "This Storytime request requires reconciliation') > claim.indexOf('if (data.status === "processing")'));
 });
