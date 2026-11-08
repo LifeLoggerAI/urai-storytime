@@ -8,8 +8,10 @@ export function redactForPublicShare(text: string): string {
 
 export function explainWhyGenerated(sourceSignals: string[]): string {
   if (!sourceSignals.length) {
-    return "This story was generated from your selected Storytime inputs only.";
+    return "Created from submitted Storytime inputs. This creative reconstruction is not verified against recorded memories.";
   }
 
-  return `This story was generated from opted-in URAI signals: ${sourceSignals.join(", ")}. You can turn these sources off in Story Settings.`;
+  // These are user-provided labels, not fetched source artifacts. Avoid
+  // implying an authorized source lookup or leaking labels into UI prose.
+  return "Created from submitted Storytime inputs. Source-signal labels were saved as unverified context, not used to generate the narrative or checked against recorded memories.";
 }
