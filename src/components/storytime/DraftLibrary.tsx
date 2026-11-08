@@ -1,16 +1,17 @@
 "use client";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
+import { captureStorytimeAccountLease } from "@/lib/storytime/current-account-lease";
 import type { StoryDraft } from "@/lib/storytime/types";
 
 type State =
   | { status: "blocked"; drafts: StoryDraft[] }
   | { status: "signedOut"; drafts: StoryDraft[] }
   | { status: "loading"; drafts: StoryDraft[] }
-  | { status: "ready"; drafts: StoryDraft[] }
+  | { status: "ready"; drafts: StoryDraft[]; user: User }
   | { status: "error"; drafts: StoryDraft[] };
 
 export function DraftLibrary() {
@@ -22,12 +23,19 @@ export function DraftLibrary() {
   useEffect(() => {
     if (!cloudReady) return undefined;
     let active = true;
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
+    let authEpoch = 0;
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!active) return;
+      const epoch = ++authEpoch;
+      const actorLease = captureStorytimeAccountLease(
+        user, epoch, () => auth.currentUser, () => authEpoch
+      );
       if (!user) {
         setState({ status: "signedOut", drafts: [] });
         return;
       }
+      setState({ status: "loading", drafts: [] });
       try {
         const snapshot = await getDocs(query(
           collection(getFirebaseDb(), "storyDrafts"),
@@ -35,20 +43,27 @@ export function DraftLibrary() {
           orderBy("updatedAt", "desc"),
           limit(5)
         ));
-        if (!active) return;
+        if (!actorLease.isCurrent()) return;
         setState({
           status: "ready",
+          user,
           drafts: snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryDraft)
         });
       } catch {
-        if (active) setState({ status: "error", drafts: [] });
+        if (actorLease.isCurrent()) setState({ status: "error", drafts: [] });
       }
     });
     return () => {
       active = false;
+      authEpoch += 1;
       unsubscribe();
     };
   }, [cloudReady]);
+
+  if (state.status === "ready" && (!cloudReady || state.user !== getFirebaseAuth().currentUser
+    || state.drafts.some((draft) => draft.userId !== state.user.uid))) {
+    return <section className="storytime-card storytime-stack" aria-label="Private Storytime drafts" role="status" aria-live="polite" aria-busy={true}>Loading private drafts...</section>;
+  }
 
   return (
     <section className="storytime-card storytime-stack" aria-label="Private Storytime drafts">

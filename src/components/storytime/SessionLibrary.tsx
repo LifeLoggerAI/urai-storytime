@@ -1,9 +1,10 @@
 "use client";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
+import { captureStorytimeAccountLease } from "@/lib/storytime/current-account-lease";
 import type { StorySession } from "@/lib/storytime/types";
 
 type LibraryState =
@@ -11,7 +12,7 @@ type LibraryState =
   | { status: "loading"; message: string }
   | { status: "signedOut"; message: string }
   | { status: "empty"; message: string }
-  | { status: "ready"; sessions: StorySession[] }
+  | { status: "ready"; sessions: StorySession[]; user: User }
   | { status: "error"; message: string };
 
 function toErrorMessage(error: unknown) {
@@ -33,8 +34,14 @@ export function SessionLibrary() {
     if (!cloudReady) return undefined;
 
     let active = true;
-    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), async (user) => {
+    let authEpoch = 0;
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!active) return;
+      const epoch = ++authEpoch;
+      const actorLease = captureStorytimeAccountLease(
+        user, epoch, () => auth.currentUser, () => authEpoch
+      );
       if (!user) {
         setState({ status: "signedOut", message: "Sign in is required before saved cloud sessions can be listed." });
         return;
@@ -52,19 +59,25 @@ export function SessionLibrary() {
         const snapshot = await getDocs(sessionsQuery);
         const sessions = snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }) as StorySession);
 
-        if (!active) return;
-        setState(sessions.length > 0 ? { status: "ready", sessions } : { status: "empty", message: "No saved cloud sessions yet." });
+        if (!actorLease.isCurrent()) return;
+        setState(sessions.length > 0 ? { status: "ready", sessions, user } : { status: "empty", message: "No saved cloud sessions yet." });
       } catch (error) {
-        if (!active) return;
+        if (!actorLease.isCurrent()) return;
         setState({ status: "error", message: toErrorMessage(error) });
       }
     });
 
     return () => {
       active = false;
+      authEpoch += 1;
       unsubscribe();
     };
   }, [cloudReady]);
+
+  if (state.status === "ready" && (!cloudReady || state.user !== getFirebaseAuth().currentUser
+    || state.sessions.some((session) => session.userId !== state.user.uid))) {
+    return <section className="storytime-card storytime-stack" aria-label="Saved sessions" role="status" aria-live="polite" aria-busy={true}>Loading private session list...</section>;
+  }
 
   if (state.status === "ready") {
     return (
