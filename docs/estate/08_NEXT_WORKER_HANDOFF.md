@@ -24,3 +24,7 @@ Start from the present docs/estate/01 through 09, MANIFEST.json, SOURCE_TO_STORY
 Never turn an attributed family recollection into recorded fact. Never turn a model-generated scene into evidence. Preserve the exact source ID/hash and user corrections, and label unsupported claims unresolved. No protected memory, person likeness, cloned voice, private share or media export unless signed authority and purpose proven.
 
 Final decision remains **production HOLD**.
+
+
+## New permanent continuation evidence — 96 branch trees
+The previous two-tree inventory is **superseded in scope** by `docs/estate/history/BRANCH_TREES_01.json` through `BRANCH_TREES_08.json` and deduplicated `BRANCH_HEAD_AGGREGATE.json`: 96 branch heads, all nontruncated, 4,760 distinct Git blob identities, 66,472,643 Git-reported unique bytes, no raw-byte SHA-256; no checked-in common media types, but no off-Git media inspected. Historical original children's lock and 2024-dated audit are recovered in `history/HISTORICAL_CHILD_STORYTIME_CANON_CONFLICT_20261107.md`; May 11, 2026 is the observed historic branch commit date and must not be relabeled 2024. Key next worker tasks: deduplicate actual unique Git blob bytes and validate SHA-256 where retrievable; traverse all intermediate historical commits; inspect 4,120 dependency-path occurrences separately from original authored code; investigate documented external media with lawful/owner permission; resolve child-locked experience vs later adult narrative-memory consent.
