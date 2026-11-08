@@ -1,0 +1,100 @@
+{
+  "schema": "one-urai-storytime-historical-branch-head-summary-v1",
+  "repository": "LifeLoggerAI/urai-storytime",
+  "snapshot_date": "2026-11-07",
+  "branch_heads": 96,
+  "full_recursive_trees": 96,
+  "errors": [],
+  "truncated": [],
+  "branch_head_file_occurrences": 28282,
+  "branch_head_duplicated_byte_sum": 165225461,
+  "unique_paths": 4680,
+  "unique_sha1_blobs": 4760,
+  "distinct_blob_reported_bytes": 66472643,
+  "file_mode_occurrences": {
+    "100644": 28254,
+    "100755": 18,
+    "120000": 10
+  },
+  "functions_node_modules_path_occurrences": 4120,
+  "tracked_media_file_occurrences_matching_selected_extensions": 0,
+  "largest_branches": [
+    {
+      "name": "local-next-build-fixes",
+      "sha": "5ae2bde986f1eb30f516e8774ebe31a524abab42",
+      "files": 4229,
+      "bytes": 60830012
+    },
+    {
+      "name": "review/chalk-r782-storytime-firebase-target-identity-hold-20261105",
+      "sha": "312240f5da9042a2cc9d11dac179bed90dee51d1",
+      "files": 355,
+      "bytes": 1946848
+    },
+    {
+      "name": "codex/wave31-disposable-storytime-jobs-harness-20261014",
+      "sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "files": 353,
+      "bytes": 1932583
+    },
+    {
+      "name": "repair/dependency-advisories-20261007",
+      "sha": "33ecc480ffe96e83647a29e09969defeb84ca3fd",
+      "files": 350,
+      "bytes": 1893954
+    },
+    {
+      "name": "repair/storytime-current-private-session-20261010",
+      "sha": "7b35b574de7c29e181b1a1ac9f24f9ebe2a60bb5",
+      "files": 339,
+      "bytes": 1789086
+    },
+    {
+      "name": "repair/storytime-current-privacy-authority-20261008",
+      "sha": "3a8f47d0c11b248222b4a6d35d43b098a67c462a",
+      "files": 335,
+      "bytes": 1760213
+    },
+    {
+      "name": "repair/storytime-next-primary-advisories-20261007",
+      "sha": "c67dd1ebee2ea367521ee0743246f65e0c589361",
+      "files": 331,
+      "bytes": 1688436
+    },
+    {
+      "name": "repair/storytime-version-bound-deletion-recovery-20261007",
+      "sha": "cb458bfe0e4f392fbe379b69ffc1e160af32ef44",
+      "files": 330,
+      "bytes": 1686226
+    },
+    {
+      "name": "repair/storytime-final-output-authority-20261007",
+      "sha": "4e241a026bf49c6d6b160d8b7e5aff6e06a8dd41",
+      "files": 327,
+      "bytes": 1646679
+    },
+    {
+      "name": "repair/storytime-authenticated-private-delivery-20261007",
+      "sha": "f73ef6de49c5c842e282f90cc0c15e320f3411b4",
+      "files": 326,
+      "bytes": 1632963
+    }
+  ],
+  "source_files": [
+    "history/BRANCH_TREES_01.json",
+    "history/BRANCH_TREES_02.json",
+    "history/BRANCH_TREES_03.json",
+    "history/BRANCH_TREES_04.json",
+    "history/BRANCH_TREES_05.json",
+    "history/BRANCH_TREES_06.json",
+    "history/BRANCH_TREES_07.json",
+    "history/BRANCH_TREES_08.json"
+  ],
+  "limitations": [
+    "Only files reachable in 96 branch HEAD trees at snapshot; no unreachable, deleted or intermediate Git commit objects",
+    "Git blob SHA-1 and size metadata only; not downloaded SHA-256 per source blob",
+    "No external media bucket, LFS object, authorized user memory, past CI artifact downloads",
+    "Large local-next-build-fixes branch includes checked-in functions/node_modules dependency blobs",
+    "Current document-only branch itself changes during inventory; summary is observed source snapshot, not a self-consistent final forensic commit"
+  ]
+}
