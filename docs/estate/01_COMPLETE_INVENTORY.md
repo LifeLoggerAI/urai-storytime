@@ -26,3 +26,7 @@ The tree includes source text, Markdown, JSON, scripts, Next/React code, schemas
 
 ## Remaining coverage proof
 Retrieve actual bytes and calculate SHA-256 for every accessible main, review, and distinct historical blob. Enumerate every branch tree/commit graph, tags, CI artifacts and actual LFS/media object with errors captured. Never access real private memories absent specific authorization.
+
+
+## 2026-11-07 expanded historical branch-head inventory
+All **96 observed Git branch heads** were now recursively inventoried and committed in `docs/estate/history/BRANCH_TREES_01.json` through `BRANCH_TREES_08.json`. Each tree response had `truncated=false` and no fetch error. Deduplicated summary: `docs/estate/history/BRANCH_HEAD_AGGREGATE.json`. Across all heads: **28,282 repeated file entries, 4,680 unique paths, 4,760 distinct Git SHA-1 blobs, 66,472,643 distinct Git-reported blob bytes**. One historical branch (`local-next-build-fixes@5ae2bde986f1eb30f516e8774ebe31a524abab42`) has 4,229 tracked blobs, of which many are checked-in `functions/node_modules` dependencies. 10 symbolic-link occurrences and 18 executable-file mode occurrences were recorded (all in that branch); no common native image/audio/video extension was observed among tracked branch-head paths. **External Storage audio/media is still uninspected; intermediate historical commits and raw SHA-256 remain outside coverage.** See `docs/estate/history/HISTORICAL_CHILD_STORYTIME_CANON_CONFLICT_20261107.md` for recovered 2024-dated archive and provenance caveats.
