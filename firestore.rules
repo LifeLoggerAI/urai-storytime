@@ -35,28 +35,8 @@ service cloud.firestore {
     }
     function ownerOnlyCreate() { return signedIn() && request.resource.data.userId == request.auth.uid; }
     function ownerOnlyReadWrite(userId) { return isOwner(userId) || isAdmin(); }
-    function storySessionModerationFields() {
-      return [
-        'safetyStatus',
-        'safetyReview',
-        'safetyReviewedAt',
-        'safetyReviewedBy',
-        'moderationStatus',
-        'moderationDecision',
-        'moderationReviewedAt',
-        'moderationReviewedBy'
-      ];
-    }
-    function ownerStorySessionCreate() {
-      return ownerOnlyCreate()
-        && !request.resource.data.keys().hasAny(storySessionModerationFields());
-    }
-    function ownerStorySessionUpdate() {
-      return ownerOnlyReadWrite(resource.data.userId)
-        && request.resource.data.userId == resource.data.userId
-        && !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(storySessionModerationFields());
-    }
+    // Generated story and consent authority is written by verified server callables,
+    // never by a client using an owner claim. Admin SDK bypasses these rules.
     function privateFiniteTimeCreate() {
       return signedIn()
         && request.resource.data.ownerId == request.auth.uid
@@ -140,8 +120,7 @@ service cloud.firestore {
     }
     match /auditLogs/{auditLogId} {
       allow read: if isAdmin();
-      allow create: if signedIn();
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
     match /privacyRequests/{requestId} {
       allow read: if isSelf(resource.data.userId) || isAdmin();
@@ -150,61 +129,60 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /storySessions/{id} {
-      allow create: if ownerStorySessionCreate();
-      allow read, delete: if ownerOnlyReadWrite(resource.data.userId);
-      allow update: if ownerStorySessionUpdate();
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /storyChapters/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /storyMoments/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /memoryScenes/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /narratorScripts/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /ritualStorycards/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /userStoryPreferences/{id} {
       allow create: if ownerOnlyCreate();
       allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
     }
     match /storyExports/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /voiceoverJobs/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /timelineReplayEvents/{id} {
-      allow create: if ownerOnlyCreate();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /emotionalArcSummaries/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /relationshipStoryThreads/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /weeklyStoryScrolls/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /monthlyStoryScrolls/{id} {
-      allow create: if ownerOnlyCreate() || isAdmin();
-      allow read, update, delete: if ownerOnlyReadWrite(resource.data.userId);
+      allow read: if ownerOnlyReadWrite(resource.data.userId);
+      allow create, update, delete: if false;
     }
     match /storyAnalyticsEvents/{id} {
       allow create: if ownerOnlyCreate();
