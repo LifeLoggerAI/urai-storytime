@@ -1,10 +1,11 @@
 "use client";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
+import { captureStorytimeAccountLease } from "@/lib/storytime/current-account-lease";
 import { AuthPanel } from "./AuthPanel";
 import { DraftLibrary } from "./DraftLibrary";
 import { SessionLibrary } from "./SessionLibrary";
@@ -93,6 +94,15 @@ export function StorytimeHome() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const cloudReady = isStorytimeCloudModeEnabled();
+  const [formActor, setFormActor] = useState<User | null>(null);
+  const authEpoch = useRef(0);
+  const activeActor = useRef<User | null>(null);
+  const captureCurrentActor = () => {
+    const auth = getFirebaseAuth();
+    const actor = auth.currentUser;
+    const lease = captureStorytimeAccountLease(actor, authEpoch.current, () => auth.currentUser, () => authEpoch.current);
+    return { actor, isCurrent: () => actor !== null && activeActor.current === actor && lease.isCurrent() };
+  };
 
   const currentDraftFingerprint = useMemo(() => draftFingerprint({
     title,
@@ -105,14 +115,7 @@ export function StorytimeHome() {
   useEffect(() => {
     if (!cloudReady || typeof window === "undefined") return undefined;
     const requestedDraftId = new URLSearchParams(window.location.search).get("draft");
-    if (!requestedDraftId) return undefined;
-    if (!validDraftId(requestedDraftId)) {
-      setDraftStatus("The requested private draft id is invalid.");
-      return undefined;
-    }
-
     let active = true;
-    let authEpoch = 0;
     const auth = getFirebaseAuth();
     const clearResumedDraft = () => {
       setTitle("");
@@ -128,14 +131,28 @@ export function StorytimeHome() {
       setDraftId(null);
       setDraftRevision(0);
       setLastSavedDraftFingerprint(null);
+      setDraftSaving(false);
+      setIsSubmitting(false);
+      setSubmitError(null);
     };
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!active) return;
-      const epoch = ++authEpoch;
-      const isCurrentAccount = () => active && epoch === authEpoch && auth.currentUser === user;
+      authEpoch.current += 1;
+      activeActor.current = user;
+      const lease = captureStorytimeAccountLease(user, authEpoch.current, () => auth.currentUser, () => authEpoch.current);
+      const isCurrentAccount = () => active && activeActor.current === user && lease.isCurrent();
       clearResumedDraft();
+      setFormActor(user);
       if (!user) {
         setDraftStatus("Sign in to resume this private draft.");
+        return;
+      }
+      if (!requestedDraftId) {
+        setDraftStatus(null);
+        return;
+      }
+      if (!validDraftId(requestedDraftId)) {
+        setDraftStatus("The requested private draft id is invalid.");
         return;
       }
       try {
@@ -177,7 +194,8 @@ export function StorytimeHome() {
 
     return () => {
       active = false;
-      authEpoch += 1;
+      authEpoch.current += 1;
+      activeActor.current = null;
       unsubscribe();
     };
   }, [cloudReady]);
@@ -187,14 +205,15 @@ export function StorytimeHome() {
     if (currentDraftFingerprint === lastSavedDraftFingerprint) return undefined;
     if (!title.trim() && !theme.trim() && !sourceText.trim()) return undefined;
 
-    const user = getFirebaseAuth().currentUser;
-    if (!user || !user.emailVerified) return undefined;
+    const { actor: user, isCurrent } = captureCurrentActor();
+    if (!user || !user.emailVerified || !isCurrent()) return undefined;
 
     const fingerprintAtSave = currentDraftFingerprint;
     const idAtSave = draftId || createDraftId();
     const expectedRevision = draftId ? draftRevision : 0;
 
     const timer = window.setTimeout(async () => {
+      if (!isCurrent()) return;
       setDraftSaving(true);
       setDraftStatus("Saving private draft…");
       try {
@@ -202,6 +221,7 @@ export function StorytimeHome() {
           getFirebaseFunctions(),
           "saveStoryDraft"
         );
+        if (!isCurrent()) return;
         const result = await saveDraft({
           draftId: idAtSave,
           expectedRevision,
@@ -220,6 +240,7 @@ export function StorytimeHome() {
             consentVersion: DRAFT_STORAGE_CONSENT_VERSION
           }
         });
+        if (!isCurrent()) return;
         if (!result.data.draftId || typeof result.data.revision !== "number") {
           throw new Error("Draft save did not return a revision.");
         }
@@ -228,10 +249,12 @@ export function StorytimeHome() {
         setLastSavedDraftFingerprint(fingerprintAtSave);
         setDraftStatus(`Private draft saved · revision ${result.data.revision}. Generation/provider consent is not stored.`);
       } catch {
-        setLastSavedDraftFingerprint(fingerprintAtSave);
-        setDraftStatus("Private draft autosave paused after a save failure. Edit the draft to retry. No provider request was made.");
+        if (isCurrent()) {
+          setLastSavedDraftFingerprint(fingerprintAtSave);
+          setDraftStatus("Private draft autosave paused after a save failure. Edit the draft to retry. No provider request was made.");
+        }
       } finally {
-        setDraftSaving(false);
+        if (isCurrent()) setDraftSaving(false);
       }
     }, 750);
 
@@ -276,6 +299,8 @@ export function StorytimeHome() {
 
   async function handleDeleteDraft() {
     if (!draftId) return;
+    const { isCurrent } = captureCurrentActor();
+    if (!isCurrent()) return;
     setDraftStatus("Deleting private draft…");
     try {
       const deleteDraft = httpsCallable<Record<string, unknown>, { deleted?: boolean }>(
@@ -283,13 +308,14 @@ export function StorytimeHome() {
         "deleteStoryDraft"
       );
       await deleteDraft({ draftId });
+      if (!isCurrent()) return;
       setDraftId(null);
       setDraftRevision(0);
       setLastSavedDraftFingerprint(null);
       setDraftStorageConsent(false);
       setDraftStatus("Private draft deleted.");
     } catch {
-      setDraftStatus("Private draft could not be deleted. No generation/provider request was made.");
+      if (isCurrent()) setDraftStatus("Private draft could not be deleted. No generation/provider request was made.");
     }
   }
 
@@ -321,12 +347,12 @@ export function StorytimeHome() {
       return;
     }
 
-    const auth = getFirebaseAuth();
-    if (!auth.currentUser) {
+    const { actor, isCurrent } = captureCurrentActor();
+    if (!actor || !isCurrent()) {
       setSubmitError("Sign in to create and save a private story.");
       return;
     }
-    if (!auth.currentUser.emailVerified) {
+    if (!actor.emailVerified) {
       setSubmitError("Verify the adult/guardian account email before creating a cloud story.");
       return;
     }
@@ -361,6 +387,7 @@ export function StorytimeHome() {
         },
       });
 
+      if (!isCurrent()) return;
       if (!result.data.sessionId) throw new Error("Story creation did not complete.");
       if (draftId) {
         try {
@@ -368,17 +395,24 @@ export function StorytimeHome() {
             getFirebaseFunctions(),
             "deleteStoryDraft"
           );
-          await deleteDraft({ draftId });
+          if (isCurrent()) await deleteDraft({ draftId });
         } catch {
           // Story generation succeeded. A stale private draft can still be deleted later by the owner.
         }
       }
-      window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
+      if (isCurrent()) window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
     } catch (error) {
-      setSubmitError(errorMessage());
+      if (isCurrent()) setSubmitError(errorMessage());
     } finally {
-      setIsSubmitting(false);
+      if (isCurrent()) setIsSubmitting(false);
     }
+  }
+
+  // The Auth SDK can change accounts before the callback/effect has cleared
+  // old form state. Hide the previous actor's source text during that interval.
+  if (cloudReady && (activeActor.current !== getFirebaseAuth().currentUser
+    || formActor !== getFirebaseAuth().currentUser)) {
+    return <main className="storytime-shell" role="status" aria-live="polite" aria-busy={true}>Checking private Storytime account...</main>;
   }
 
   return (
