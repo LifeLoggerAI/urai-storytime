@@ -183,12 +183,9 @@ test('rules keep Storytime private by default and enforce server-time public-sha
   includesAll(rules, [
     'function ownerOnlyCreate()',
     'function ownerOnlyReadWrite(userId)',
-    'function storySessionModerationFields()',
-    'function ownerStorySessionCreate()',
-    'function ownerStorySessionUpdate()',
-    "'safetyStatus'",
-    "'moderationDecision'",
-    '.affectedKeys()',
+    'match /storySessions/{id}',
+    'allow create, update, delete: if false;',
+    'match /auditLogs/{auditLogId}',
     'match /storySessions/{id}',
     'function activePublicShare()',
     "resource.data.schemaVersion == 'public-story-share-v2'",
@@ -202,6 +199,22 @@ test('rules keep Storytime private by default and enforce server-time public-sha
     'allow read, write: if false'
   ]);
 
+  const serverOwned = [
+    'storySessions', 'storyChapters', 'storyMoments', 'memoryScenes',
+    'narratorScripts', 'ritualStorycards', 'storyExports', 'voiceoverJobs',
+    'timelineReplayEvents', 'emotionalArcSummaries', 'relationshipStoryThreads',
+    'weeklyStoryScrolls', 'monthlyStoryScrolls'
+  ];
+  for (const collection of serverOwned) {
+    const clause = rules.match(new RegExp('match /' + collection + '/\\{id\\} \\{([\\s\\S]*?)\\n    \\}'));
+    assert.ok(clause, 'Missing protected collection: ' + collection);
+    assert.match(clause[1], /allow read: if ownerOnlyReadWrite\\(resource.data.userId\\)/);
+    assert.match(clause[1], /allow create, update, delete: if false;/);
+  }
+  const audit = rules.match(/match \\/auditLogs\\/\\{auditLogId\\} \\{([\\s\\S]*?)\\n    \\}/);
+  assert.ok(audit, 'Missing server-owned audit log rule');
+  assert.match(audit[1], /allow create, update, delete: if false;/);
+  assert.doesNotMatch(rules, /function ownerStorySessionCreate\\(\\)|function ownerStorySessionUpdate\\(\\)/);
   assert.match(storageRules, /allow read, write: if false/);
 });
 
