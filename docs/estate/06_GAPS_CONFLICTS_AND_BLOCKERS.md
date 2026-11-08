@@ -37,3 +37,7 @@ Implement/verify guided review of disputed/unresolved reconstructions, accessibl
 Read/hash all actual files and unique historical Git blobs, walk all branch commit graphs and retained CI assets, locate licensed/off-Git media, distinguish LFS pointers from actual bytes, reconcile source lineage without overwriting concurrent workers.
 
 No release/merge/paid provider operation authorized by this knowledge pack.
+
+
+## Additional historical canon and asset conflicts (2026-11-07)
+The 2024-dated StoryTime lock explicitly rejects interpreting children's emotional states and tracking; current Storytime handles adult/guardian creative emotional arcs. These must be governed as separate use cases. A historical branch `AUDIT_2024-10-26.md` claims uploaded static audio MP3s, while a recovered historic callable provides only a placeholder narrative and signed Cloud Storage locator construction. No tracked MP3 or PNG files appeared in any 96 branch-head trees; the external objects were not accessible or verified. Do not claim media absence or successful production from Git-path inspection. Original audit's printed digest is unverified; historical branch head is May 2026, not an authenticated October 2024 source date. Need source/approval/time-aware reconciliation, child-specific prohibition tests, actual provider object checks only under separate access, and per-sentence truth-source citations. See `history/BRANCH_HEAD_AGGREGATE.json` and `history/HISTORICAL_CHILD_STORYTIME_CANON_CONFLICT_20261107.md`.
