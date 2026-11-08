@@ -799,9 +799,12 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
       edited: false,
       factualStatus: "creative_derivative_not_source_evidence"
     },
+    // This generation path uses direct submitted text, title, tone and motifs.
+    // sourceSignals are stored as unverified labels, not resolved memory assets
+    // and are never sent to the narrative provider as source evidence.
     whyGenerated: input.sourceSignals.length
-      ? `Generated from opted-in signals: ${input.sourceSignals.join(", ")}.`
-      : "Generated from your direct Storytime input.",
+      ? "Created from submitted Storytime inputs. Source-signal labels were saved as unverified context, not used to generate the narrative or checked against recorded memories."
+      : "Created from submitted Storytime inputs. This creative reconstruction has not been verified against recorded memories.",
     safetyStatus: outputModeration.safetyStatus,
     consentSnapshot: input.consentSnapshot,
     createdAt,
