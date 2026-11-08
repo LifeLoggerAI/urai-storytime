@@ -1,0 +1,18 @@
+# Storytime 02 — Historical implementation and worker lineage
+
+**Review only — production HOLD.** Baseline main 73f586a0a2931961ae221af7cfc0caf1b6aef39d; unmerged #97 source 312240f5da9042a2cc9d11dac179bed90dee51d1. Observed 2026-11-07. No private user records inspected.
+
+
+GitHub search returned **82 pull requests** and 95 existing branches before the new forensic branch. These are observed PR/reference counts, not the complete unreachable Git history.
+
+1. **May–June 2026:** merged PRs #1, #3, #8–#13 established a real Next story/demo product, Firebase scaffolding, source tests and launch-audit documents. Demo/source claims must not be misread as live user-memory acceptance.
+2. **July 14:** merged [#24](https://github.com/LifeLoggerAI/urai-storytime/pull/24), source 0ea33e1049b122db9bdfc518032cb2c84777d267, retained lockfile/build/CI proof. July Drive URAI-100 receipt reports 58/58 source tests, 16/16 smoke, app/Functions builds at that exact head, but states NO behavioral Firebase/provider/production certification.
+3. **July film-foundry:** branch feat/finite-time-film-foundry-20260721 at 699b254367731b8a074cd99f010a1be1454ef5ef; staged FARM TO LAKE canon/shot graph and approval documents. Final rendering false and provider funding absent.
+4. **Aug–September:** #31 Firebase Admin ADC-only, #32 app polish, #33 release workflows. Stacked design, moderation, child safety, accessibility, data rights and provider-payment changes #37–#67 contain many closed unmerged or superseded designs; preserve source history without treating them as active.
+5. **October main convergence:** merged #72 story versions, #74 legacy engine containment, #75 action provenance, #77 consented drafts, #78 immutable edit/restore, #79 autosave fix, #82 48px targets. Main source still 73f586a0a2931961ae221af7cfc0caf1b6aef39d.
+6. **Open owner [#83](https://github.com/LifeLoggerAI/urai-storytime/pull/83):** head 33ecc480ffe96e83647a29e09969defeb84ca3fd, base main. Several October privacy/provider/owner fixes (#85/#88/#89/#91/#92/#93/#94/#95) were admitted to THIS unmerged owner branch, not main. Historical PR body test counts on other heads do not transfer forward.
+7. **Open child [#96](https://github.com/LifeLoggerAI/urai-storytime/pull/96):** 31cf72a01b65667de89c9ad565b6f0a4e51759a0 on #83; exact-head CI/Verify/Visual Proof all green Oct 15; disposable Firebase Auth/Firestore/Functions emulator evidence, not real provider or consumer data.
+8. **Open child [#97](https://github.com/LifeLoggerAI/urai-storytime/pull/97):** 312240f5da9042a2cc9d11dac179bed90dee51d1 stacked on #96. R782/R783 guard raw Firebase deployment scripts and reject malformed aliases/Hosting sites; PR reports local Node22 36/36 but latest Actions are red and logs unavailable.
+9. **Open bootstrap [#98](https://github.com/LifeLoggerAI/urai-storytime/pull/98):** a0fa8fc773a768de10cdb8b33386f3ce22282d15 on main, documentation entrypoint, not an audit. This document pack is a distinct draft child of #98 to preserve concurrent workers.
+
+Do not conflate historical LifeLogger/LifeOS implementation with a currently linked Storytime memory graph. That integration requires independently validated source and identity receipts. No lost owner decisions, historical test outputs, or old architectural implementations were deleted or overwritten in this review.
