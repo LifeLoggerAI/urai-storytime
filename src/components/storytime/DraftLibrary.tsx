@@ -1,6 +1,6 @@
 "use client";
 
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
@@ -11,7 +11,7 @@ type State =
   | { status: "blocked"; drafts: StoryDraft[] }
   | { status: "signedOut"; drafts: StoryDraft[] }
   | { status: "loading"; drafts: StoryDraft[] }
-  | { status: "ready"; drafts: StoryDraft[] }
+  | { status: "ready"; drafts: StoryDraft[]; user: User }
   | { status: "error"; drafts: StoryDraft[] };
 
 export function DraftLibrary() {
@@ -46,6 +46,7 @@ export function DraftLibrary() {
         if (!actorLease.isCurrent()) return;
         setState({
           status: "ready",
+          user,
           drafts: snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as StoryDraft)
         });
       } catch {
@@ -59,8 +60,8 @@ export function DraftLibrary() {
     };
   }, [cloudReady]);
 
-  if (state.status === "ready" && (!cloudReady || !getFirebaseAuth().currentUser
-    || state.drafts.some((draft) => draft.userId !== getFirebaseAuth().currentUser?.uid))) {
+  if (state.status === "ready" && (!cloudReady || state.user !== getFirebaseAuth().currentUser
+    || state.drafts.some((draft) => draft.userId !== state.user.uid))) {
     return <section className="storytime-card storytime-stack" aria-label="Private Storytime drafts" role="status" aria-live="polite" aria-busy={true}>Loading private drafts...</section>;
   }
 
