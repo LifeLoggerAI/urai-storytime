@@ -121,11 +121,18 @@ test('session owners cannot create or escalate server-owned safety and moderatio
     safetyStatus: 'approved',
   }));
 
-  await assertSucceeds(setDoc(sessionRef, {
+  await assertFails(setDoc(sessionRef, {
     userId: 'alice',
     title: 'Private draft',
   }));
-  await assertSucceeds(updateDoc(sessionRef, { title: 'Private draft updated' }));
+  await seed('storySessions/session-a', {
+    userId: 'alice',
+    title: 'Private existing story',
+    safetyStatus: 'needs_review',
+  });
+  await assertFails(updateDoc(sessionRef, { title: 'Unapproved source rewrite' }));
+  await assertFails(updateDoc(sessionRef, { 'consentSnapshot.voiceover': true }));
+  await assertFails(updateDoc(sessionRef, { 'provenance.factualStatus': 'recorded_source_truth' }));
   await assertFails(updateDoc(sessionRef, { safetyStatus: 'approved' }));
   await assertFails(updateDoc(sessionRef, { moderationDecision: 'approved' }));
 });
