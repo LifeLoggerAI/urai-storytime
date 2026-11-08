@@ -68,7 +68,7 @@ test('private Storytime session ownership is enforced and clients cannot mint mo
   await assertSucceeds(getDoc(doc(owner, 'storySessions/session-a')));
   await assertFails(getDoc(doc(other, 'storySessions/session-a')));
   await assertFails(getDoc(doc(signedOut, 'storySessions/session-a')));
-  await assertSucceeds(updateDoc(doc(owner, 'storySessions/session-a'), { title: 'Updated synthetic title' }));
+  await assertFails(updateDoc(doc(owner, 'storySessions/session-a'), { title: 'Forged synthetic title' }));
   await assertFails(updateDoc(doc(owner, 'storySessions/session-a'), { safetyStatus: 'approved' }));
   await assertFails(updateDoc(doc(other, 'storySessions/session-a'), { title: 'Cross-owner mutation' }));
 });
@@ -89,6 +89,51 @@ test('private Storytime bundle records deny cross-user reads', async () => {
   for (const [path] of fixtures) {
     await assertSucceeds(getDoc(doc(owner, path)));
     await assertFails(getDoc(doc(other, path)));
+  }
+});
+
+test('generated stories, derived narration, media-job metadata and audit evidence remain server-write-only', async () => {
+  const collections = [
+    'storySessions', 'storyChapters', 'storyMoments', 'memoryScenes',
+    'narratorScripts', 'ritualStorycards', 'storyExports', 'voiceoverJobs',
+    'timelineReplayEvents', 'emotionalArcSummaries', 'relationshipStoryThreads',
+    'weeklyStoryScrolls', 'monthlyStoryScrolls'
+  ];
+  const owner = testEnv.authenticatedContext('ownerUser').firestore();
+  const other = testEnv.authenticatedContext('otherUser').firestore();
+  const admin = testEnv.authenticatedContext('adminUser', { admin: true }).firestore();
+  const signedOut = testEnv.unauthenticatedContext().firestore();
+  for (const collection of collections) {
+    const path = collection + '/synthetic-owner-record';
+    await seedFirestore(path, {
+      userId: 'ownerUser', sessionId: 'session-a',
+      title: 'original synthetic story', status: 'ready',
+      consentSnapshot: { voiceover: false, memoryUse: false },
+      provenance: { factualStatus: 'creative_derivative_not_source_evidence' },
+    });
+    await assertSucceeds(getDoc(doc(owner, path)));
+    await assertSucceeds(getDoc(doc(admin, path)));
+    await assertFails(getDoc(doc(other, path)));
+    await assertFails(getDoc(doc(signedOut, path)));
+    for (const client of [owner, other, admin, signedOut]) {
+      await assertFails(setDoc(doc(client, collection + '/forged-actor-record'), {
+        userId: 'ownerUser', sessionId: 'session-a',
+        safetyStatus: 'approved', status: 'ready',
+      }));
+      await assertFails(updateDoc(doc(client, path), {
+        'consentSnapshot.voiceover': true,
+        'provenance.factualStatus': 'recorded_source_truth',
+        title: 'forged synthetic claim'
+      }));
+      await assertFails(deleteDoc(doc(client, path)));
+    }
+  }
+  await seedFirestore('auditLogs/audit-fixture', { userId: 'ownerUser', event: 'synthetic-test' });
+  await assertSucceeds(getDoc(doc(admin, 'auditLogs/audit-fixture')));
+  for (const client of [owner, other, admin, signedOut]) {
+    await assertFails(setDoc(doc(client, 'auditLogs/forged-audit'), { userId: 'ownerUser', event: 'pretend-authorized' }));
+    await assertFails(updateDoc(doc(client, 'auditLogs/audit-fixture'), { event: 'rewritten' }));
+    await assertFails(deleteDoc(doc(client, 'auditLogs/audit-fixture')));
   }
 });
 
