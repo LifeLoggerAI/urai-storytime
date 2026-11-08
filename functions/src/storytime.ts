@@ -926,9 +926,30 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
       // cancellation or revocation cannot be overwritten by a blind batch.
       await commitPaidOutput(writeStory);
     } else {
-      const batch = db.batch();
-      writeStory(batch);
-      await batch.commit();
+      // The deterministic builder is nonproduction-only, but a separate
+      // cancellation transaction must not race this final story write.
+      // Firestore retries this transaction if cancellation updates the claim.
+      await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(generationRequest.requestRef);
+        const claim = current.data() || {};
+        if (!current.exists || claim.userId !== userId || claim.requestId !== input.requestId) {
+          throw new HttpsError("permission-denied", "Story generation request authority is unavailable.");
+        }
+        if (claim.cancellationRequested === true || claim.status === "cancellation_requested" || claim.status === "cancelled") {
+          throw new HttpsError("cancelled", "Story generation was cancelled before persistence.");
+        }
+        if (claim.status !== "processing"
+          || !sameStorytimeGenerationBinding(claim, {
+            reviewedRequestSha256: processedRequestSha256,
+            providerInputSha256: storySpendHash(storySourceJson(providerInput))
+          })
+          || claim.consentSnapshot?.storyGeneration !== true
+          || claim.consentSnapshot?.providerProcessing !== true
+          || claim.consentVersion !== STORY_GENERATION_CONSENT_VERSION) {
+          throw new HttpsError("failed-precondition", "Current reviewed Storytime authority is unavailable.");
+        }
+        writeStory(transaction);
+      });
     }
   } catch {
     let persisted = false;
