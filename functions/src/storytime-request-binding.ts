@@ -9,7 +9,10 @@ export type StorytimeReusableSession = {
   userId?: unknown;
   requestId?: unknown;
   status?: unknown;
+  safetyStatus?: unknown;
   revoked?: unknown;
+  requestReview?: { processedRequestSha256?: unknown } | null;
+  provenance?: { factualStatus?: unknown } | null;
 };
 
 const sha256Pattern = /^[0-9a-f]{64}$/;
@@ -26,14 +29,23 @@ export function sameStorytimeGenerationBinding(
     && stored.providerInputSha256 === current.providerInputSha256;
 }
 
+export function isValidStorytimeSessionId(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{8,128}$/.test(value);
+}
+
 export function isReusableStorytimeSession(
   stored: StorytimeReusableSession | null | undefined,
   ownerUid: string,
-  requestId: string
+  requestId: string,
+  reviewedRequestSha256: string
 ): boolean {
   return !!stored
+    && sha256Pattern.test(reviewedRequestSha256)
     && stored.userId === ownerUid
     && stored.requestId === requestId
     && stored.status === "ready"
-    && stored.revoked !== true;
+    && stored.safetyStatus === "approved"
+    && stored.revoked !== true
+    && stored.requestReview?.processedRequestSha256 === reviewedRequestSha256
+    && stored.provenance?.factualStatus === "creative_derivative_not_source_evidence";
 }
