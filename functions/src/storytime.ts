@@ -5,6 +5,7 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
+import { sameStorytimeGenerationBinding, isReusableStorytimeSession } from "./storytime-request-binding.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
 import { boundStorytimeRemoteJob, confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone, preservedStorytimeTerminalStatus } from "./storytime-voiceover-result-guard.js";
 import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, type StorytimeVoiceoverAdmission } from "./storytime-voiceover-consent-admission.js";
@@ -409,6 +410,10 @@ function reviewedRequestSha256(input: z.infer<typeof GenerateStorySchema>) {
 
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
   const requestRef = generationRequestRef(userId, input.requestId);
+  const expectedReviewedRequestSha256 = reviewedRequestSha256(input);
+  const expectedProviderInputSha256 = storySpendHash(storySourceJson(
+    providerInputFromRequest(input, input.sourceText || "A quiet signal became a private URAI story.")
+  ));
   const result = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(requestRef);
     if (snapshot.exists) {
@@ -416,7 +421,19 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       if (data.userId !== userId) {
         throw new HttpsError("permission-denied", "Story generation request is unavailable.");
       }
+      // Never reuse an id for a different recollection, source or consent.
+      // Missing legacy fingerprint evidence must also fail closed.
+      if (!sameStorytimeGenerationBinding(data, {
+        reviewedRequestSha256: expectedReviewedRequestSha256,
+        providerInputSha256: expectedProviderInputSha256
+      })) {
+        throw new HttpsError("already-exists", "This Storytime request ID belongs to a different reviewed source.");
+      }
       if (data.status === "succeeded" && typeof data.sessionId === "string") {
+        const original = await transaction.get(db.collection("storySessions").doc(data.sessionId));
+        if (!original.exists || !isReusableStorytimeSession(original.data(), userId, input.requestId)) {
+          throw new HttpsError("failed-precondition", "The original Storytime session is no longer available for reuse.");
+        }
         return { requestRef, reusedSessionId: data.sessionId as string };
       }
       if (data.status === "cancelled" || data.status === "cancellation_requested" || data.cancellationRequested === true) {
@@ -439,8 +456,8 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       operatorRole: input.operator.role,
       consentVersion: input.consentSnapshot.consentVersion,
       reviewVersion: input.requestReview.reviewVersion,
-      reviewedRequestSha256: reviewedRequestSha256(input),
-      providerInputSha256: storySpendHash(storySourceJson(providerInputFromRequest(input, input.sourceText || "A quiet signal became a private URAI story."))),
+      reviewedRequestSha256: expectedReviewedRequestSha256,
+      providerInputSha256: expectedProviderInputSha256,
       consentSnapshot: input.consentSnapshot,
       createdAt: snapshot.data()?.createdAt || timestamp,
       updatedAt: timestamp
