@@ -951,7 +951,13 @@ export const generateStorySession = onCall({ secrets: [storytimeSpendWorkerToken
         writeStory(transaction);
       });
     }
-  } catch {
+  } catch (error) {
+    // A deliberate authorization/cancellation refusal must not be rewritten
+    // as a persistence failure by the generic lost-acknowledgement reconciler.
+    if (providerReceipt.provider === "local_builder" && error instanceof HttpsError
+      && ["cancelled", "failed-precondition", "permission-denied"].includes(error.code)) {
+      throw error;
+    }
     let persisted = false;
     try {
       persisted = await reconcileStoryPersistence({
