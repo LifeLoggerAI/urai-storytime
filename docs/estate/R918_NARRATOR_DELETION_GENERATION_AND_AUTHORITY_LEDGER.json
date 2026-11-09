@@ -1,0 +1,151 @@
+{
+  "schema": "one-urai-genesis-storytime-r918-independent-delivery-deletion-integrity-v1",
+  "observed_local_date": "2026-11-08",
+  "release": "PRODUCTION_HOLD_NO_GO",
+  "handoff_scope": "docs_only_addendum_to_R917_not_a_retest",
+  "storytime_latest_under_review": {
+    "engineering_pr": 110,
+    "engineering_head": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+    "forensic_parent_pr": 115,
+    "parent_head": "685baf73e22e19c4832fa23014a7bb30e3d63133"
+  },
+  "upstream_jobs": {
+    "pr": 170,
+    "head": "d379debb757a405b8757aa244e8bb87dfb574e37",
+    "status": "open_draft_unmerged",
+    "main_bridge_blob": "cec3a4f6638aa3d646457b08f7c24e99cf4715a3"
+  },
+  "preserved_inventory": {
+    "storytime_tracked_blobs": 383,
+    "git_reported_bytes": 2083982,
+    "tree_sha": "c0745b9d85e5939746ee2b505fb206b53b2cb1d4",
+    "source": "R913 complete manifest + R914 correction",
+    "not_a_full_raw_byte_audit": true
+  },
+  "new_findings": [
+    {
+      "id": "R918-DELETE-GENERATION-CAS-001",
+      "priority": "P0",
+      "status": "SOURCE_CONFIRMED_RACE_RISK_NOT_RUNTIME_PROVEN",
+      "title": "Storytime narrator delete-output lacks Cloud Storage generation precondition",
+      "source": {
+        "repository": "LifeLoggerAI/urai-jobs",
+        "commit": "d379debb757a405b8757aa244e8bb87dfb574e37",
+        "path": "functions/src/jobs/storytimeNarratorBridge.ts",
+        "blob": "0729c324c4c600eb3092abbf3a2674486e257cc7",
+        "lines": "328-389"
+      },
+      "current_safeguards": [
+        "bound job owner/session/script and terminal status check",
+        "exact owner/session/script object-path prefix",
+        "transaction commits derivativeAccessState REVOKED and outputDeletionState PENDING before Storage call",
+        "post-delete transaction rechecks stored artifactPath before setting COMPLETE"
+      ],
+      "gap": [
+        "GCS file.delete uses ignoreNotFound:true without ifGenerationMatch",
+        "same object path may refer to a newer immutable storage generation between fence and delete",
+        "post-delete condition checks only artifactPath and can remain unchanged after same-path object replacement",
+        "original Storage generation and object owner metadata not pinned by this function"
+      ],
+      "counterexample": "Jobs PR170 privateMediaDelivery.ts deleteOwnedLifeMovieArtifact uses metadata generation, required owner/job hash markers and file.delete({ignoreNotFound:true,ifGenerationMatch:generation}); narrator deleteOutput does not call it.",
+      "source_evidence_status": "16/16 static original source assertions PASS; no actual Cloud Storage race execution",
+      "hypothesis": "Without a generation precondition, a replacement of the same Storage path could cause deletion of a different current generation. Actual feasibility depends on writer IAM, object lifecycle and bucket version semantics; no incident claimed.",
+      "required_fix": "Make narrator output deletion compare immutable job-bound generation and object identity; use GCS conditional delete; retain PENDING on mismatch, 412 or unknown metadata; independently review cleanup retry/idempotency and no early COMPLETE.",
+      "negative_test": "Synthetic narrator job output generation g1, interleave object write at same path with g2 after PENDING; attempted delete g1 must NOT delete g2, must retain PENDING and require reconciliation.",
+      "ownership": "Jobs narrator/private media owner with Storytime+Privacy reviewer"
+    },
+    {
+      "id": "R918-OWNER-FENCE-ABSENCE-POLICY-002",
+      "priority": "P0_POLICY_REVIEW",
+      "status": "SOURCE_SEMANTICS_VERIFIED_NOT_AN_INCIDENT",
+      "title": "Jobs owner deletion fence treats missing documents differently from malformed present documents",
+      "source": {
+        "repository": "LifeLoggerAI/urai-jobs",
+        "commit": "d379debb757a405b8757aa244e8bb87dfb574e37",
+        "path": "functions/src/jobs/privateMediaDelivery.ts",
+        "blob": "2261b2f2bc315c2fa6935890af5294f553c0474a",
+        "lines": "15-29"
+      },
+      "observed": "Only existing local owner and canonical deletion fence documents must have explicit false status. If both documents are absent, the helper itself does not throw. Source smoke tests start from no fences and expect valid delivery; malformed present fields deny.",
+      "interpretation": "Possible intended default for not-deleted users, not automatically vulnerability. Distinguish absence of deletion tombstone from independent affirmative permission to use original recorded memory; canonical signed grant remains separate.",
+      "next_action": "Explicitly document owner-deletion tombstone provisioning/absence policy, migration for absent or orphaned records, and original-source grants; test missing, malformed, deleted, revoked and created-during-stream cases.",
+      "ownership": "Jobs + Privacy"
+    },
+    {
+      "id": "R918-ACCEPTANCE-EVIDENCE-003",
+      "priority": "P0",
+      "status": "VERIFICATION_NOT_EXECUTED",
+      "title": "Narrator deletion race missing from inspected synthetic tests and current CI",
+      "source_tests": [
+        {
+          "path": "scripts/private-media-download-authority-smoke.mjs",
+          "blob": "4dc4e6f4d1f7182c68c8cdbad51240391e126242",
+          "scope": "streaming source/owner/consent token and descriptor generation rejections, not narrator delete-output object replacement"
+        },
+        {
+          "path": "scripts/storytime-narrator-consent-transaction.test.mjs",
+          "blob": "02ece3f9dfe45790272ccba843b2c821f69b3f30",
+          "scope": "narrator job/consent transaction tests, no narrator generation-precondition deletion fixture observed"
+        },
+        {
+          "path": "scripts/life-movies-output-deletion-smoke.mjs",
+          "blob": "9cba42ede8b1ea4bfe604caa24cfb456fda7d30a",
+          "scope": "tests ifGenerationMatch mismatch in separate life-movie deletion path, not narrator deleteOutput"
+        }
+      ],
+      "existing_release_tests": "R916 45-case synthetic acceptance matrix still entirely NOT_EXECUTED; R917 exact-head failing job runs had zero steps and no runner; emulator skipped.",
+      "required_test": "Add true narrator storage generation replacement race, wrong owner, wrong job/metadata, delete during streamed bytes, 412 retry and postcondition/backup purge; run genuine four-emulator/Storage integration with synthetic objects."
+    }
+  ],
+  "retained_cross_service_blockers": [
+    {
+      "id": "G1",
+      "status": "P0",
+      "issue": "Privacy main canonical registry lacks storytime.voiceover and rejects unknown purpose; no independently verified signed original-source/owner/purpose grant at Jobs"
+    },
+    {
+      "id": "G2",
+      "status": "P0",
+      "issue": "Storytime draft playback.delivery/action:deliver incompatible with Jobs main; corresponding Jobs #170 source unmerged and deployed source unknown"
+    },
+    {
+      "id": "G3",
+      "status": "P0",
+      "issue": "R912 fresh generation guard no trusted signed legacy/provider-spend clearance issuer or unlock; missing guard denies everyone"
+    },
+    {
+      "id": "G4",
+      "status": "P0",
+      "issue": "Recorded captured source and human attributed recollection distinct from AI generated creative derivative; no source-to-scene claim-level runtime acceptance"
+    },
+    {
+      "id": "G5",
+      "status": "P0",
+      "issue": "Protected current CI/independent approval, effective deployed Firebase/GCP identity, full Jobs/Studio/Spatial Replay + revocation/backup purge not evidenced"
+    },
+    {
+      "id": "G6",
+      "status": "P0",
+      "issue": "NarratorScript providerStatus completed refers to TEXT record, never accepted TTS audio proof"
+    }
+  ],
+  "evidence_grades": {
+    "source_readbacks": "VERIFIED_FROM_EXACT_GITHUB_BLOBS",
+    "static_assertions": "16_OF_16_PASS_ORIGINAL_SOURCE_INSPECTION_NOT_EXECUTABLE_TESTS",
+    "runnable_tests_this_r918": "0_EXECUTED",
+    "firebase_emulators_this_r918": "0_EXECUTED",
+    "actual_gcs_race": "NOT_EXECUTED",
+    "real_private_memories": "NOT_ACCESSED",
+    "any_live_deployment_or_provider_spend": false,
+    "raw_sha256_all_assets": "NOT_AVAILABLE",
+    "protected_pr_review": "NOT_OBSERVED"
+  },
+  "releases": [
+    "Do not mark delete output COMPLETE on path-only readback without proving exact generation and current permissions",
+    "Do not treat missing tombstone as original source authorization",
+    "Do not claim any current head CI passed after zero-step failures",
+    "Do not use real private source or paid provider for tests",
+    "No merge/deploy or hand-setting clearance receipts"
+  ],
+  "next_worker_entrypoint": "Read R918 source ledger and focused report, R917 first-read and comprehensive report, R916 45-case matrix, R915 paired source contract, R914 tree object correction, R913 383-file inventory; refresh exact PR heads; then run synthetic narrator GCS generation CAS race with owner/consent and four-emulator proofs."
+}
