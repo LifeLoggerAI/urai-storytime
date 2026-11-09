@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import { z } from "zod";
 import { auditLog } from "./audit-log.js";
 import { sameStorytimeGenerationBinding, isReusableStorytimeSession, isValidStorytimeSessionId } from "./storytime-request-binding.js";
+import { heldStorytimeAdmissionRecord, isClearedStorytimeAdmissionGuard } from "./story-generation-admission.js";
 import { StorytimeNarratorDeliverySchema } from "./storytime-media-delivery-contract.js";
 import { boundStorytimeRemoteJob, confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone, preservedStorytimeTerminalStatus } from "./storytime-voiceover-result-guard.js";
 import { stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, type StorytimeVoiceoverAdmission } from "./storytime-voiceover-consent-admission.js";
@@ -410,6 +411,7 @@ function reviewedRequestSha256(input: z.infer<typeof GenerateStorySchema>) {
 
 async function claimGenerationRequest(userId: string, input: z.infer<typeof GenerateStorySchema>) {
   const requestRef = generationRequestRef(userId, input.requestId);
+  const admissionRef = db.collection("storytimeGenerationAdmissionGuards").doc(userId);
   const expectedReviewedRequestSha256 = reviewedRequestSha256(input);
   const expectedProviderInputSha256 = storySpendHash(storySourceJson(
     providerInputFromRequest(input, input.sourceText || "A quiet signal became a private URAI story.")
@@ -453,7 +455,17 @@ async function claimGenerationRequest(userId: string, input: z.infer<typeof Gene
       throw new HttpsError("failed-precondition", "This Storytime request requires reconciliation before any further generation.");
     }
 
+    // Only a separately reviewed, charge-reconciled legacy clearance opens
+    // new source admission. Never infer clearance from a missing guard.
+    // This read and both writes share one Firestore transaction across devices.
+    const guardSnapshot = await transaction.get(admissionRef);
+    if (!isClearedStorytimeAdmissionGuard(guardSnapshot.data(), userId)) {
+      throw new HttpsError("failed-precondition", "Story generation is held pending prior request and provider-charge reconciliation.");
+    }
     const timestamp = now();
+    transaction.set(admissionRef, heldStorytimeAdmissionRecord(
+      userId, input.requestId, expectedReviewedRequestSha256, expectedProviderInputSha256, timestamp
+    ));
     transaction.set(requestRef, {
       userId,
       requestId: input.requestId,
