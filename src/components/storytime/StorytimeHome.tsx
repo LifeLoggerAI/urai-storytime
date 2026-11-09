@@ -10,6 +10,7 @@ import { bindStorytimeGenerationAttempt, type StorytimeGenerationAttempt } from 
 import { AuthPanel } from "./AuthPanel";
 import { DraftLibrary } from "./DraftLibrary";
 import { SessionLibrary } from "./SessionLibrary";
+import { StoryGenerationRecovery } from "./StoryGenerationRecovery";
 
 const MAX_SOURCE_CHARS = 1200;
 const AUDIENCE_AGE_BANDS = ["family", "preschool_3_5", "early_reader_6_8", "middle_grade_9_12"] as const;
@@ -462,6 +463,7 @@ export function StorytimeHome() {
           <AuthPanel />
           <SessionLibrary />
           <DraftLibrary />
+          <StoryGenerationRecovery />
         </section>
 
         <form className="storytime-card storytime-form" onSubmit={handleCreateStory} aria-describedby={!cloudReady ? "storytime-unavailable" : undefined} aria-busy={isSubmitting}>
