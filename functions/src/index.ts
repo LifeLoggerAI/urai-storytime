@@ -46,3 +46,5 @@ export { saveStoryRevision, restoreStoryVersion, listStoryVersions } from "./sto
 export { deliverStorytimeVoiceover } from "./storytime-voiceover-delivery.js";
 
 export { reconcileStorytimeNarratorDispatches } from "./storytime-narrator-reconciliation.js";
+
+export { getStorytimeGenerationRecovery } from "./story-generation-recovery.js";
