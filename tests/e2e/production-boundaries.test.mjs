@@ -183,12 +183,9 @@ test('rules keep Storytime private by default and enforce server-time public-sha
   includesAll(rules, [
     'function ownerOnlyCreate()',
     'function ownerOnlyReadWrite(userId)',
-    'function storySessionModerationFields()',
-    'function ownerStorySessionCreate()',
-    'function ownerStorySessionUpdate()',
-    "'safetyStatus'",
-    "'moderationDecision'",
-    '.affectedKeys()',
+    'match /storySessions/{id}',
+    'allow create, update, delete: if false;',
+    'match /auditLogs/{auditLogId}',
     'match /storySessions/{id}',
     'function activePublicShare()',
     "resource.data.schemaVersion == 'public-story-share-v2'",
@@ -202,6 +199,28 @@ test('rules keep Storytime private by default and enforce server-time public-sha
     'allow read, write: if false'
   ]);
 
+  const serverOwned = [
+    'storySessions', 'storyChapters', 'storyMoments', 'memoryScenes',
+    'narratorScripts', 'ritualStorycards', 'storyExports', 'voiceoverJobs',
+    'timelineReplayEvents', 'emotionalArcSummaries', 'relationshipStoryThreads',
+    'weeklyStoryScrolls', 'monthlyStoryScrolls'
+  ];
+  function ruleBody(marker) {
+    const start = rules.indexOf(marker);
+    assert.ok(start !== -1, 'Missing protected rule: ' + marker);
+    const end = rules.indexOf('\n    }', start);
+    assert.ok(end > start, 'Missing rule closing brace: ' + marker);
+    return rules.slice(start, end);
+  }
+  for (const collection of serverOwned) {
+    const clause = ruleBody('match /' + collection + '/{id} {');
+    assert.ok(clause.includes('allow read: if ownerOnlyReadWrite(resource.data.userId);'));
+    assert.ok(clause.includes('allow create, update, delete: if false;'));
+  }
+  const audit = ruleBody('match /auditLogs/{auditLogId} {');
+  assert.ok(audit.includes('allow create, update, delete: if false;'));
+  assert.ok(!rules.includes('function ownerStorySessionCreate()'));
+  assert.ok(!rules.includes('function ownerStorySessionUpdate()'));
   assert.match(storageRules, /allow read, write: if false/);
 });
 
