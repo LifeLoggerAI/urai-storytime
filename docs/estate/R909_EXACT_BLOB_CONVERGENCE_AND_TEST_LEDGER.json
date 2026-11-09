@@ -1,0 +1,199 @@
+{
+  "schema": "one-urai-genesis-storytime-r909-merged-blob-ledger-v1",
+  "repository": "LifeLoggerAI/urai-storytime",
+  "review_only": true,
+  "production_hold": true,
+  "observer_date_local": "2026-11-08",
+  "common_ancestor_engineering_pr97": "312240f5da9042a2cc9d11dac179bed90dee51d1",
+  "source_base_pr105": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+  "donor_pr100": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+  "donor_pr102_includes_pr101": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+  "initial_integrated_commit": "3c5d8b12dadc62c6faf908182221e2251870160a",
+  "source_blob_copy_count": 13,
+  "source_unchanged_to_base_count": 7,
+  "source_new_paths_count": 6,
+  "base_source_files": 363,
+  "integrated_files": 369,
+  "unintended_changes": [],
+  "comparison": "Every donor target file on PR105 matched its original PR97 blob or was absent before copying; all other 356 tracked base files stayed bit-for-bit same Git blob SHA/mode. All copied donor SHA/mode match.",
+  "files": [
+    {
+      "path": "docs/estate/R900_SERVER_WRITTEN_STORYTIME_CANON_SECURITY_REVIEW_20261107.md",
+      "source_pr": 100,
+      "source_head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "base_common_sha": null,
+      "source_blob_sha1": "5cd98d6ff8d9d9d83997602ef4ca292a5b43059c",
+      "source_mode": "100644",
+      "source_git_size_bytes": 4507,
+      "is_new": true,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "firestore.rules",
+      "source_pr": 100,
+      "source_head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "base_common_sha": "6af88a7cb0ecbfa7ee7256bba80a9fcfc24a83d5",
+      "source_blob_sha1": "4d67e85c49f3599ef32b0eb398084442ad65c496",
+      "source_mode": "100644",
+      "source_git_size_bytes": 8889,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "tests/e2e/production-boundaries.test.mjs",
+      "source_pr": 100,
+      "source_head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "base_common_sha": "74915ca27db3c68276c831198875bfac5b94853d",
+      "source_blob_sha1": "33354de1f1466705e0c344d411ef2afcd2f30832",
+      "source_mode": "100644",
+      "source_git_size_bytes": 9463,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "tests/rules-emulator/authorization-matrix.test.mjs",
+      "source_pr": 100,
+      "source_head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "base_common_sha": "14c03b61954ad6f72a6881732977e1f51ffe0d27",
+      "source_blob_sha1": "fea6b4f23ec104cfa8c038ee9aea2dddb3107b21",
+      "source_mode": "100644",
+      "source_git_size_bytes": 12676,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "tests/rules-emulator/public-share-lifecycle.test.mjs",
+      "source_pr": 100,
+      "source_head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "base_common_sha": "bcae76eb7d6248455277a5369637761a84b2b7e8",
+      "source_blob_sha1": "a230290e09bd5867cb8de4887d963fe4ab42618f",
+      "source_mode": "100644",
+      "source_git_size_bytes": 5944,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "docs/estate/R902_PRIVATE_LIBRARY_AUTH_EPOCH_SECURITY_REVIEW_20261107.md",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": null,
+      "source_blob_sha1": "4d4015cd82cb01d54131d8b8d4b68e25c9cc0288",
+      "source_mode": "100644",
+      "source_git_size_bytes": 3740,
+      "is_new": true,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "src/components/storytime/DraftLibrary.tsx",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": "717cffa573acf52f18f7391fc0bcf71138753dc9",
+      "source_blob_sha1": "3243563f4a0ae49dde6cdab10caeb3c669c5d278",
+      "source_mode": "100644",
+      "source_git_size_bytes": 4012,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "src/components/storytime/SessionLibrary.tsx",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": "0cfbc20c159203cb6759b0eb14f54089136121a7",
+      "source_blob_sha1": "ccf7a22d8b98de53bdec433780f9564928ed9255",
+      "source_mode": "100644",
+      "source_git_size_bytes": 4492,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "src/lib/storytime/current-account-lease.ts",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": null,
+      "source_blob_sha1": "f5e4ff2472265734a22fec59b0a1c7c33065351c",
+      "source_mode": "100644",
+      "source_git_size_bytes": 674,
+      "is_new": true,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "tests/unit/storytime-current-account-lease.test.mjs",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": null,
+      "source_blob_sha1": "574373500f59250306f7d20112888560db6e3977",
+      "source_mode": "100644",
+      "source_git_size_bytes": 2142,
+      "is_new": true,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "docs/estate/R903_HOME_FORM_AUTH_FENCE_20261107.md",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": null,
+      "source_blob_sha1": "e3d55a2cc5ba9d44a2fddc50462eda8d375748d5",
+      "source_mode": "100644",
+      "source_git_size_bytes": 4843,
+      "is_new": true,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "src/components/storytime/StorytimeHome.tsx",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": "873bac26e0daa9a1638102a0fd57cff6a8c59c3c",
+      "source_blob_sha1": "4c65137273ec09f39bfffe520bc5cc9018f08bc8",
+      "source_mode": "100644",
+      "source_git_size_bytes": 26369,
+      "is_new": false,
+      "raw_sha256_verified": null
+    },
+    {
+      "path": "tests/e2e/storytime-home-auth-fence.test.mjs",
+      "source_pr": 102,
+      "source_head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "base_common_sha": null,
+      "source_blob_sha1": "595bb6120ee94aca0e0f4cc8ca0a0d3b6a2b3ea1",
+      "source_mode": "100644",
+      "source_git_size_bytes": 3682,
+      "is_new": true,
+      "raw_sha256_verified": null
+    }
+  ],
+  "original_helper_native_checks": {
+    "actor_lease": {
+      "path": "src/lib/storytime/current-account-lease.ts",
+      "git_blob_sha1": "f5e4ff2472265734a22fec59b0a1c7c33065351c",
+      "computed_sha256": "1f964ca97f059b8b9d78a44c8e5bb227f4b2fd3a4c8117b940bf92b5a18c8510",
+      "cases_passed": 6
+    },
+    "request_binding": {
+      "path": "functions/src/storytime-request-binding.ts",
+      "git_blob_sha1": "ce28459340e271c108756248ae46ec95df6e3be6",
+      "computed_sha256": "8a235f716ac1b13dc6ad435462d76ff22e73da563c35807ce4064df7d7e5a867",
+      "cases_passed": 13
+    },
+    "node_version": "v22.16.0",
+    "suite_combined_status": "19/19 PASS",
+    "combined_tap_sha256": "f37063affc5dd50d1a27f27874d6ec9c154a2b45b9d385dface17378d74a9784",
+    "tests": "R909-authored synthetic unit tests on exact donor helper bytes, NOT full original repository tests"
+  },
+  "static_rules_readback": {
+    "rule_sha1": "4d67e85c49f3599ef32b0eb398084442ad65c496",
+    "protected_generated_collection_matches": 13,
+    "audit_logs_protected": true,
+    "total_static_write_denials": 14,
+    "verified_on_branch": "3c5d8b12dadc62c6faf908182221e2251870160a",
+    "not_emulator_certified": true
+  },
+  "unverified": [
+    "Real original-project npm ci/TS/Next and Functions builds",
+    "Original five-case lease unit test source assertions and 4-case home source-contract suite as fully executed project tests",
+    "Firebase Auth/Firestore/Functions/Storage emulator owner/other account negative behavior",
+    "React/browser same-user auth event and stale asynchronous responses",
+    "Actual signed Privacy owner+source+purpose grant and downsteam Jobs TTS current consent",
+    "Physical provider output, protected Replay, deletion/backup and live deployment",
+    "Exact new-head CI green and independent reviewer approval"
+  ]
+}
