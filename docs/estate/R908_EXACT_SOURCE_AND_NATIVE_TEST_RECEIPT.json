@@ -1,0 +1,157 @@
+{
+  "schema": "one-urai-storytime-r908-verification-receipt-v1",
+  "audit_local_date": "2026-11-08",
+  "repository": "LifeLoggerAI/urai-storytime",
+  "source_pr": 105,
+  "source_commit": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+  "classifications": {
+    "current_source": "semantic_reviewed_selected_files",
+    "entire_source": "inventoried_paths",
+    "raw_bytes": "hashed_one_selected_blob",
+    "native_test": "isolated_test_verified_helper_only",
+    "firebase_emulators": "not_run_r908",
+    "full_repo_build": "not_run_r908",
+    "cross_service_runtime": "unverified",
+    "device": "unverified",
+    "production": "HOLD"
+  },
+  "native_original_bytes": {
+    "file": "src/lib/storytime/redaction.ts",
+    "byte_length": 974,
+    "git_blob_sha1": "4a0e97ed2d6d0c8798ed8ff25b40895d2e8136ae",
+    "computed_sha256": "d21b5a7b84ed6564f5108c43f0b065b02d71e430101e1b8eafb88d214bde1953",
+    "runner": {
+      "runtime": "node",
+      "version": "v22.16.0",
+      "command": "node --test /mnt/data/storytime_r908/evidence/r908-redaction-native.test.mjs",
+      "source": "GitHub connected file exact bytes materialized locally, Git blob hash-verified"
+    },
+    "native_test_file_sha256": "fe8359403d30a4fe9236e4a50d2692aef1d5b5fdd08fc3cf57898ea234a1deaa",
+    "native_tap_log_sha256": "d59461acb8096202fe5124397c2e42bb25b6a8f7a9d95bed82c687ecb625c167",
+    "passed": 10,
+    "failed": 0,
+    "total": 10,
+    "test_case_names": [
+      "empty source labels do not imply recorded memory verification",
+      "one sensitive label is never printed",
+      "multiple user source labels are never printed",
+      "label is identified as unverified context, not source evidence",
+      "hostile label text is not echoed into the explanation",
+      "non-Latin family label is not echoed into the explanation",
+      "public redactor hides basic email",
+      "public redactor hides basic phone",
+      "public redactor hides simple street addresses",
+      "public redactor hides simple capitalized names"
+    ],
+    "limits": [
+      "Synthetic-only isolated helper execution, not complete original repo or 4-case test suite",
+      "Regex matches on simple cases are not full data leakage/redaction certification",
+      "Only one file was reconstituted; all other source modules observed via GitHub connector"
+    ]
+  },
+  "github_action_runs": [
+    {
+      "pr": 96,
+      "sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "run_id": 38685224348,
+      "kind": "CI",
+      "conclusion": "success",
+      "note": "Historical Oct 15 disposable emulator and build; not transferable"
+    },
+    {
+      "pr": 96,
+      "sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "run_id": 38685224444,
+      "kind": "Verify",
+      "conclusion": "success"
+    },
+    {
+      "pr": 96,
+      "sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "run_id": 38685224333,
+      "kind": "Visual",
+      "conclusion": "success"
+    },
+    {
+      "pr": 105,
+      "sha": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+      "run_id": 42536900659,
+      "kind": "CI",
+      "conclusion": "failure",
+      "failed_job_ids": [
+        128903095523,
+        128903095590
+      ],
+      "failed_job_steps": 0,
+      "native_emulator_job": "skipped",
+      "prod_only_job": "skipped"
+    },
+    {
+      "pr": 105,
+      "sha": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+      "run_id": 42536900653,
+      "kind": "Verify",
+      "conclusion": "failure",
+      "failed_job_ids": [
+        128903095587
+      ],
+      "failed_job_steps": 0
+    },
+    {
+      "pr": 105,
+      "sha": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+      "run_id": 42536900738,
+      "kind": "Visual Proof",
+      "conclusion": "failure",
+      "failed_job_ids": [
+        128903095458
+      ],
+      "failed_job_steps": 0
+    },
+    {
+      "pr": 99,
+      "sha": "a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+      "run_id": 42536924815,
+      "kind": "CI",
+      "conclusion": "failure"
+    },
+    {
+      "pr": 99,
+      "sha": "a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+      "run_id": 42536924817,
+      "kind": "Verify",
+      "conclusion": "failure"
+    },
+    {
+      "pr": 99,
+      "sha": "a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+      "run_id": 42536924814,
+      "kind": "Visual Proof",
+      "conclusion": "failure"
+    }
+  ],
+  "log_errors": [
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "job_ids": [
+        128903095523,
+        128903095590,
+        128903095587,
+        128903095458
+      ],
+      "api_result": "404 BlobNotFound",
+      "interpretation": "No native job step logs available, cannot attribute failure to tests or runner billing. Failing jobs showed empty runner name and no steps."
+    }
+  ],
+  "raw_checkout": {
+    "github_git_clone_attempt": "failed",
+    "error": "Could not resolve host: github.com",
+    "full_npm_install": "not_run",
+    "builds": "not_run",
+    "four_emulators": "not_run"
+  },
+  "owner_privacy": "No production or private media read, no provider call, no new consent issued, no use of actual child data",
+  "cross_service": "Storytime-Jobs inspected on repo source, actual signed cross-project consent and protected media readback unverified",
+  "reviewer_approval": "None observed on PR99 or PR105",
+  "launch_decision": "NO-GO; HOLD"
+}
