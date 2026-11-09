@@ -1,0 +1,4261 @@
+{
+  "schema": "one-urai-storytime-r913-source-tree-and-visible-refs-v1",
+  "observed_date_central": "2026-11-08",
+  "repository": "LifeLoggerAI/urai-storytime",
+  "source_head_commit_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+  "source_head_pull_request": 110,
+  "source_git_tree_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+  "tree_truncated": false,
+  "tracked_files": 383,
+  "tracked_directories": 56,
+  "git_reported_blob_bytes_total": 2083982,
+  "main_head_sha": "73f586a0a2931961ae221af7cfc0caf1b6aef39d",
+  "main_files": 306,
+  "main_bytes": 1356257,
+  "added_vs_main": 77,
+  "modified_vs_main": 40,
+  "removed_vs_main": 0,
+  "removed_paths_vs_main": [],
+  "extensions": {
+    "example": 1,
+    "firebaserc": 1,
+    "yml": 8,
+    "gitignore": 1,
+    "md": 116,
+    "json": 13,
+    "log": 2,
+    "txt": 2,
+    "rules": 2,
+    "ts": 65,
+    "mjs": 141,
+    "css": 1,
+    "tsx": 27,
+    "svg": 2,
+    "xml": 1
+  },
+  "prefixes": {
+    ".env.example": {
+      "count": 1,
+      "bytes": 1731
+    },
+    ".firebaserc": {
+      "count": 1,
+      "bytes": 237
+    },
+    ".github/workflows": {
+      "count": 8,
+      "bytes": 72136
+    },
+    ".gitignore": {
+      "count": 1,
+      "bytes": 2219
+    },
+    "README.md": {
+      "count": 1,
+      "bytes": 9039
+    },
+    "docs/ACCESSIBILITY.md": {
+      "count": 1,
+      "bytes": 3960
+    },
+    "docs/ARCHITECTURE.md": {
+      "count": 1,
+      "bytes": 9695
+    },
+    "docs/AUDIT.md": {
+      "count": 1,
+      "bytes": 5115
+    },
+    "docs/AUDIT_2026-07-06.md": {
+      "count": 1,
+      "bytes": 20589
+    },
+    "docs/AUTH_AND_FAMILY_MODEL.md": {
+      "count": 1,
+      "bytes": 1629
+    },
+    "docs/CANONICAL_APP_ROOT.md": {
+      "count": 1,
+      "bytes": 2167
+    },
+    "docs/CROSS_SYSTEM_CANON_AUTHORITY.md": {
+      "count": 1,
+      "bytes": 3610
+    },
+    "docs/DEFINITION_OF_DONE.md": {
+      "count": 1,
+      "bytes": 4444
+    },
+    "docs/DEPLOYMENT_AND_ROLLBACK.md": {
+      "count": 1,
+      "bytes": 4278
+    },
+    "docs/DEPLOYMENT_RUNBOOK.md": {
+      "count": 1,
+      "bytes": 1868
+    },
+    "docs/DONE_DONE_LAUNCH_AUDIT.md": {
+      "count": 1,
+      "bytes": 21834
+    },
+    "docs/ENVIRONMENT_VARIABLES.md": {
+      "count": 1,
+      "bytes": 4273
+    },
+    "docs/EVIDENCE_STATUS.md": {
+      "count": 1,
+      "bytes": 243
+    },
+    "docs/FINAL_PRODUCTION_BLOCKERS.md": {
+      "count": 1,
+      "bytes": 2202
+    },
+    "docs/FIREBASE_READINESS.md": {
+      "count": 1,
+      "bytes": 1155
+    },
+    "docs/FIREBASE_RUNTIME_VERIFICATION.md": {
+      "count": 1,
+      "bytes": 1487
+    },
+    "docs/FIRESTORE_DATA_MODEL.md": {
+      "count": 1,
+      "bytes": 1211
+    },
+    "docs/FIRESTORE_RULES_STATUS.md": {
+      "count": 1,
+      "bytes": 1469
+    },
+    "docs/LIVE_DEPLOYMENT_EXECUTION.md": {
+      "count": 1,
+      "bytes": 1316
+    },
+    "docs/LOCAL_DEVELOPMENT.md": {
+      "count": 1,
+      "bytes": 2065
+    },
+    "docs/LOCKFILE_MATERIALIZATION_RECEIPT_2026-07-14.md": {
+      "count": 1,
+      "bytes": 1883
+    },
+    "docs/MODERATION_AND_CHILD_SAFETY.md": {
+      "count": 1,
+      "bytes": 8656
+    },
+    "docs/OBSERVABILITY_ARCHITECTURE.md": {
+      "count": 1,
+      "bytes": 1075
+    },
+    "docs/OBSERVABILITY_AUDIT_LOGGING.md": {
+      "count": 1,
+      "bytes": 1567
+    },
+    "docs/PRIVACY_AND_SAFETY_ENGINEERING.md": {
+      "count": 1,
+      "bytes": 7141
+    },
+    "docs/PRIVACY_OPERATIONS_ARCHITECTURE.md": {
+      "count": 1,
+      "bytes": 5100
+    },
+    "docs/PRODUCTION_BLOCKER_HANDOFF.md": {
+      "count": 1,
+      "bytes": 3573
+    },
+    "docs/PRODUCTION_ENVIRONMENT_CONTRACT.md": {
+      "count": 1,
+      "bytes": 2534
+    },
+    "docs/PRODUCTION_READINESS_STATUS.md": {
+      "count": 1,
+      "bytes": 3397
+    },
+    "docs/PRODUCTION_RELEASE_GATE.md": {
+      "count": 1,
+      "bytes": 1907
+    },
+    "docs/PRODUCTION_SMOKE_CHECKLIST.md": {
+      "count": 1,
+      "bytes": 883
+    },
+    "docs/PRODUCT_VISION.md": {
+      "count": 1,
+      "bytes": 5402
+    },
+    "docs/RATE_LIMIT_COST_CONTROL.md": {
+      "count": 1,
+      "bytes": 1300
+    },
+    "docs/RELEASE_EVIDENCE_LOG.md": {
+      "count": 1,
+      "bytes": 4149
+    },
+    "docs/ROADMAP.md": {
+      "count": 1,
+      "bytes": 29705
+    },
+    "docs/ROLLBACK_RUNBOOK.md": {
+      "count": 1,
+      "bytes": 1149
+    },
+    "docs/SECURITY_AND_CHILD_SAFETY.md": {
+      "count": 1,
+      "bytes": 8979
+    },
+    "docs/STORYTIME_ADMIN_MODERATION_CONTRACT.md": {
+      "count": 1,
+      "bytes": 2093
+    },
+    "docs/STORYTIME_AUTHENTICATED_PRIVATE_DELIVERY.md": {
+      "count": 1,
+      "bytes": 3926
+    },
+    "docs/STORYTIME_DEPLOYMENT.md": {
+      "count": 1,
+      "bytes": 7993
+    },
+    "docs/STORYTIME_EMULATOR_BEHAVIOR_SPEC.md": {
+      "count": 1,
+      "bytes": 5150
+    },
+    "docs/STORYTIME_IMPLEMENTATION_PASS_2.md": {
+      "count": 1,
+      "bytes": 1796
+    },
+    "docs/STORYTIME_IMPLEMENTATION_PASS_3.md": {
+      "count": 1,
+      "bytes": 1553
+    },
+    "docs/STORYTIME_IMPLEMENTATION_PASS_4.md": {
+      "count": 1,
+      "bytes": 1937
+    },
+    "docs/STORYTIME_JOBS_STAGING_ACCEPTANCE.md": {
+      "count": 1,
+      "bytes": 3930
+    },
+    "docs/STORYTIME_PROTECTED_PROVIDER_SPEND.md": {
+      "count": 1,
+      "bytes": 17278
+    },
+    "docs/STORYTIME_QA_CHECKLIST.md": {
+      "count": 1,
+      "bytes": 8677
+    },
+    "docs/STORYTIME_SYSTEM_OF_SYSTEMS_AUDIT_2026-05-19.md": {
+      "count": 1,
+      "bytes": 10297
+    },
+    "docs/STORY_PERSISTENCE_ARCHITECTURE.md": {
+      "count": 1,
+      "bytes": 1331
+    },
+    "docs/STORY_PRIVATE_VERSION_PRIVACY_AUTHORITY.md": {
+      "count": 1,
+      "bytes": 1659
+    },
+    "docs/STORY_VERSION_TRANSACTION_AUTHORITY.md": {
+      "count": 1,
+      "bytes": 2588
+    },
+    "docs/TESTING.md": {
+      "count": 1,
+      "bytes": 4016
+    },
+    "docs/WEBSITE_LAUNCH_PLAN.md": {
+      "count": 1,
+      "bytes": 5592
+    },
+    "docs/estate": {
+      "count": 12,
+      "bytes": 75788
+    },
+    "docs/evidence": {
+      "count": 7,
+      "bytes": 35599
+    },
+    "docs/finite-time": {
+      "count": 5,
+      "bytes": 10970
+    },
+    "docs/launch": {
+      "count": 2,
+      "bytes": 2466
+    },
+    "firebase.authorization-rules-emulator.json": {
+      "count": 1,
+      "bytes": 342
+    },
+    "firebase.emulators.json": {
+      "count": 1,
+      "bytes": 129
+    },
+    "firebase.json": {
+      "count": 1,
+      "bytes": 1517
+    },
+    "firebase.public-share-rules-emulator.json": {
+      "count": 1,
+      "bytes": 222
+    },
+    "firestore.indexes.json": {
+      "count": 1,
+      "bytes": 4363
+    },
+    "firestore.rules": {
+      "count": 1,
+      "bytes": 8973
+    },
+    "functions/package-lock.json": {
+      "count": 1,
+      "bytes": 110290
+    },
+    "functions/package.json": {
+      "count": 1,
+      "bytes": 626
+    },
+    "functions/src": {
+      "count": 35,
+      "bytes": 310411
+    },
+    "functions/tsconfig.json": {
+      "count": 1,
+      "bytes": 310
+    },
+    "launch-proof/urai-storytime-current-head-status": {
+      "count": 1,
+      "bytes": 1009
+    },
+    "launch-proof/urai-storytime-done-done-pass": {
+      "count": 8,
+      "bytes": 16752
+    },
+    "launch-proof/urai-storytime-external-execution-lock": {
+      "count": 1,
+      "bytes": 2326
+    },
+    "launch-proof/urai-storytime-final-repo-side-lock": {
+      "count": 1,
+      "bytes": 1947
+    },
+    "launch-proof/urai-storytime-production-grade-pass": {
+      "count": 1,
+      "bytes": 3382
+    },
+    "launch-proof/urai-storytime-production-lock": {
+      "count": 26,
+      "bytes": 81542
+    },
+    "launch-proof/urai-storytime-release-evidence-template": {
+      "count": 1,
+      "bytes": 1846
+    },
+    "legacy/static-demo": {
+      "count": 2,
+      "bytes": 2861
+    },
+    "next-env.d.ts": {
+      "count": 1,
+      "bytes": 262
+    },
+    "next.config.mjs": {
+      "count": 1,
+      "bytes": 143
+    },
+    "package-lock.json": {
+      "count": 1,
+      "bytes": 162420
+    },
+    "package.json": {
+      "count": 1,
+      "bytes": 3490
+    },
+    "scripts/build.mjs": {
+      "count": 1,
+      "bytes": 322
+    },
+    "scripts/format-check.mjs": {
+      "count": 1,
+      "bytes": 80
+    },
+    "scripts/guarded-firebase-deploy.mjs": {
+      "count": 1,
+      "bytes": 6255
+    },
+    "scripts/lint.mjs": {
+      "count": 1,
+      "bytes": 90
+    },
+    "scripts/server.mjs": {
+      "count": 1,
+      "bytes": 1683
+    },
+    "scripts/storytime-jobs-staging-acceptance.mjs": {
+      "count": 1,
+      "bytes": 15978
+    },
+    "scripts/typecheck.mjs": {
+      "count": 1,
+      "bytes": 92
+    },
+    "scripts/urai-production-verify.mjs": {
+      "count": 1,
+      "bytes": 1650
+    },
+    "scripts/validate-deployment-readiness.mjs": {
+      "count": 1,
+      "bytes": 1792
+    },
+    "scripts/validate-emulator-behavior-spec.mjs": {
+      "count": 1,
+      "bytes": 1451
+    },
+    "scripts/validate-emulator-runtime.mjs": {
+      "count": 1,
+      "bytes": 1247
+    },
+    "scripts/validate-emulator-scaffold.mjs": {
+      "count": 1,
+      "bytes": 1070
+    },
+    "scripts/validate-env-template.mjs": {
+      "count": 1,
+      "bytes": 3561
+    },
+    "scripts/validate-live-production-config.mjs": {
+      "count": 1,
+      "bytes": 3869
+    },
+    "scripts/validate-production-evidence.mjs": {
+      "count": 1,
+      "bytes": 1266
+    },
+    "scripts/validate-production-readiness.mjs": {
+      "count": 1,
+      "bytes": 10993
+    },
+    "scripts/validate-production-smoke.mjs": {
+      "count": 1,
+      "bytes": 507
+    },
+    "scripts/validate-provider-wiring.mjs": {
+      "count": 1,
+      "bytes": 2886
+    },
+    "scripts/validate-security-rules.mjs": {
+      "count": 1,
+      "bytes": 2716
+    },
+    "scripts/write-ci-reproducibility-receipt.mjs": {
+      "count": 1,
+      "bytes": 2680
+    },
+    "src/admin-boundary.mjs": {
+      "count": 1,
+      "bytes": 972
+    },
+    "src/analytics-adapter.mjs": {
+      "count": 1,
+      "bytes": 549
+    },
+    "src/app": {
+      "count": 8,
+      "bytes": 12161
+    },
+    "src/auth-boundary.mjs": {
+      "count": 1,
+      "bytes": 1397
+    },
+    "src/components": {
+      "count": 21,
+      "bytes": 95952
+    },
+    "src/core": {
+      "count": 1,
+      "bytes": 1007
+    },
+    "src/favicon.svg": {
+      "count": 1,
+      "bytes": 313
+    },
+    "src/firebase-adapter.mjs": {
+      "count": 1,
+      "bytes": 2111
+    },
+    "src/lib": {
+      "count": 24,
+      "bytes": 129566
+    },
+    "src/life-movie-story-graph.mjs": {
+      "count": 1,
+      "bytes": 3429
+    },
+    "src/live-persistence.mjs": {
+      "count": 1,
+      "bytes": 590
+    },
+    "src/moderation-boundary.mjs": {
+      "count": 1,
+      "bytes": 1804
+    },
+    "src/moderation-queue.mjs": {
+      "count": 1,
+      "bytes": 513
+    },
+    "src/monitoring-alerting.mjs": {
+      "count": 1,
+      "bytes": 593
+    },
+    "src/observability.mjs": {
+      "count": 1,
+      "bytes": 1595
+    },
+    "src/og.svg": {
+      "count": 1,
+      "bytes": 833
+    },
+    "src/privacy-jobs.mjs": {
+      "count": 1,
+      "bytes": 452
+    },
+    "src/privacy-operations.mjs": {
+      "count": 1,
+      "bytes": 1691
+    },
+    "src/release-gates.mjs": {
+      "count": 1,
+      "bytes": 1012
+    },
+    "src/robots.txt": {
+      "count": 1,
+      "bytes": 75
+    },
+    "src/runtime-readiness.mjs": {
+      "count": 1,
+      "bytes": 2276
+    },
+    "src/safety": {
+      "count": 2,
+      "bytes": 1179
+    },
+    "src/sitemap.xml": {
+      "count": 1,
+      "bytes": 165
+    },
+    "src/story-engine": {
+      "count": 2,
+      "bytes": 1144
+    },
+    "src/story-persistence.mjs": {
+      "count": 1,
+      "bytes": 2426
+    },
+    "storage.rules": {
+      "count": 1,
+      "bytes": 883
+    },
+    "tests/admin-boundary.test.mjs": {
+      "count": 1,
+      "bytes": 521
+    },
+    "tests/analytics-adapter.test.mjs": {
+      "count": 1,
+      "bytes": 1384
+    },
+    "tests/auth-boundary.test.mjs": {
+      "count": 1,
+      "bytes": 943
+    },
+    "tests/e2e": {
+      "count": 51,
+      "bytes": 246343
+    },
+    "tests/firebase-adapter.test.mjs": {
+      "count": 1,
+      "bytes": 940
+    },
+    "tests/firestore-rules.test.mjs": {
+      "count": 1,
+      "bytes": 606
+    },
+    "tests/fixtures": {
+      "count": 5,
+      "bytes": 139506
+    },
+    "tests/helpers": {
+      "count": 1,
+      "bytes": 11502
+    },
+    "tests/live-persistence-boundary.test.mjs": {
+      "count": 1,
+      "bytes": 584
+    },
+    "tests/moderation-boundary.test.mjs": {
+      "count": 1,
+      "bytes": 976
+    },
+    "tests/monitoring-alerting.test.mjs": {
+      "count": 1,
+      "bytes": 1111
+    },
+    "tests/observability.test.mjs": {
+      "count": 1,
+      "bytes": 1074
+    },
+    "tests/privacy-operations.test.mjs": {
+      "count": 1,
+      "bytes": 1098
+    },
+    "tests/provider-wiring.test.mjs": {
+      "count": 1,
+      "bytes": 485
+    },
+    "tests/release-gates.test.mjs": {
+      "count": 1,
+      "bytes": 1157
+    },
+    "tests/rules-emulator": {
+      "count": 4,
+      "bytes": 22485
+    },
+    "tests/storage-rules.test.mjs": {
+      "count": 1,
+      "bytes": 602
+    },
+    "tests/story-persistence.test.mjs": {
+      "count": 1,
+      "bytes": 1525
+    },
+    "tests/unit": {
+      "count": 29,
+      "bytes": 137374
+    },
+    "tsconfig.json": {
+      "count": 1,
+      "bytes": 716
+    }
+  },
+  "historical_branch_snapshot": "PR #99 head a1d9153a8b9308090649f2ede0f0eb7b43d74db8; 96/96 branch heads, 4,760 unique Git blobs, 66,472,643 reported distinct Git blob bytes, no full intermediate history or raw-byte claim",
+  "current_branch_count": 108,
+  "branch_listing_pages": [
+    100,
+    8
+  ],
+  "common_native_media_paths": [],
+  "scope_limits": [
+    "All 383 tracked file paths, Git SHA-1, modes and reported sizes are inventoried, but no global raw-byte download/SHA-256 hash is claimed.",
+    "Visible branch HEAD count includes R913 branch; it is not the complete intermediate/unreachable/deleted history.",
+    "External Firebase Storage, private memory, cloud media, paid provider and Git LFS objects have not been read.",
+    "Absence of common native media extensions in tracked source does not establish no external or historical media.",
+    "Source tree from open PR #110 not merged main and not certified production/deployed.",
+    "Live provider status, CI runtime and independent review are separate proof categories."
+  ],
+  "files": [
+    {
+      "path": ".env.example",
+      "mode": "100644",
+      "git_blob_sha1": "a09e8cd8d7458a41302fdd035e86a9ef12b09271",
+      "git_reported_size_bytes": 1731,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".firebaserc",
+      "mode": "100644",
+      "git_blob_sha1": "96967b104fd87402158f137e2d2ad6dbe839d1d7",
+      "git_reported_size_bytes": 237,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "mode": "100644",
+      "git_blob_sha1": "8b85a34567b27506c0359a91ff6ad1eb74f1e96b",
+      "git_reported_size_bytes": 13141,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/protected-deployment.yml",
+      "mode": "100644",
+      "git_blob_sha1": "2c4d21f506b668299ed0eadea2220f9cf1cca693",
+      "git_reported_size_bytes": 12699,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/protected-rollback-drill.yml",
+      "mode": "100644",
+      "git_blob_sha1": "84c41a912409fb4dbaf62c36f760bfafc2929cb0",
+      "git_reported_size_bytes": 13085,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/protected-rollback-test.yml",
+      "mode": "100644",
+      "git_blob_sha1": "34e1b4aacbfcedb4f6fef92e892161863f081dbf",
+      "git_reported_size_bytes": 4261,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/public-share-rules-emulator.yml",
+      "mode": "100644",
+      "git_blob_sha1": "cbaf6fc4a46781d51481d4978d1f58cfb897880f",
+      "git_reported_size_bytes": 8521,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/release-promotion.yml",
+      "mode": "100644",
+      "git_blob_sha1": "7bc11e2ef0072a161fc04fee38e4c814f5ca81dc",
+      "git_reported_size_bytes": 13108,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/storytime-visual-proof.yml",
+      "mode": "100644",
+      "git_blob_sha1": "3cae7e759eceae0dd21c8353af21fa8814ce7db9",
+      "git_reported_size_bytes": 4450,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".github/workflows/urai-production-verify.yml",
+      "mode": "100644",
+      "git_blob_sha1": "4aa290e488578ebee5295265a72ff55e90241c35",
+      "git_reported_size_bytes": 2871,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": ".gitignore",
+      "mode": "100644",
+      "git_blob_sha1": "5ad37cdcc9f6f1ef86cde1b0cd464ba649ebe498",
+      "git_reported_size_bytes": 2219,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "git_blob_sha1": "bfabdc19f3a32cc46f35131554efbb11549296ad",
+      "git_reported_size_bytes": 9039,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/ACCESSIBILITY.md",
+      "mode": "100644",
+      "git_blob_sha1": "a7346ede7e356bc03e934a92bde011283b322d4a",
+      "git_reported_size_bytes": 3960,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "mode": "100644",
+      "git_blob_sha1": "c653039234e96e30e765a43e93af7bd08afebe16",
+      "git_reported_size_bytes": 9695,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/AUDIT.md",
+      "mode": "100644",
+      "git_blob_sha1": "e8ceed1aad8232844b03e8c8b695dd06927f3749",
+      "git_reported_size_bytes": 5115,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/AUDIT_2026-07-06.md",
+      "mode": "100644",
+      "git_blob_sha1": "bcd76c2e10188774bf3fb81a0ed8f4acdb8fe53a",
+      "git_reported_size_bytes": 20589,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/AUTH_AND_FAMILY_MODEL.md",
+      "mode": "100644",
+      "git_blob_sha1": "a6de0360c808fa16f785f3e7afd80f3750fe1eaf",
+      "git_reported_size_bytes": 1629,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/CANONICAL_APP_ROOT.md",
+      "mode": "100644",
+      "git_blob_sha1": "7ee21ca9339d7b2281cbacbc60e267ba6ae3ca2f",
+      "git_reported_size_bytes": 2167,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/CROSS_SYSTEM_CANON_AUTHORITY.md",
+      "mode": "100644",
+      "git_blob_sha1": "0f9f47e9337b685215cf7b7acff7b573767278cf",
+      "git_reported_size_bytes": 3610,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/DEFINITION_OF_DONE.md",
+      "mode": "100644",
+      "git_blob_sha1": "5dc56a53d5fa8c8a111b554557427c373ed25e93",
+      "git_reported_size_bytes": 4444,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/DEPLOYMENT_AND_ROLLBACK.md",
+      "mode": "100644",
+      "git_blob_sha1": "1b6a4365d51c2d0cc2a3e703ff716e9a7400f0d7",
+      "git_reported_size_bytes": 4278,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/DEPLOYMENT_RUNBOOK.md",
+      "mode": "100644",
+      "git_blob_sha1": "3a8a8d329e22822b99394d965c952903e7b17ee1",
+      "git_reported_size_bytes": 1868,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/DONE_DONE_LAUNCH_AUDIT.md",
+      "mode": "100644",
+      "git_blob_sha1": "9a9c322c94104e119ff1982774283ded0d5618ad",
+      "git_reported_size_bytes": 21834,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/ENVIRONMENT_VARIABLES.md",
+      "mode": "100644",
+      "git_blob_sha1": "6d335b32a2eb602030200d4149a729902580aac3",
+      "git_reported_size_bytes": 4273,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/EVIDENCE_STATUS.md",
+      "mode": "100644",
+      "git_blob_sha1": "de5f1663448ccf189642b89db87165fb44740922",
+      "git_reported_size_bytes": 243,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/FINAL_PRODUCTION_BLOCKERS.md",
+      "mode": "100644",
+      "git_blob_sha1": "bee158cd2d70ab8d636674c2bdb6482424de3b8a",
+      "git_reported_size_bytes": 2202,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/FIREBASE_READINESS.md",
+      "mode": "100644",
+      "git_blob_sha1": "9f7ea72096dd9d6683d4aba4fc0478a36f553b97",
+      "git_reported_size_bytes": 1155,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/FIREBASE_RUNTIME_VERIFICATION.md",
+      "mode": "100644",
+      "git_blob_sha1": "24b1ab59be2422038547e7a63ee680f40fc69ca6",
+      "git_reported_size_bytes": 1487,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/FIRESTORE_DATA_MODEL.md",
+      "mode": "100644",
+      "git_blob_sha1": "f6585ac632eb01991e211f3fbbbb463f43ea92ac",
+      "git_reported_size_bytes": 1211,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/FIRESTORE_RULES_STATUS.md",
+      "mode": "100644",
+      "git_blob_sha1": "04de58ff823667f8caeac5e97c2bd3cf61331dd5",
+      "git_reported_size_bytes": 1469,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/LIVE_DEPLOYMENT_EXECUTION.md",
+      "mode": "100644",
+      "git_blob_sha1": "ed42248d0c4a00f8ba154b6aefaa23fcca229437",
+      "git_reported_size_bytes": 1316,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/LOCAL_DEVELOPMENT.md",
+      "mode": "100644",
+      "git_blob_sha1": "2aec16cac2543d12acdbed15db7ed0e55fcf9936",
+      "git_reported_size_bytes": 2065,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/LOCKFILE_MATERIALIZATION_RECEIPT_2026-07-14.md",
+      "mode": "100644",
+      "git_blob_sha1": "1215f7117f2cc9a670aedc91f90ca61a45526546",
+      "git_reported_size_bytes": 1883,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/MODERATION_AND_CHILD_SAFETY.md",
+      "mode": "100644",
+      "git_blob_sha1": "15c49451bf273bfe3e9a206efbca26f98a68d036",
+      "git_reported_size_bytes": 8656,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/OBSERVABILITY_ARCHITECTURE.md",
+      "mode": "100644",
+      "git_blob_sha1": "3ecb64be94cbe5cd4cdb0e38c4299b4a451726d3",
+      "git_reported_size_bytes": 1075,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/OBSERVABILITY_AUDIT_LOGGING.md",
+      "mode": "100644",
+      "git_blob_sha1": "7ae0b3d7039d3d788432e61f2a63669952417a1f",
+      "git_reported_size_bytes": 1567,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRIVACY_AND_SAFETY_ENGINEERING.md",
+      "mode": "100644",
+      "git_blob_sha1": "06dd833f3b9291dfed7831a0fba21ee259d42998",
+      "git_reported_size_bytes": 7141,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRIVACY_OPERATIONS_ARCHITECTURE.md",
+      "mode": "100644",
+      "git_blob_sha1": "91bc40af62246e17f4a6ff7f8224a375392aeadf",
+      "git_reported_size_bytes": 5100,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCTION_BLOCKER_HANDOFF.md",
+      "mode": "100644",
+      "git_blob_sha1": "1ac671c608d8e5e0c40b278c0896a03dc977c377",
+      "git_reported_size_bytes": 3573,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCTION_ENVIRONMENT_CONTRACT.md",
+      "mode": "100644",
+      "git_blob_sha1": "595843d4bcf202476793301df1bd191835530814",
+      "git_reported_size_bytes": 2534,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCTION_READINESS_STATUS.md",
+      "mode": "100644",
+      "git_blob_sha1": "35cb6924e4957ce9046ed3b81ec64060041ee033",
+      "git_reported_size_bytes": 3397,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCTION_RELEASE_GATE.md",
+      "mode": "100644",
+      "git_blob_sha1": "fe06b2d07a0483bc4c89781a2b093f2421daf651",
+      "git_reported_size_bytes": 1907,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCTION_SMOKE_CHECKLIST.md",
+      "mode": "100644",
+      "git_blob_sha1": "e0a7f0a0cc7b52bfc71104acd147e7206686660e",
+      "git_reported_size_bytes": 883,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/PRODUCT_VISION.md",
+      "mode": "100644",
+      "git_blob_sha1": "a4bad6a9044c8fcaa72426276cfb2fde6d3ed630",
+      "git_reported_size_bytes": 5402,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/RATE_LIMIT_COST_CONTROL.md",
+      "mode": "100644",
+      "git_blob_sha1": "48853906f812bcb0248677d3dc8d2a4b9b178283",
+      "git_reported_size_bytes": 1300,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/RELEASE_EVIDENCE_LOG.md",
+      "mode": "100644",
+      "git_blob_sha1": "b2a455ec30b075ab72f31a8c388523ca8b937eb0",
+      "git_reported_size_bytes": 4149,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/ROADMAP.md",
+      "mode": "100644",
+      "git_blob_sha1": "0b5a48a87a314d1678bcb2958758a60ad196862e",
+      "git_reported_size_bytes": 29705,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/ROLLBACK_RUNBOOK.md",
+      "mode": "100644",
+      "git_blob_sha1": "96d34dd5a2f571e7c4492255dc30277601942560",
+      "git_reported_size_bytes": 1149,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/SECURITY_AND_CHILD_SAFETY.md",
+      "mode": "100644",
+      "git_blob_sha1": "87051ca5072ddc1086497b3ce62686996f0066f5",
+      "git_reported_size_bytes": 8979,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_ADMIN_MODERATION_CONTRACT.md",
+      "mode": "100644",
+      "git_blob_sha1": "172e13a4dac1440e44f71135f526266b45010c5a",
+      "git_reported_size_bytes": 2093,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_AUTHENTICATED_PRIVATE_DELIVERY.md",
+      "mode": "100644",
+      "git_blob_sha1": "60887f5b336104ee9faf37cdb3f4bc613b87cda6",
+      "git_reported_size_bytes": 3926,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/STORYTIME_DEPLOYMENT.md",
+      "mode": "100644",
+      "git_blob_sha1": "34c55dd5f271e6a233e20afc7f1eb132b0594d2b",
+      "git_reported_size_bytes": 7993,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_EMULATOR_BEHAVIOR_SPEC.md",
+      "mode": "100644",
+      "git_blob_sha1": "abfad76364278f91d8e2b523618b0cfbc670f95d",
+      "git_reported_size_bytes": 5150,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_IMPLEMENTATION_PASS_2.md",
+      "mode": "100644",
+      "git_blob_sha1": "f90503a39ea804f273b210ff553e8560f5c9555d",
+      "git_reported_size_bytes": 1796,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_IMPLEMENTATION_PASS_3.md",
+      "mode": "100644",
+      "git_blob_sha1": "1ddbffe5cd1921ddfef361461cd7f475a391db93",
+      "git_reported_size_bytes": 1553,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_IMPLEMENTATION_PASS_4.md",
+      "mode": "100644",
+      "git_blob_sha1": "033b2e0a788601d817215b06a5b05bde6c72f203",
+      "git_reported_size_bytes": 1937,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_JOBS_STAGING_ACCEPTANCE.md",
+      "mode": "100644",
+      "git_blob_sha1": "853219c02c9eaf904c66281677d205377f32a471",
+      "git_reported_size_bytes": 3930,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/STORYTIME_PROTECTED_PROVIDER_SPEND.md",
+      "mode": "100644",
+      "git_blob_sha1": "670dbae52f228eb18c061574dd3a4722ca698109",
+      "git_reported_size_bytes": 17278,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/STORYTIME_QA_CHECKLIST.md",
+      "mode": "100644",
+      "git_blob_sha1": "3282da7f019cc1709ee3a25c608d83a5a558a832",
+      "git_reported_size_bytes": 8677,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORYTIME_SYSTEM_OF_SYSTEMS_AUDIT_2026-05-19.md",
+      "mode": "100644",
+      "git_blob_sha1": "db14d14f14194556d05dd90b92ad2decceea7b93",
+      "git_reported_size_bytes": 10297,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORY_PERSISTENCE_ARCHITECTURE.md",
+      "mode": "100644",
+      "git_blob_sha1": "250d4aaca74653d3cad4bd15e8da291d63fdac2a",
+      "git_reported_size_bytes": 1331,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/STORY_PRIVATE_VERSION_PRIVACY_AUTHORITY.md",
+      "mode": "100644",
+      "git_blob_sha1": "1c5df274156261ec67e6e0d29b50d0a65ec30200",
+      "git_reported_size_bytes": 1659,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/STORY_VERSION_TRANSACTION_AUTHORITY.md",
+      "mode": "100644",
+      "git_blob_sha1": "103f8111d75292bd3c8686646b35900a024ea782",
+      "git_reported_size_bytes": 2588,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/TESTING.md",
+      "mode": "100644",
+      "git_blob_sha1": "dc2ab277acbe10920a5809f46492b8f2f0c33074",
+      "git_reported_size_bytes": 4016,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/WEBSITE_LAUNCH_PLAN.md",
+      "mode": "100644",
+      "git_blob_sha1": "3a688e1934f11a6174ee84e78d892f63723c3979",
+      "git_reported_size_bytes": 5592,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/estate/R900_SERVER_WRITTEN_STORYTIME_CANON_SECURITY_REVIEW_20261107.md",
+      "mode": "100644",
+      "git_blob_sha1": "5cd98d6ff8d9d9d83997602ef4ca292a5b43059c",
+      "git_reported_size_bytes": 4507,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R902_PRIVATE_LIBRARY_AUTH_EPOCH_SECURITY_REVIEW_20261107.md",
+      "mode": "100644",
+      "git_blob_sha1": "4d4015cd82cb01d54131d8b8d4b68e25c9cc0288",
+      "git_reported_size_bytes": 3740,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R903_HOME_FORM_AUTH_FENCE_20261107.md",
+      "mode": "100644",
+      "git_blob_sha1": "e3d55a2cc5ba9d44a2fddc50462eda8d375748d5",
+      "git_reported_size_bytes": 4843,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R904_GENERATION_IDEMPOTENCY_SOURCE_BINDING_20261107.md",
+      "mode": "100644",
+      "git_blob_sha1": "27048e678c4da53f88e17acf2eafab8e6d1ed90c",
+      "git_reported_size_bytes": 5458,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R905_GENERATION_RETRY_STATE_AND_SOURCE_TRUTH_20261107.md",
+      "mode": "100644",
+      "git_blob_sha1": "f81b9cf91ba4499185212c654ed8f0425a1dab2b",
+      "git_reported_size_bytes": 4730,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R906_ATOMIC_LOCAL_STORY_CANCELLATION_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "d054abe20963eafc982a8ddce6d9406829d0f9df",
+      "git_reported_size_bytes": 5046,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R907_SOURCE_SIGNAL_TRUTHFUL_ATTRIBUTION_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "cff69a541558f51ce55b03c9b530a74bc956411d",
+      "git_reported_size_bytes": 4902,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R909_EXACT_BLOB_CONVERGENCE_AND_TEST_LEDGER.json",
+      "mode": "100644",
+      "git_blob_sha1": "7c5f5cd42e3681d642df7263200af5676d2c7243",
+      "git_reported_size_bytes": 8251,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R909_SECURITY_CONVERGENCE_SOURCE_TEST_AND_GATE_REVIEW_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "40e0435c11b65a9d238fe307aa90ba80b9ff2612",
+      "git_reported_size_bytes": 10693,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R910_UNCERTAIN_GENERATION_REQUEST_ID_AND_RECEIPT_HOLD_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "042ad7cb7192b038a9c48868c4e14e795e77bf2d",
+      "git_reported_size_bytes": 5912,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R911_OWNER_GENERATION_RECEIPT_RECOVERY_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "9808b474abd65c3faded1d7e6771162b4c986ed6",
+      "git_reported_size_bytes": 7672,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/estate/R912_PER_OWNER_UNSETTLED_GENERATION_ADMISSION_20261108.md",
+      "mode": "100644",
+      "git_blob_sha1": "5b7bf667cafa16b54bc006f2cffe02de2f01f85f",
+      "git_reported_size_bytes": 10034,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/evidence/2026-09-27-storytime-review-closeout/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "75901a7f87f00a664641f429c5a816cae2321b41",
+      "git_reported_size_bytes": 2172,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/evidence/2026-09-27-storytime-review-closeout/typecheck.log",
+      "mode": "100644",
+      "git_blob_sha1": "f0063a133497632452387057619507f849c9fda2",
+      "git_reported_size_bytes": 149,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/evidence/2026-09-27-storytime-review-closeout/unit-e2e.log",
+      "mode": "100644",
+      "git_blob_sha1": "9f00eba3110acd4a3944cb4225d9b182baeda8cd",
+      "git_reported_size_bytes": 16234,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/evidence/NEXT_PRIMARY_ADVISORY_SOURCE_REMEDIATION_20261007.md",
+      "mode": "100644",
+      "git_blob_sha1": "552c0129c74584edf3b5d87691731ac361da3143",
+      "git_reported_size_bytes": 2050,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/evidence/STORYTIME_VERSIONED_DELETION_RECOVERY_20261007.md",
+      "mode": "100644",
+      "git_blob_sha1": "28c629595f48135bc6e12152bdcc6c86195734cd",
+      "git_reported_size_bytes": 5375,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/evidence/cloud-session-current-authority-20261010.md",
+      "mode": "100644",
+      "git_blob_sha1": "0c69ae34bcd45653162d23a71581c67f0a367def",
+      "git_reported_size_bytes": 6121,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/evidence/current-privacy-actor-20261008.md",
+      "mode": "100644",
+      "git_blob_sha1": "4c69cf4fb85ee9a5d074740cde69d93038e39576",
+      "git_reported_size_bytes": 3498,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "docs/finite-time/CANON_AND_SHOT_GRAPH_CONTRACT.md",
+      "mode": "100644",
+      "git_blob_sha1": "f8aef01ce8169319becf51104a7a0d96276b0e78",
+      "git_reported_size_bytes": 2211,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/finite-time/FARM_TO_LAKE_APPROVAL_LEDGER.md",
+      "mode": "100644",
+      "git_blob_sha1": "090ff30ead27e3429ea82ce86a4cc920be651e18",
+      "git_reported_size_bytes": 3576,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/finite-time/FARM_TO_LAKE_NARRATION_CANDIDATE_V2.txt",
+      "mode": "100644",
+      "git_blob_sha1": "ebf88fa8c2fa76bc519fea187b01c0c2eff11c11",
+      "git_reported_size_bytes": 2022,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/finite-time/approvals/FARM_TO_LAKE_V2_REVIEW_TEMPLATE.md",
+      "mode": "100644",
+      "git_blob_sha1": "102fe14ecc6ead24da3a611c2593f869e06a05a1",
+      "git_reported_size_bytes": 1811,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/finite-time/approvals/FOUNDER_BUDGET_APPROVAL_2026-07-21.md",
+      "mode": "100644",
+      "git_blob_sha1": "47dff1a52b54873fdfc802ff39a7727373222c5c",
+      "git_reported_size_bytes": 1350,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/launch/HARDENING.md",
+      "mode": "100644",
+      "git_blob_sha1": "f008ec82d14767c0c1af2e4518c7659299a7669e",
+      "git_reported_size_bytes": 647,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "docs/launch/WAVE3_STORYTIME_LAUNCH_LOCK_EVIDENCE.md",
+      "mode": "100644",
+      "git_blob_sha1": "ea2b9a4eae346d46831f5c06cb498709807059f9",
+      "git_reported_size_bytes": 1819,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "firebase.authorization-rules-emulator.json",
+      "mode": "100644",
+      "git_blob_sha1": "4a42778e38f00a82d1ff39ce18156465009a9003",
+      "git_reported_size_bytes": 342,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "firebase.emulators.json",
+      "mode": "100644",
+      "git_blob_sha1": "6d49d43bb92a6a825de53fc5e17763aa2cfabd4e",
+      "git_reported_size_bytes": 129,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "firebase.json",
+      "mode": "100644",
+      "git_blob_sha1": "ae5dd32e79d8942925bb208021c17e0f56456347",
+      "git_reported_size_bytes": 1517,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "firebase.public-share-rules-emulator.json",
+      "mode": "100644",
+      "git_blob_sha1": "2ef78b329b0e99d101faf463a8ca77013e28870b",
+      "git_reported_size_bytes": 222,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "firestore.indexes.json",
+      "mode": "100644",
+      "git_blob_sha1": "4bd4e61921b2d33f97f3ff07b174403f13ad6677",
+      "git_reported_size_bytes": 4363,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "firestore.rules",
+      "mode": "100644",
+      "git_blob_sha1": "afb4ed09243a81b15d3614f8cd1fcc70d33b481e",
+      "git_reported_size_bytes": 8973,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/package-lock.json",
+      "mode": "100644",
+      "git_blob_sha1": "d4bc8045022dd923ece7525fa1612f497e6a0464",
+      "git_reported_size_bytes": 110290,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/package.json",
+      "mode": "100644",
+      "git_blob_sha1": "671747f16177f69d77268cd2644d33deb6955322",
+      "git_reported_size_bytes": 626,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/audit-log.ts",
+      "mode": "100644",
+      "git_blob_sha1": "de3a850067b3148b2049d6822dc29b01f87289dc",
+      "git_reported_size_bytes": 1629,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/finite-time-registry.ts",
+      "mode": "100644",
+      "git_blob_sha1": "7e75da00768b49f98d7d9171ad2ad8817a40f2cb",
+      "git_reported_size_bytes": 17524,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/generate-emotional-arc-summary.ts",
+      "mode": "100644",
+      "git_blob_sha1": "d755d6821574a81f7274fdceee5e60282af97ec7",
+      "git_reported_size_bytes": 1843,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/generate-narrator-script.ts",
+      "mode": "100644",
+      "git_blob_sha1": "dc1d26eda48acfceed0f3d8975dc69decd6fb8a8",
+      "git_reported_size_bytes": 2285,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/generate-weekly-story-scroll.ts",
+      "mode": "100644",
+      "git_blob_sha1": "7a21dfd672b36f4e3f0f57f7527c8d11057a9d99",
+      "git_reported_size_bytes": 1805,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/index.ts",
+      "mode": "100644",
+      "git_blob_sha1": "f7c414672ed745f4deca3b2fff419a5e57ee96d6",
+      "git_reported_size_bytes": 1806,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/moderation-operations.ts",
+      "mode": "100644",
+      "git_blob_sha1": "bb677c7499f5f869f23d26312531ea3f0de01969",
+      "git_reported_size_bytes": 6387,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/privacy-actor.ts",
+      "mode": "100644",
+      "git_blob_sha1": "57f62ccacf1e218d41f2eca6fc6d990aae9ca007",
+      "git_reported_size_bytes": 2478,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/privacy-execution.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ae243cda0fd7b8e4d033a9ac4c1b3c90b0e6a062",
+      "git_reported_size_bytes": 74897,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/privacy-requests.ts",
+      "mode": "100644",
+      "git_blob_sha1": "417467a34d0a89b93c18813e0c225c4ebc4ea5ad",
+      "git_reported_size_bytes": 3843,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/public-story-share-lifecycle.ts",
+      "mode": "100644",
+      "git_blob_sha1": "24e6069ca4d88c0f0b56dd71159e95b2c19ed230",
+      "git_reported_size_bytes": 8910,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/readiness.ts",
+      "mode": "100644",
+      "git_blob_sha1": "c861e7987e4d8253a1b0b4ce028c4e72a9429c43",
+      "git_reported_size_bytes": 2629,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/rebuild-user-story-archive.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ec675d471f39b1621a74d5ef1ebe1f44d6b65dd4",
+      "git_reported_size_bytes": 2049,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/refresh-story-timeline.ts",
+      "mode": "100644",
+      "git_blob_sha1": "7ba995750de1b1c81eeb351e34c0b3b67aec2411",
+      "git_reported_size_bytes": 1609,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/revoke-public-story-share.ts",
+      "mode": "100644",
+      "git_blob_sha1": "de2dae3046cfea00d3d421d65f3d0e80b7390c1a",
+      "git_reported_size_bytes": 2265,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/safety-reports.ts",
+      "mode": "100644",
+      "git_blob_sha1": "0e42a46436f446b389fac0c60f480c8b2e13b9c9",
+      "git_reported_size_bytes": 4660,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/story-drafts.ts",
+      "mode": "100644",
+      "git_blob_sha1": "7a32d36df497bdca06b9f71bb46f2daf94ee99b1",
+      "git_reported_size_bytes": 4314,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/story-generation-admission.ts",
+      "mode": "100644",
+      "git_blob_sha1": "01079313fd93d6340364aed9cd3ace86b52c51a5",
+      "git_reported_size_bytes": 2020,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/story-generation-recovery-contract.ts",
+      "mode": "100644",
+      "git_blob_sha1": "fbd18b874a88fefe7c7398bbe6c8e58b8ad18c86",
+      "git_reported_size_bytes": 2121,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/story-generation-recovery.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ed3da697df1250d62ebd0c11cb0d62224737a97c",
+      "git_reported_size_bytes": 2915,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/story-persistence.ts",
+      "mode": "100644",
+      "git_blob_sha1": "84607ce3f18c2b68c48a413796b8bbe560fc16dd",
+      "git_reported_size_bytes": 2111,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/story-provider-spend.ts",
+      "mode": "100644",
+      "git_blob_sha1": "3dd098eb66131b7fb29d5dc7e1d1f5d09876d7c1",
+      "git_reported_size_bytes": 25579,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/story-provider.ts",
+      "mode": "100644",
+      "git_blob_sha1": "8fc5537b74989bb9261c925368f8cab4b14809cf",
+      "git_reported_size_bytes": 13655,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/story-version.ts",
+      "mode": "100644",
+      "git_blob_sha1": "6de849af342daae65eedd596632a6c0a2a5994d1",
+      "git_reported_size_bytes": 1746,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/story-versioning.ts",
+      "mode": "100644",
+      "git_blob_sha1": "51e4702362e44a0cfe87ca3bb7b98d4c1aef120e",
+      "git_reported_size_bytes": 13169,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/storytime-media-delivery-contract.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9511c1c2840db9554d1edab07357c0de084b2e5b",
+      "git_reported_size_bytes": 584,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-narrator-reconciliation.ts",
+      "mode": "100644",
+      "git_blob_sha1": "723e97e1e659aa8ca86d864bcc15283f05246287",
+      "git_reported_size_bytes": 969,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-narrator-recovery-authority.ts",
+      "mode": "100644",
+      "git_blob_sha1": "22e481c92845ca2a6d72ade48b36d64eae729ae4",
+      "git_reported_size_bytes": 1498,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-record-builders.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9740f3eb4637b75f961a9f5aed1a60b329f2ccac",
+      "git_reported_size_bytes": 2062,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/storytime-request-binding.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ce28459340e271c108756248ae46ec95df6e3be6",
+      "git_reported_size_bytes": 1877,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-scroll-builders.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ec15565f19eb32cb38f7208360c0e538e3bc8451",
+      "git_reported_size_bytes": 1050,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/src/storytime-voiceover-consent-admission.ts",
+      "mode": "100644",
+      "git_blob_sha1": "43d44560d392b7be908ba5d38e855828eb7f7d77",
+      "git_reported_size_bytes": 29797,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-voiceover-delivery.ts",
+      "mode": "100644",
+      "git_blob_sha1": "3801bbd3a6931e6da7d3291c2e2bbae73fa976ca",
+      "git_reported_size_bytes": 10341,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime-voiceover-result-guard.ts",
+      "mode": "100644",
+      "git_blob_sha1": "8861282f0e883119de161141d86405c9fde51a55",
+      "git_reported_size_bytes": 1939,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "functions/src/storytime.ts",
+      "mode": "100644",
+      "git_blob_sha1": "95716cf1beb2f2382657f5c5934ad4a516e3a133",
+      "git_reported_size_bytes": 56045,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "functions/tsconfig.json",
+      "mode": "100644",
+      "git_blob_sha1": "b2ad36677edbbb1d67f0e786f879d0c1a3b1587e",
+      "git_reported_size_bytes": 310,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-current-head-status/2026-06-29T0020Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "61181bc2bd524f1f77a965fdeac1d6d52226db0a",
+      "git_reported_size_bytes": 1009,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "0e8107f405a4352caa859961f57af4d7bd38ec63",
+      "git_reported_size_bytes": 4233,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/blockers.md",
+      "mode": "100644",
+      "git_blob_sha1": "4f57cdb8a620be4c61d8265ba1da5e04961fd2b2",
+      "git_reported_size_bytes": 1902,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/build-test-results.md",
+      "mode": "100644",
+      "git_blob_sha1": "429cc7e850bd94e93c32ff7776a20cea03afff8b",
+      "git_reported_size_bytes": 1655,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/command-log.md",
+      "mode": "100644",
+      "git_blob_sha1": "189a18b1214840071ad3c87a2830deae9c21283b",
+      "git_reported_size_bytes": 1493,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/deployment-check.md",
+      "mode": "100644",
+      "git_blob_sha1": "2fd5c6c48d2e9cfde5f3ee4bfc508669b395ce32",
+      "git_reported_size_bytes": 1938,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/feature-truth-table.md",
+      "mode": "100644",
+      "git_blob_sha1": "2414e45cd48ad85d7e7d3437df9fc01b08d3ff3f",
+      "git_reported_size_bytes": 2449,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/git-diff-summary.md",
+      "mode": "100644",
+      "git_blob_sha1": "034df1d09ef46e2c54f11bf1549767d497a5963f",
+      "git_reported_size_bytes": 1370,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-done-done-pass/2026-06-28T2319Z/route-map.md",
+      "mode": "100644",
+      "git_blob_sha1": "cbff80dda8eea399cfb1cfe7003aa92f804da00e",
+      "git_reported_size_bytes": 1712,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-external-execution-lock/2026-06-28T2350Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "8dd348d467ebb92b9c15f6aeebe1432b340ef39b",
+      "git_reported_size_bytes": 2326,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-final-repo-side-lock/2026-06-29T0015Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "58fe372d40caf8e6ae710d8aea2be61b7cbc8693",
+      "git_reported_size_bytes": 1947,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-grade-pass/2026-06-28T2338Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "d43cb321e63221a4583c7ee83819a9da3e71574e",
+      "git_reported_size_bytes": 3382,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-28T2025Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "f560f82ede8bb87f21f92ecfc6e95a10023e78fa",
+      "git_reported_size_bytes": 15530,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "0f66f214a42915470dc55edf52834374f14143e4",
+      "git_reported_size_bytes": 1872,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/audit-report.md",
+      "mode": "100644",
+      "git_blob_sha1": "a822ec019d92069ab29eccdc74660d52e669becd",
+      "git_reported_size_bytes": 5308,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/blockers.md",
+      "mode": "100644",
+      "git_blob_sha1": "9c317281f7c6ba0f0fae12f96784df8d21a81864",
+      "git_reported_size_bytes": 2864,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/build-test-deploy-proof.md",
+      "mode": "100644",
+      "git_blob_sha1": "78ea23491da3f83f1d83776c3e9c2852da2b3c2a",
+      "git_reported_size_bytes": 2161,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/completion-plan.md",
+      "mode": "100644",
+      "git_blob_sha1": "458f237fdb268c96d6c9684e3145259b29b31cfa",
+      "git_reported_size_bytes": 2993,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/data-schema.md",
+      "mode": "100644",
+      "git_blob_sha1": "fd457f823423686c047a43aa63cefbbf7dee25c1",
+      "git_reported_size_bytes": 3402,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/function-map.md",
+      "mode": "100644",
+      "git_blob_sha1": "1ae7bfa5adfad303dc8fb4f7c8f8e46941aa7d3f",
+      "git_reported_size_bytes": 2704,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0000Z/route-map.md",
+      "mode": "100644",
+      "git_blob_sha1": "2ff76996465c9860da85e6d6a6568898922d3203",
+      "git_reported_size_bytes": 1929,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "abbf697f58c3f1214f882947ba6d8ed8722f8269",
+      "git_reported_size_bytes": 2159,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/audit-report.md",
+      "mode": "100644",
+      "git_blob_sha1": "04994af6248cc8e4ebc11926eedef260910086c2",
+      "git_reported_size_bytes": 2677,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/blocker-register.md",
+      "mode": "100644",
+      "git_blob_sha1": "2d62ef852cb4f76891a63d0563d99df5a64ea7ea",
+      "git_reported_size_bytes": 3367,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/build-test-deploy-proof.md",
+      "mode": "100644",
+      "git_blob_sha1": "de6922ce9c91bc62240e815c85af926d98073643",
+      "git_reported_size_bytes": 1865,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/command-logs/connector-verification.md",
+      "mode": "100644",
+      "git_blob_sha1": "e1d2a9d04b9c0e1114e7b7efabc503ce4194e6b3",
+      "git_reported_size_bytes": 1624,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/completion-plan.md",
+      "mode": "100644",
+      "git_blob_sha1": "291f6c8ea00d6c553e1793981a75323d7a2f1b58",
+      "git_reported_size_bytes": 3653,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/continued-safe-fixes.md",
+      "mode": "100644",
+      "git_blob_sha1": "2c6a80f3fb765bdb819659e52d331cf5fb43247e",
+      "git_reported_size_bytes": 4160,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/data-schema.md",
+      "mode": "100644",
+      "git_blob_sha1": "8a96773ade34b45381ca64d97785a06685cbfb24",
+      "git_reported_size_bytes": 2098,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/ecosystem-coordinator-handoff.md",
+      "mode": "100644",
+      "git_blob_sha1": "c3aebbbcfbac49eb162a814a96d5dbce108ba456",
+      "git_reported_size_bytes": 3183,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/export-voiceover-status.md",
+      "mode": "100644",
+      "git_blob_sha1": "366978b7ae558ccc7ccae5217ca8f67f212774d4",
+      "git_reported_size_bytes": 1502,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/function-map.md",
+      "mode": "100644",
+      "git_blob_sha1": "4cdc2ed27de7dc30de07d575e8ae526d98d31704",
+      "git_reported_size_bytes": 3635,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/generation-provider-status.md",
+      "mode": "100644",
+      "git_blob_sha1": "ceee29bf31023f1437df1bae512cabcfdf1f4cf6",
+      "git_reported_size_bytes": 2055,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/persistence-proof.md",
+      "mode": "100644",
+      "git_blob_sha1": "453190f9001fa50243c3aad8c2656142ff203e3a",
+      "git_reported_size_bytes": 1564,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/route-map.md",
+      "mode": "100644",
+      "git_blob_sha1": "52adefe97d0dd1214fca69b3891df81ecdbb334a",
+      "git_reported_size_bytes": 3279,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/safe-fixes-completed.md",
+      "mode": "100644",
+      "git_blob_sha1": "5dd796c8d1bcb25c4d45aa0aef9cd5038d8dfd26",
+      "git_reported_size_bytes": 1898,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/safety-privacy-review.md",
+      "mode": "100644",
+      "git_blob_sha1": "2107fb25b71e2fd7d0d33a99836f2e2fbb4d47eb",
+      "git_reported_size_bytes": 2272,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-production-lock/2026-06-30T0100Z/sharing-proof.md",
+      "mode": "100644",
+      "git_blob_sha1": "82ef1dab7743c846f2db0c88954da5d1f6c73966",
+      "git_reported_size_bytes": 1788,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "launch-proof/urai-storytime-release-evidence-template/2026-06-29T0000Z/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "938c2722710ad044d393576b6ec3c08a339940bb",
+      "git_reported_size_bytes": 1846,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "legacy/static-demo/README.md",
+      "mode": "100644",
+      "git_blob_sha1": "ea32a5994304e5cc3278c6610ded062679868345",
+      "git_reported_size_bytes": 971,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "legacy/static-demo/story-engine.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d14aaddc1e4326db49c63404fcfce8d54d64ffbf",
+      "git_reported_size_bytes": 1890,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "next-env.d.ts",
+      "mode": "100644",
+      "git_blob_sha1": "830fb594ca2970a827555c28a253b097367e08d8",
+      "git_reported_size_bytes": 262,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "next.config.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "77b6bb27c2dcd765eab9ef80cde7f777bdcaebfb",
+      "git_reported_size_bytes": 143,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "package-lock.json",
+      "mode": "100644",
+      "git_blob_sha1": "87b753df83cae6e233cb9aebb88bccc4460a692a",
+      "git_reported_size_bytes": 162420,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "git_blob_sha1": "a607122106b8bddbe65a7ac0e8b5e08648b5e169",
+      "git_reported_size_bytes": 3490,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/build.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "83867488c1185ab5a939711deff4abcdba8715c5",
+      "git_reported_size_bytes": 322,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/format-check.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "04a3685569af4a7eff6c99d000a983ee715630ab",
+      "git_reported_size_bytes": 80,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/guarded-firebase-deploy.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "9abe56112e8bd1abdfa67f916eb6627919487796",
+      "git_reported_size_bytes": 6255,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "scripts/lint.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "3e20c7d6511289b3bd3a326af8747bac76560a73",
+      "git_reported_size_bytes": 90,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/server.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d79e27c5cb3380fd61fb2744c28d522b0ff116fd",
+      "git_reported_size_bytes": 1683,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/storytime-jobs-staging-acceptance.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d6616c5fb34d44af0c07855615f3ad19da19dee1",
+      "git_reported_size_bytes": 15978,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "scripts/typecheck.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "e571a1f03d050fe36ef6869f27759fd8d5361006",
+      "git_reported_size_bytes": 92,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/urai-production-verify.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "f8e0ad78683d7f610dc1365e29c0c31d836a3d7a",
+      "git_reported_size_bytes": 1650,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-deployment-readiness.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "1f9afdcd5150aeb9e16b28f6e2b703f1d6f979a1",
+      "git_reported_size_bytes": 1792,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-emulator-behavior-spec.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "e2eb0edbe334d42a2d81ef5090eca80bb2903391",
+      "git_reported_size_bytes": 1451,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-emulator-runtime.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ff2be150934d0e481a6bda7d3594818124d417aa",
+      "git_reported_size_bytes": 1247,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-emulator-scaffold.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "53ca44f0912628c24dedbd9457bc276faea9f4fb",
+      "git_reported_size_bytes": 1070,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-env-template.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c78f0c8b07aeca61ef1606c01bf1986ffac86079",
+      "git_reported_size_bytes": 3561,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-live-production-config.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "10c2c305c4cdeb2bc99e1c14d561b8357a44a747",
+      "git_reported_size_bytes": 3869,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-production-evidence.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "f07834f7f0e3b82797be8e44a385f413c869d577",
+      "git_reported_size_bytes": 1266,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-production-readiness.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "424a9ea45035f50dfd9f863356760876b543ab87",
+      "git_reported_size_bytes": 10993,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-production-smoke.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "28621f8f5942448824b8819708c964fde7bda72c",
+      "git_reported_size_bytes": 507,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-provider-wiring.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "6763966fff9f5b211f4d47e87d6acba579fbd12f",
+      "git_reported_size_bytes": 2886,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/validate-security-rules.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "74ff8a6bee75364f5f2618f2aa6748802fc060e4",
+      "git_reported_size_bytes": 2716,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "scripts/write-ci-reproducibility-receipt.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c8e6662bdfa5c92ee51551aea283876ac5621b7d",
+      "git_reported_size_bytes": 2680,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/admin-boundary.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d250ef33c25416922fcf8bacfd76ed59feb49eed",
+      "git_reported_size_bytes": 972,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/analytics-adapter.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "88f9fed95dd176cf56f4a1095d62dc4200858c8f",
+      "git_reported_size_bytes": 549,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/globals.css",
+      "mode": "100644",
+      "git_blob_sha1": "3f8e630372643306432d63c9700daac897ed1e89",
+      "git_reported_size_bytes": 7409,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "ed0d69588338b724b3d06ed3dc7ebd3b84a41ad1",
+      "git_reported_size_bytes": 869,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/page.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "c120b495d9856854c029d494cddce826f08f7344",
+      "git_reported_size_bytes": 110,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/robots.ts",
+      "mode": "100644",
+      "git_blob_sha1": "80d2e604be0e5a852f19c0b8356993e390597f9e",
+      "git_reported_size_bytes": 158,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/app/share/story/[shareId]/page.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "9f8e5c6eca6b83174793c58d8672b6edf11742a1",
+      "git_reported_size_bytes": 2341,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/storytime/[sessionId]/page.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "c03dd7fda055902eb909a606c5cb1e2e1bdb0d4b",
+      "git_reported_size_bytes": 651,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/storytime/page.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "87511907f017de16dc5ea5f9009dd7f78840393a",
+      "git_reported_size_bytes": 143,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/app/storytime/settings/page.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "4b7ee977944eebc3607356164e885869dfc0d9a4",
+      "git_reported_size_bytes": 480,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/auth-boundary.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d53dcbbf40037a491749381416893b10ade58161",
+      "git_reported_size_bytes": 1397,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/AuthPanel.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "18c2663c4ad7bc4339f4f3d493f8e4bc8f642268",
+      "git_reported_size_bytes": 6746,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/ChapterTimeline.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "0700b77dc42af1af3ea194410bad4a2216463ac6",
+      "git_reported_size_bytes": 611,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/CloudSession.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "321009fcc4dbe74c92f17551a3fb4b007483fa83",
+      "git_reported_size_bytes": 8600,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/DraftLibrary.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "3243563f4a0ae49dde6cdab10caeb3c669c5d278",
+      "git_reported_size_bytes": 4012,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/EmotionalArcViewer.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "3031818fa27e0ef932133d7a729ef802ee66c831",
+      "git_reported_size_bytes": 428,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/MemorySceneCard.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "cd1ca29f05db2d8785eac619f0485cf59f86e07c",
+      "git_reported_size_bytes": 394,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/NarratorBubble.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "efec3bdbd592ec0d58b6661a4db8bfd17f98607c",
+      "git_reported_size_bytes": 448,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/PrivacyRequestControls.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "3512a03eb1b4b8df566b4223069dc171588941de",
+      "git_reported_size_bytes": 11993,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/RelationshipStoryThreadView.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "6c5959aa17fa923ffcb874771a2022db615789cd",
+      "git_reported_size_bytes": 452,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/RitualStorycardViewer.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "3dd18025b7339d7ff6671021c53c7d33df5937e0",
+      "git_reported_size_bytes": 405,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/SafetyReportControls.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "814a440c18d2ba4fb67b963b66e4b60fa311dbd8",
+      "git_reported_size_bytes": 4682,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/SessionLibrary.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "ccf7a22d8b98de53bdec433780f9564928ed9255",
+      "git_reported_size_bytes": 4492,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/ShareControls.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "45992321031d2ac565e06adf843e1c664bee1b3d",
+      "git_reported_size_bytes": 4174,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/ShareStory.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "24825a52c6cd2daee0a4a975fc849164d2c634a5",
+      "git_reported_size_bytes": 4766,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StoryGenerationRecovery.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "bc51938198025fd9d7a3a868803f64e415728718",
+      "git_reported_size_bytes": 3950,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/components/storytime/StoryPlayer.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "dfba7bcd6caf6339db18dd6ba0de83f9597084e0",
+      "git_reported_size_bytes": 912,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StoryRevisionEditor.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "8bc59e5ad6a1df4f67bb77019243c5dd4197ad66",
+      "git_reported_size_bytes": 7226,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StoryScrollExportPreview.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "913cbe48134dcf3a67a087e1e4fd0e4addbe4019",
+      "git_reported_size_bytes": 488,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StorySettings.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "291019a76f537c8cdbfabe796a45b74cb3b21df6",
+      "git_reported_size_bytes": 2232,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StoryVersionHistory.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "31dbf0507781eaf1abfd13ccb255add22157f668",
+      "git_reported_size_bytes": 1436,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/components/storytime/StorytimeHome.tsx",
+      "mode": "100644",
+      "git_blob_sha1": "ea8f49c45151f222325e953c32405302e0767a7f",
+      "git_reported_size_bytes": 27505,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/core/types.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "845c286c9ee4cb774bafc79c0c8ba1f999b3c8ea",
+      "git_reported_size_bytes": 1007,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/favicon.svg",
+      "mode": "100644",
+      "git_blob_sha1": "0bbf17ce6ecebd86673de949ba24a562f16559d2",
+      "git_reported_size_bytes": 313,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/firebase-adapter.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7ea77cb3d1e092f85a01976361f1de17da563ad5",
+      "git_reported_size_bytes": 2111,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/finite-time/farm-to-lake.ts",
+      "mode": "100644",
+      "git_blob_sha1": "3a3e632b71dd1fdd199cf5bb6fef2620292d45d9",
+      "git_reported_size_bytes": 42365,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/finite-time/final-render-approval.ts",
+      "mode": "100644",
+      "git_blob_sha1": "cc5d1d50aff1cb3bdbf93c4ad841ac8c86daca85",
+      "git_reported_size_bytes": 9901,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/finite-time/registry.ts",
+      "mode": "100644",
+      "git_blob_sha1": "fafc331f4c9839676ca501ba6846b1e3b6f2bcc1",
+      "git_reported_size_bytes": 4001,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/finite-time/schemas.ts",
+      "mode": "100644",
+      "git_blob_sha1": "6f5fd0c502c0dd416712ad77dc957523a1f1c84e",
+      "git_reported_size_bytes": 9810,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/firebase/admin.ts",
+      "mode": "100644",
+      "git_blob_sha1": "ea9b6f4613e982ce7686b1910475de1bdf863335",
+      "git_reported_size_bytes": 3804,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/firebase/client.ts",
+      "mode": "100644",
+      "git_blob_sha1": "fd15f74473d68f94e8f77844ba4fc6aa20c83bb1",
+      "git_reported_size_bytes": 2830,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/admin-moderation-contract.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9c0f8310e2eea5f279540fc4f163c5dd7033d14f",
+      "git_reported_size_bytes": 4572,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/asset-factory.ts",
+      "mode": "100644",
+      "git_blob_sha1": "bba08ceed1eb607f40f179446059c2e58c70aabb",
+      "git_reported_size_bytes": 5017,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/current-account-lease.ts",
+      "mode": "100644",
+      "git_blob_sha1": "f5e4ff2472265734a22fec59b0a1c7c33065351c",
+      "git_reported_size_bytes": 674,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/current-session-records.ts",
+      "mode": "100644",
+      "git_blob_sha1": "31171e94077ac6279501917980b54e892c513b09",
+      "git_reported_size_bytes": 2782,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/export-download.ts",
+      "mode": "100644",
+      "git_blob_sha1": "8d153d282439f783f2f7d1ec8a32f91e45932d32",
+      "git_reported_size_bytes": 4947,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/generation-attempt.ts",
+      "mode": "100644",
+      "git_blob_sha1": "3f49841af2ea89d03358a53ac349b579a1f5ae0b",
+      "git_reported_size_bytes": 1272,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/integration-contracts.ts",
+      "mode": "100644",
+      "git_blob_sha1": "2628f31bcedf2188aec09d049fc37c20c2b9d36c",
+      "git_reported_size_bytes": 4983,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/locales.ts",
+      "mode": "100644",
+      "git_blob_sha1": "b9b7d579000c9444db870a022e7c01d6a568e97d",
+      "git_reported_size_bytes": 4663,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/media-job-contract.ts",
+      "mode": "100644",
+      "git_blob_sha1": "4d51fe79cc1014d07794736e59ee6f32c755aff7",
+      "git_reported_size_bytes": 2298,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/narrator-delivery.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9812ea3cb7066bd38bfb5b11a9285ab0134a34f3",
+      "git_reported_size_bytes": 4864,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/narrator-prompts.ts",
+      "mode": "100644",
+      "git_blob_sha1": "1e9654fe53059b16a3c4e9d6a8cd5566905bf536",
+      "git_reported_size_bytes": 1760,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/privacy-actor-lease.ts",
+      "mode": "100644",
+      "git_blob_sha1": "eae1a3e52e4fa58ba388c1857738648552e67134",
+      "git_reported_size_bytes": 1003,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "src/lib/storytime/redaction.ts",
+      "mode": "100644",
+      "git_blob_sha1": "4a0e97ed2d6d0c8798ed8ff25b40895d2e8136ae",
+      "git_reported_size_bytes": 974,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/runtime-config.ts",
+      "mode": "100644",
+      "git_blob_sha1": "85894e226a839a3e4a90aae92a90460b1704f1cd",
+      "git_reported_size_bytes": 2540,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/safety.ts",
+      "mode": "100644",
+      "git_blob_sha1": "4283a603c6d3f46924dbdf06db29ca59181714a8",
+      "git_reported_size_bytes": 1438,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/server-session-store.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9f99773f68e2d91f4f00534e5a5f95dbe33b1c4f",
+      "git_reported_size_bytes": 688,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/story-builder.ts",
+      "mode": "100644",
+      "git_blob_sha1": "6ac37bfe49ee1bf6ac60299bc73fe7e26f1f2243",
+      "git_reported_size_bytes": 5265,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/lib/storytime/types.ts",
+      "mode": "100644",
+      "git_blob_sha1": "3b98c8872c2144ea83db192a347db5a96d4e8ad0",
+      "git_reported_size_bytes": 7115,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/life-movie-story-graph.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "f84e427d027cddc43476062c2bd00fa1df29ba61",
+      "git_reported_size_bytes": 3429,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/live-persistence.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "e5e6ab4ad1573ee2118e9581ebc97fdeb7334031",
+      "git_reported_size_bytes": 590,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/moderation-boundary.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7bd6a3bc815751f6a7a1d26245a4a4324c0b82e1",
+      "git_reported_size_bytes": 1804,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/moderation-queue.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "dd8540db1ca37d1b8f09571d1cdb31e287e77627",
+      "git_reported_size_bytes": 513,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/monitoring-alerting.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "804f20c25d5704de6b582aeefd0d7c0ebeb75b28",
+      "git_reported_size_bytes": 593,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/observability.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c62510b97debe50814874d09a61217921e4f5710",
+      "git_reported_size_bytes": 1595,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/og.svg",
+      "mode": "100644",
+      "git_blob_sha1": "6033cd9df598e044930ac879886d799ecc7ceba0",
+      "git_reported_size_bytes": 833,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/privacy-jobs.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "262ef8572d7271903da7c553c476d33c18f65ac2",
+      "git_reported_size_bytes": 452,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/privacy-operations.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "56faba84cf0b1782e72b5ac89770e73154b5cf17",
+      "git_reported_size_bytes": 1691,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/release-gates.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "51529ee96b1f16964114602e058401cef80cdf79",
+      "git_reported_size_bytes": 1012,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/robots.txt",
+      "mode": "100644",
+      "git_blob_sha1": "d169ca9747ec41ab8d572ccef4363c4c99fccd19",
+      "git_reported_size_bytes": 75,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/runtime-readiness.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "82b5a165320e662db08072774c3fc6b06e4ce8f8",
+      "git_reported_size_bytes": 2276,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/safety/LocalSafetyProvider.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ffcfd5dff7fbf757fdf75394219ac4d6ee84e9c3",
+      "git_reported_size_bytes": 871,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/safety/moderationRules.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "0c6985f2338119d597cc84a5597b75e7db35c0de",
+      "git_reported_size_bytes": 308,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/sitemap.xml",
+      "mode": "100644",
+      "git_blob_sha1": "4b177601ac1cd65c1a797755f895652058fa8dbe",
+      "git_reported_size_bytes": 165,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/story-engine/SceneSplitter.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ad5e675d2eb907d37c9b88f953df9b7eb4a13ed6",
+      "git_reported_size_bytes": 486,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/story-engine/providers/LocalDemoStoryProvider.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "2a5dc93d6c57ce0d259dd8421a8c921565f8f14b",
+      "git_reported_size_bytes": 658,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "src/story-persistence.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "23ed970b129b63edfac60eca2c4557b41b78f8ff",
+      "git_reported_size_bytes": 2426,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "storage.rules",
+      "mode": "100644",
+      "git_blob_sha1": "337ffeaf57d52f82456c0939e431d36a7434e489",
+      "git_reported_size_bytes": 883,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/admin-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "4122539f37d6da210509f99dacbebd313eb5bb40",
+      "git_reported_size_bytes": 521,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/analytics-adapter.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "6c5407d16db3ba15c3299b942325b339c59a150c",
+      "git_reported_size_bytes": 1384,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/auth-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "97edbc1b0b8d07f2cae069798de122747d927277",
+      "git_reported_size_bytes": 943,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/canonical-app-root.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "74abe380bbb424e9569b383e89b5cf89304ad6b3",
+      "git_reported_size_bytes": 2748,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/finite-time-hardening.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "6744e8a1eba5b49f788db2b2174b97e46e7c13c7",
+      "git_reported_size_bytes": 1285,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/finite-time-private-registry.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "f8a175f526c5621cc13335957b4f96b430efab9f",
+      "git_reported_size_bytes": 5610,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/privacy-account-ledger-inventory.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "3c0157035b094d5586f46a47e3716d0c5cac604a",
+      "git_reported_size_bytes": 2839,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/privacy-export-inventory-version.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "71ee4cade8a46301367fd78ecf3ac855f898b537",
+      "git_reported_size_bytes": 4155,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/privacy-session-owner-isolation.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7d9854413afc6b53129a20a4c42765abcccb39e3",
+      "git_reported_size_bytes": 2814,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/production-boundaries.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "33354de1f1466705e0c344d411ef2afcd2f30832",
+      "git_reported_size_bytes": 9463,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/protected-workflows.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "41aed9646148eb7dd1273925976f8627f2ece8c1",
+      "git_reported_size_bytes": 3401,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/public-share-query.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "4e98218372cd5362555105117ff89f18833ce324",
+      "git_reported_size_bytes": 3118,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/release-promotion-workflow.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "966095b79235c78fb927313b26270d966a72264a",
+      "git_reported_size_bytes": 2759,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/smoke.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "52170928c21c10675500b8f8a977ba1bab0ed4cb",
+      "git_reported_size_bytes": 13354,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/story-persistence-reconciliation.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "5b2e67454035cb331f6d7956cfbe8a6c88a5ca7c",
+      "git_reported_size_bytes": 4505,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/story-versioning-transaction.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "490ef2d62155a48a10aaa18843e19554cde20510",
+      "git_reported_size_bytes": 9927,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-accessibility-contract.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "48d117c54d08650fcfc96108c3eb63baff684370",
+      "git_reported_size_bytes": 2735,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-accessibility-foundation.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ad5cfe8122e909dec3f3a088b290fab34808ba09",
+      "git_reported_size_bytes": 2558,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-account-lifecycle.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "370ac25f46e1d63f06220df9fee7f1668d1fa3e0",
+      "git_reported_size_bytes": 2024,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-admin-moderation-contract.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "5c4cd5fd9d92410803e5584be293f057d32b9ae9",
+      "git_reported_size_bytes": 1641,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-archive-timeline.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "424cb8ddf1e2eb0ae8483839d4b86c077e6eb65c",
+      "git_reported_size_bytes": 1319,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-asset-factory-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "27100259217582881d5312d5bce4124ea9a6dae5",
+      "git_reported_size_bytes": 969,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-builder-consent.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ee9d02f39712ef28ee09e9b038959077101344d8",
+      "git_reported_size_bytes": 688,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-consent-provider-safety.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "0263f0e171bea364dc4a40bc5c447b0d4eb32434",
+      "git_reported_size_bytes": 2832,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-current-privacy-authority.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "31bc3dd505bbc32549ce4e2b2b0c0fb1190c28cd",
+      "git_reported_size_bytes": 10042,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-data-rights-execution.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "f043e79bd4afc080f5858775a2de6281f7adad19",
+      "git_reported_size_bytes": 3303,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-deletion-recovery.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "b7d138641018c2759dec2fd5af83df49dde258cd",
+      "git_reported_size_bytes": 14397,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-dependency-security.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "5d361dd247a635cda1cc9512680cdc8246e05b90",
+      "git_reported_size_bytes": 1546,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-dynamic-accessibility.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "cbdc4c1fb7f4a2ec33c81ff02c8292fda8947776",
+      "git_reported_size_bytes": 2107,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-edit-restore-current-schema.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a432a45be30e1f3b37213e7a3f16a6feab67028b",
+      "git_reported_size_bytes": 2633,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-export-browser-stream.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "85b3f77342088afcffb4cf3726a141e778194aad",
+      "git_reported_size_bytes": 4685,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-export-download-authority.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "0aca5c98303c8a5f17c129df127a614369d259e9",
+      "git_reported_size_bytes": 5530,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-generation-recovery-view.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "b3efbbfe9f2e4fcccce4eaa00242a3fd61c7bd67",
+      "git_reported_size_bytes": 2813,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-home-auth-fence.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "595bb6120ee94aca0e0f4cc8ca0a0d3b6a2b3ea1",
+      "git_reported_size_bytes": 3682,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-launch-accessibility.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "03ef92445262997734baadcc7409405ecae007c8",
+      "git_reported_size_bytes": 2126,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-local-commit-cancellation-fence.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "3b2e20a84d36c91111a2b86a3d25025fbaed46c8",
+      "git_reported_size_bytes": 3162,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-localization-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ef5d9821b131b1300fcde0815a3f24567482f307",
+      "git_reported_size_bytes": 1269,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-media-job-truth.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "fc3d061d2ee8fd82fd736bbc85373cb9e9b7ca15",
+      "git_reported_size_bytes": 2379,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-moderation-admin-contract.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "5055b58703e9d044679013a75a1eef1efca8dd3a",
+      "git_reported_size_bytes": 1891,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-moderation-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "9f663bda13ae78c1aa5f48e15e171b6f6ac1917d",
+      "git_reported_size_bytes": 1125,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-narrator-delivery-authority.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "fc1c82397f04ee215acf82dec1a08b8ad44dd335",
+      "git_reported_size_bytes": 8086,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-privacy-actor-lease.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7ad2adf915f3b8ae66a95eda992e011c1fb0351b",
+      "git_reported_size_bytes": 3370,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-privacy-execution.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7b15f4cd6aad4e1020f0979b82a98f191f4baffb",
+      "git_reported_size_bytes": 3304,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-privacy-requests.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "87e509090c872329efde46e1f161869f2ac1df9d",
+      "git_reported_size_bytes": 1736,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-private-drafts-current-main.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "abe537367b7dea5802ba78baeb9f86bf4b9324fe",
+      "git_reported_size_bytes": 3190,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-private-version-privacy.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "3cd7bc1643bc04faddebc7622fe010ce37a36a8d",
+      "git_reported_size_bytes": 6212,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-protected-provider-execution.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "57d02154644e2545970b8998397fc2f85bb2376a",
+      "git_reported_size_bytes": 57065,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/e2e/storytime-provenance-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "2f1d2ce4dbea1199a4183ce03d9d8b78a0bee458",
+      "git_reported_size_bytes": 1247,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-provider-cancellation-reconciliation.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d7d664ecc63f872d4f50064ff5d895c3a28628c2",
+      "git_reported_size_bytes": 2743,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-provider-daily-budget.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "aa84b3cac52b291a0166b9892de65515c1d3f23d",
+      "git_reported_size_bytes": 4038,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-provider-receipt.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a31da3323550dd72addeff7ec66c413e0c001e80",
+      "git_reported_size_bytes": 3293,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-release-provider-environment.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "8d07ebabd3345504238671ae33ef13778f558333",
+      "git_reported_size_bytes": 2638,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-safety-reporting.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "800704ed25ff82b8cb50c7c7f7a8eefef5ed88b6",
+      "git_reported_size_bytes": 2692,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/e2e/storytime-versioned-creation-current-main.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "1ad225d554bfe9d81628fba88ae4200cb335ce5f",
+      "git_reported_size_bytes": 3295,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/firebase-adapter.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "bbf2f5691b7e40145b0300f6045a8a94f21644c1",
+      "git_reported_size_bytes": 940,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/firestore-rules.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "2ffb2a69782be1f2cba725b2ba8f852b247cfe93",
+      "git_reported_size_bytes": 606,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/fixtures/canonical-spend-gateway-46ed831.ts",
+      "mode": "100644",
+      "git_blob_sha1": "c212ef5d520e9aa1ed60fac656b030018cae4730",
+      "git_reported_size_bytes": 44035,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/fixtures/canonical-spend-gateway-8fbc356.ts",
+      "mode": "100644",
+      "git_blob_sha1": "cacbae5c35e62540d019e879f46e41981c8e42d3",
+      "git_reported_size_bytes": 39498,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/fixtures/canonical-spend-gateway-acea7ea.ts",
+      "mode": "100644",
+      "git_blob_sha1": "e547456c428c8e9f60e66162286cfb452f5ef89d",
+      "git_reported_size_bytes": 34913,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/fixtures/story-provider-before-9178b98.ts",
+      "mode": "100644",
+      "git_blob_sha1": "9178b980a5d4287b5537169bc6fbee933220a567",
+      "git_reported_size_bytes": 12449,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/fixtures/storytime-export-runtime.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "dbdac83f1ae512299eb66d6952896563b47b565b",
+      "git_reported_size_bytes": 8611,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/helpers/storytime-privacy-fixture.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "cea5473d5b81dc0d52251b88d9b102f6c4e4055f",
+      "git_reported_size_bytes": 11502,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/live-persistence-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "8e958252fabd02b21e59fec12ba87f016b9f93d9",
+      "git_reported_size_bytes": 584,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/moderation-boundary.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c7527c6492553bf78791f78257a4bfda9f84ea5d",
+      "git_reported_size_bytes": 976,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/monitoring-alerting.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "69e87418c586ec444744a5a1d5f115617a1e18a1",
+      "git_reported_size_bytes": 1111,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/observability.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c80049abe05767541e81282b45b4513e16ec4d97",
+      "git_reported_size_bytes": 1074,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/privacy-operations.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a00e9723e937f07448eb9ff01cdfe7642999d4d1",
+      "git_reported_size_bytes": 1098,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/provider-wiring.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d60032d1be3306b821ac2534d1d6040026195d79",
+      "git_reported_size_bytes": 485,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/release-gates.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a15f8e1da30ee70b3b41e4fd492032a113f49550",
+      "git_reported_size_bytes": 1157,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/rules-emulator/authorization-matrix.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "fea6b4f23ec104cfa8c038ee9aea2dddb3107b21",
+      "git_reported_size_bytes": 12676,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/rules-emulator/cloud-session-queries.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a57dea7e8fe750e0acd8caa88409d84e04776e3f",
+      "git_reported_size_bytes": 3674,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/rules-emulator/package.json",
+      "mode": "100644",
+      "git_blob_sha1": "b765b1d5abfa885a38b29c8faa27ff11c2b02ecc",
+      "git_reported_size_bytes": 191,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/rules-emulator/public-share-lifecycle.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a230290e09bd5867cb8de4887d963fe4ab42618f",
+      "git_reported_size_bytes": 5944,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/storage-rules.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "1d22a8b35838bd79fce11073fe852b8ebb90f19a",
+      "git_reported_size_bytes": 602,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/story-persistence.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "d131b2abdd1b8a0562c5157facee47dc55b9e2ae",
+      "git_reported_size_bytes": 1525,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/asset-factory-adapter.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "fbb97bfd96dfd814cff91303d73652897d8da13c",
+      "git_reported_size_bytes": 2325,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/cloud-session-current-source.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "dbd4c7ee00bf97c0987e6b5e2125684b4f2aacc1",
+      "git_reported_size_bytes": 12209,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/env-template-validation.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "8fc491ed7b969ebdde06b3a9f868ab264cb44389",
+      "git_reported_size_bytes": 3599,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/firebase-deploy-target.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "6e511890527551b8278d07aabefcd138efd22b14",
+      "git_reported_size_bytes": 7679,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/generate-emotional-arc-summary-callable.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "26a4f9462689d55f9a1c8c6752b20c0ad2d04e80",
+      "git_reported_size_bytes": 1219,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/generate-narrator-script-callable.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c30400374354b2ae03d5ad6153f4381adf79b02a",
+      "git_reported_size_bytes": 1236,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/generate-weekly-story-scroll-callable.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "9534373dd623381e7ff5b05281c3add444116c16",
+      "git_reported_size_bytes": 1224,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/life-movie-story-graph.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "7dd0c15f06e50f8b14f84d2e5ebdc15733778fcc",
+      "git_reported_size_bytes": 1940,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/package-scripts.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "c1997a0bc53baf38bb3ddf34fe1ac971c2d8f891",
+      "git_reported_size_bytes": 1418,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/private-draft-current-actor.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "9718e1c5845fd0f6fda087da7f50f34711bb9b97",
+      "git_reported_size_bytes": 6457,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/refresh-story-timeline-callable.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "32d635cf06d8f1e341d5132c409ad2a5ae25c430",
+      "git_reported_size_bytes": 1081,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/story-engine.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "33537d434018f8a56b1fb3d85d9b8118c6d31c29",
+      "git_reported_size_bytes": 524,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-current-account-lease.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "574373500f59250306f7d20112888560db6e3977",
+      "git_reported_size_bytes": 2142,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-export-download.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "2863dc6d70bd4dfaf569c66f51d338ed412b8559",
+      "git_reported_size_bytes": 5463,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-functions-voiceover.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "e8a09a514399c3ef49df295266c1fae3032e4e1b",
+      "git_reported_size_bytes": 3557,
+      "changed_vs_main": true,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-generation-admission.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "a1174e34cb75e05030443a0c611a6a593c54bb00",
+      "git_reported_size_bytes": 5351,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-generation-attempt.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "dcd622d91f88ac06ff3ec4dea2e6a72b85b1a934",
+      "git_reported_size_bytes": 3922,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-generation-recovery.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "1bbd4b9823ff2e183291553e73a139bd3151dc63",
+      "git_reported_size_bytes": 5543,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-integration-contracts.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "90e0d2e448c796cddf14d2830ea96766b7b5a08a",
+      "git_reported_size_bytes": 1454,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-jobs-staging-acceptance.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "e5f8c9a3c1303ebaa5d6bf4eba8e991d86132b09",
+      "git_reported_size_bytes": 14160,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-narrator-delivery.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ee8ffb24d5410e46bcda3c6c49ba2ccdb3a878d4",
+      "git_reported_size_bytes": 6079,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-narrator-recovery-authority.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "177add17decf0a4cc862721e44f66c3d5f0cde4d",
+      "git_reported_size_bytes": 2490,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-record-builders.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "5213d45d83f4507fe0377f2c04955a8c6cf3376e",
+      "git_reported_size_bytes": 1289,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-request-binding.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "87e2e7e610f5e0b0071c20ec6a1cbf624f215cde",
+      "git_reported_size_bytes": 4774,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-responsive-layout.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "9cfe5c694a6316b24a803acacb726a50b9c9483d",
+      "git_reported_size_bytes": 764,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-scroll-builders.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "bb7426b50a41ebc9679f19ed649d6ba107d39997",
+      "git_reported_size_bytes": 1104,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    },
+    {
+      "path": "tests/unit/storytime-source-signal-provenance.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "b2eeb68be5928378588e1fed84b136fcd967b019",
+      "git_reported_size_bytes": 2520,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-voiceover-consent-admission.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "699ef7ba35c419027a5a7040ba0b65a38030e1f2",
+      "git_reported_size_bytes": 31380,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tests/unit/storytime-voiceover-result-guard.test.mjs",
+      "mode": "100644",
+      "git_blob_sha1": "ce665025d777d3faa6076489fbce4b5b0f536d6e",
+      "git_reported_size_bytes": 4471,
+      "changed_vs_main": true,
+      "added_vs_main": true
+    },
+    {
+      "path": "tsconfig.json",
+      "mode": "100644",
+      "git_blob_sha1": "c06d6e17fc7fe5315ea8bad0bfcd2d8f882e46a5",
+      "git_reported_size_bytes": 716,
+      "changed_vs_main": false,
+      "added_vs_main": false
+    }
+  ],
+  "visible_branch_heads": [
+    {
+      "name": "a11y/storytime-dynamic-status-focus-20260924",
+      "head_commit_sha": "50f25c6d35b9bb729c8d0321d7ecd775efe63d57",
+      "protected": false
+    },
+    {
+      "name": "a11y/storytime-keyboard-status-hardening-20260923",
+      "head_commit_sha": "bd828946a2750334d7d30008fcb87fd603f19ac3",
+      "protected": false
+    },
+    {
+      "name": "agent/storytime-release-workflow-hardening-20260801",
+      "head_commit_sha": "16e3baf346b0dbcf4b32df09292e95c0a0a9af8e",
+      "protected": false
+    },
+    {
+      "name": "audit/urai-storytime-fixes",
+      "head_commit_sha": "2a1066792f94fdbfd80a5bd610364b0f6233c725",
+      "protected": false
+    },
+    {
+      "name": "audit/2026-07-06-production-truth",
+      "head_commit_sha": "0ea33e1049b122db9bdfc518032cb2c84777d267",
+      "protected": false
+    },
+    {
+      "name": "audit-completion/storytime-create-flow",
+      "head_commit_sha": "d05274c83e138ed6b4e8af50772a9ad2fb4bdaeb",
+      "protected": false
+    },
+    {
+      "name": "audit-completion/storytime-create-flow-main",
+      "head_commit_sha": "717409c59ff3f1305a16d2bd3ce00a8c4ca8c462",
+      "protected": false
+    },
+    {
+      "name": "canon/upstream-authority-20260924",
+      "head_commit_sha": "7d8244cd82aae5dd7df08175b00c472718558c84",
+      "protected": false
+    },
+    {
+      "name": "canon/upstream-authority-restack-20260925",
+      "head_commit_sha": "1804a09ef1ee19ab3aacc4b4ec8c46350243e650",
+      "protected": false
+    },
+    {
+      "name": "canon/upstream-authority-successor-20260925",
+      "head_commit_sha": "a92007bee124e57274aec127fa3413a3218f667f",
+      "protected": false
+    },
+    {
+      "name": "chatgpt/urai-product-polish-20260812",
+      "head_commit_sha": "736771e85a51304237c896d929824d489b894c61",
+      "protected": false
+    },
+    {
+      "name": "chore/actions-node24-current-storytime-main-20261005",
+      "head_commit_sha": "b4782926d2856238501e044696bfe89971687d26",
+      "protected": false
+    },
+    {
+      "name": "chore/archive-static-demo-entrypoints-20260715",
+      "head_commit_sha": "2a78ff5c41b5b361f2abe7bb4732138cc6a966ca",
+      "protected": false
+    },
+    {
+      "name": "chore/reproducibility-receipt-current-main-20261005",
+      "head_commit_sha": "320358633ff02b5974d5945473d9f6895bb9c615",
+      "protected": false
+    },
+    {
+      "name": "cleanup/storytime-canonical-app-20260924",
+      "head_commit_sha": "ff6570b3a99c2b6d86d1dfaae6779a4f06aa026a",
+      "protected": false
+    },
+    {
+      "name": "codex/audit-and-prepare-urai-storytime-for-production",
+      "head_commit_sha": "671c2fde4b901f1c3ea071e33569f850e9d2749e",
+      "protected": false
+    },
+    {
+      "name": "codex/wave31-disposable-storytime-jobs-harness-20261014",
+      "head_commit_sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "protected": false
+    },
+    {
+      "name": "cold-vault-2026-08-16",
+      "head_commit_sha": "892c067babce0affbea983fdc9cb3e00abd03165",
+      "protected": false
+    },
+    {
+      "name": "completion/storytime-narrator-runtime-20261003",
+      "head_commit_sha": "780f0a03c8c075d144b340d3dcde45bd9cc66027",
+      "protected": false
+    },
+    {
+      "name": "contracts/storytime-admin-moderation-20260923",
+      "head_commit_sha": "fe732b7183d224049f8e58ff88effd51acd16ae9",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-edit-restore-current-schema-20261005",
+      "head_commit_sha": "a569fdcb21196750fc3839e3a98e6512009f0b46",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-launch-a11y-20260926",
+      "head_commit_sha": "b92eb794cdac6068cafdecd652fd4fe735a5554c",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-launch-required-20260926",
+      "head_commit_sha": "aa62e1b478f44646c5d95928b747b9402f8301aa",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-life-movie-truth-20261003",
+      "head_commit_sha": "45993d92f02fb79932d8e6070d9751e9083ef933",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-privacy-media-closeout-20260926",
+      "head_commit_sha": "2c38c3cb4c05b9d261fc1407d1e91f4d2f1ab33e",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-private-drafts-current-main-20261005",
+      "head_commit_sha": "bc789cfb8795aad46f679a187fabcb9c491a369c",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-private-drafts-current-main-r2-20261005",
+      "head_commit_sha": "7e934d304ebe3c8cd6634c6b1dcbd9993c8f86ec",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-terminal-system-20260923",
+      "head_commit_sha": "abd927000ef07f2fd921d80c085044608ccf2596",
+      "protected": false
+    },
+    {
+      "name": "converge/storytime-version-review-current-main-20261005",
+      "head_commit_sha": "8c738c23c1bfe86be8b8cc3f58bf40e8ca7e4504",
+      "protected": false
+    },
+    {
+      "name": "design/storytime-intimate-editorial-reconcile-20260921",
+      "head_commit_sha": "2ae7ceda0d00aee6eef006a5af0bb354688835ae",
+      "protected": false
+    },
+    {
+      "name": "docs/genesis-estate-handoff-20261106",
+      "head_commit_sha": "a0fa8fc773a768de10cdb8b33386f3ce22282d15",
+      "protected": false
+    },
+    {
+      "name": "docs/genesis-storytime-forensic-20261107",
+      "head_commit_sha": "a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+      "protected": false
+    },
+    {
+      "name": "docs/genesis-storytime-r913-final-next-chalk-20261108",
+      "head_commit_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+      "protected": false
+    },
+    {
+      "name": "docs/storytime-r908-audit-continuity-20261108",
+      "head_commit_sha": "83247db6cfc7bed1bd0059eb2aff51056222c575",
+      "protected": false
+    },
+    {
+      "name": "feat/finite-time-film-foundry-20260721",
+      "head_commit_sha": "699b254367731b8a074cd99f010a1be1454ef5ef",
+      "protected": false
+    },
+    {
+      "name": "feature/storytime-multi-model-router-20260925",
+      "head_commit_sha": "e121bd2ecd32475c4b08aed3e6696bfdb171cc5c",
+      "protected": false
+    },
+    {
+      "name": "fix/current-authorization-emulator-proof-20260926",
+      "head_commit_sha": "ce4ac04e0c06f8d445f92795681709deaa664363",
+      "protected": false
+    },
+    {
+      "name": "fix/private-draft-postmerge-privacy-autosave-20261005",
+      "head_commit_sha": "2f8e239f896bce918c2c4b2805fd01425cfc749e",
+      "protected": false
+    },
+    {
+      "name": "fix/public-48px-targets-20261005",
+      "head_commit_sha": "888abdf64485a3da72cbb10aa7a7ff6e0ea64db5",
+      "protected": false
+    },
+    {
+      "name": "fix/storytime-public-share-lifecycle-20260715",
+      "head_commit_sha": "af544ebe144539fd425a2b8a0887aeebb98556a1",
+      "protected": false
+    },
+    {
+      "name": "hardening/correct-action-provenance-20261005",
+      "head_commit_sha": "ffb81bb44805d9333fd6eb207ba747a1f4aa6f34",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-accessibility-browser-foundation-20260923",
+      "head_commit_sha": "7f7f2a6320cd18c7731030d4ed7cfdbdd6d2c770",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-accessibility-contract-20260923",
+      "head_commit_sha": "46ff9dc5a36cf638d9aba5b579c0516e23bc435e",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-accessibility-contract-v2-20260923",
+      "head_commit_sha": "9470bd4cfc4c2ca5b8983e8090444470a1fbb611",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-consent-provider-safety-20260923",
+      "head_commit_sha": "0560b39fd4e82d994dfa871bd7cc21f3722ea5cb",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-job-truth-20260923",
+      "head_commit_sha": "e2f8199ae15eab6eb1da2aa74cf3dabd27bff8a9",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-job-truth-v2-20260923",
+      "head_commit_sha": "382e3dda5ac0b60e35ca4cde300864fad084b2e6",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-job-truth-v3-20260923",
+      "head_commit_sha": "76eae94a212093b71770c19f3d4db8aceb92721f",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-media-job-truth-20260923",
+      "head_commit_sha": "4dc2da929235c83024fc6d33d32a6e6bb530c877",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-moderation-admin-contract-20260923",
+      "head_commit_sha": "4ef24d555b2d297dc74e8c16bb26a325aa347a17",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-operational-health-20260923",
+      "head_commit_sha": "08f0670f6be7599254cd0cf87f2a7fefff922b6a",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-provider-daily-budget-20260923",
+      "head_commit_sha": "9a51feccb29dcb6dcf04703df3abdce62c4c32a5",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-provider-receipts-20260923",
+      "head_commit_sha": "d988568118c2e16c9eec687c8ebdafcc8f27a9e8",
+      "protected": false
+    },
+    {
+      "name": "hardening/storytime-user-safety-reporting-20260923",
+      "head_commit_sha": "420b03b4bee52e88cedef130a120f20d2f9396b9",
+      "protected": false
+    },
+    {
+      "name": "hygiene/storytime-canonical-app-legacy-engine-20260923",
+      "head_commit_sha": "ed85657a70330aa66beac1246d7523ec3c18f478",
+      "protected": false
+    },
+    {
+      "name": "hygiene/storytime-legacy-engine-current-main-20261005",
+      "head_commit_sha": "8a8549680413c3cccf11c0c3d43e31913880e1b9",
+      "protected": false
+    },
+    {
+      "name": "hygiene/storytime-legacy-engine-current-main-r2-20261005",
+      "head_commit_sha": "153a9f977df48c8f70bd76e563d738bf1566b4a5",
+      "protected": false
+    },
+    {
+      "name": "implement-done-done-audit-pack",
+      "head_commit_sha": "c74c2ce186182a15838c44e7e66c0bf77adddf7e",
+      "protected": false
+    },
+    {
+      "name": "implement-production-storytime-v25",
+      "head_commit_sha": "f32cbeb6cd65b1f38d9d6a06d0a08331a6d044e2",
+      "protected": false
+    },
+    {
+      "name": "implementation/firebase-readiness-scaffold",
+      "head_commit_sha": "25e59e32818b6b5ef49fec78f5536f8f61f2d7e2",
+      "protected": false
+    },
+    {
+      "name": "implementation/storytime-system-audit-2026-05-19",
+      "head_commit_sha": "1113840c526e24e761c4d15d781957a9dd67635f",
+      "protected": false
+    },
+    {
+      "name": "integration/life-movie-story-graph-20261002",
+      "head_commit_sha": "0150b80e922c0b90f6aed1a3599461697936df55",
+      "protected": false
+    },
+    {
+      "name": "local-next-build-fixes",
+      "head_commit_sha": "5ae2bde986f1eb30f516e8774ebe31a524abab42",
+      "protected": false
+    },
+    {
+      "name": "main",
+      "head_commit_sha": "73f586a0a2931961ae221af7cfc0caf1b6aef39d",
+      "protected": false
+    },
+    {
+      "name": "ops/runtime-readiness-endpoint-20260911",
+      "head_commit_sha": "ffb2b1f735c7e7eaa3d11722e87cf3a20cc0fae8",
+      "protected": false
+    },
+    {
+      "name": "privacy/storytime-data-rights-execution-20260923",
+      "head_commit_sha": "016c912237aa7eb8dbec8205b4eed67642f62f57",
+      "protected": false
+    },
+    {
+      "name": "product/storytime-private-drafts-20260923",
+      "head_commit_sha": "4b5ffa7b996a5c10db74b1d679856155ab9eac39",
+      "protected": false
+    },
+    {
+      "name": "product/storytime-versioned-creation-20260923",
+      "head_commit_sha": "649c4727c833960401839dc6189bea0476c82bda",
+      "protected": false
+    },
+    {
+      "name": "reconcile/storytime-canonical-20260902",
+      "head_commit_sha": "0c2851134926bd8b346e120bf3de9af24494f13a",
+      "protected": false
+    },
+    {
+      "name": "reconcile-next-app",
+      "head_commit_sha": "08af825b80e657c63dae59a7107510cf8ff89cae",
+      "protected": false
+    },
+    {
+      "name": "repair/canon-provenance-reconciliation-20261007",
+      "head_commit_sha": "d2de9758ce9b307a8f7c48c2d3bb37fa4c169860",
+      "protected": false
+    },
+    {
+      "name": "repair/dependency-advisories-20261007",
+      "head_commit_sha": "33ecc480ffe96e83647a29e09969defeb84ca3fd",
+      "protected": false
+    },
+    {
+      "name": "repair/release-workflow-node24-20260901",
+      "head_commit_sha": "e5c4bc99843d571941663503df6cfc743f9190ef",
+      "protected": false
+    },
+    {
+      "name": "repair/story-version-transaction-authority-20261007",
+      "head_commit_sha": "f9d0f4e786770cefad7dcb13cad273abc0e06643",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-authenticated-private-delivery-20261007",
+      "head_commit_sha": "f73ef6de49c5c842e282f90cc0c15e320f3411b4",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-current-privacy-authority-20261008",
+      "head_commit_sha": "3a8f47d0c11b248222b4a6d35d43b098a67c462a",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-current-private-session-20261010",
+      "head_commit_sha": "7b35b574de7c29e181b1a1ac9f24f9ebe2a60bb5",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-final-output-authority-20261007",
+      "head_commit_sha": "4e241a026bf49c6d6b160d8b7e5aff6e06a8dd41",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-monotonic-admission-20261007",
+      "head_commit_sha": "432fd59e28b170013d722191b11bb3c73c139023",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-next-primary-advisories-20261007",
+      "head_commit_sha": "c67dd1ebee2ea367521ee0743246f65e0c589361",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-paid-output-confirmation-3cbd61d-20261007",
+      "head_commit_sha": "a2c2471020928f62c441c9fea687a66081740659",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-protected-provider-spend-20261007",
+      "head_commit_sha": "3cbd61d41b444f6cbcb497991d5290db78385604",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-restricted-indexing-20261007",
+      "head_commit_sha": "3c05081e6fd092334c3f1f3470c81d450e76028e",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-review-closeout-20260927",
+      "head_commit_sha": "5a4d03a14787d87e392e18ebde75294fc3decc15",
+      "protected": false
+    },
+    {
+      "name": "repair/storytime-version-bound-deletion-recovery-20261007",
+      "head_commit_sha": "cb458bfe0e4f392fbe379b69ffc1e160af32ef44",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-r782-storytime-firebase-target-identity-hold-20261105",
+      "head_commit_sha": "312240f5da9042a2cc9d11dac179bed90dee51d1",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-generation-fingerprint-20261107",
+      "head_commit_sha": "57b54044bb6e61713c75ba559166a1128244dc19",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-home-auth-fence-20261107",
+      "head_commit_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-local-commit-cancellation-fence-20261107",
+      "head_commit_sha": "94022314d331cac68fe48e93d52f438a12c1e96d",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-private-list-auth-lease-20261107",
+      "head_commit_sha": "598c969fe4a258331c442692887903bacadf42fa",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-r909-security-convergence-20261108",
+      "head_commit_sha": "f2614267fde4da8d71be9b124d495dedafdcdc97",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-r910-generation-retry-receipt-20261108",
+      "head_commit_sha": "5af562ba7ebf39b0466b245a81ddc232de5459e0",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-r911-owner-generation-receipts-20261108",
+      "head_commit_sha": "a11f35708bb81ae1cedfc36175af0595ac62874a",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-r912-server-admission-fence-20261108",
+      "head_commit_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-server-owned-canon-20261107",
+      "head_commit_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "protected": false
+    },
+    {
+      "name": "review/chalk-storytime-source-signal-provenance-r907-20261108",
+      "head_commit_sha": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+      "protected": false
+    },
+    {
+      "name": "runtime/storytime-node22-ga-20260913",
+      "head_commit_sha": "0a602ef06ea2c1fb450be97fb4155558de2c6e17",
+      "protected": false
+    },
+    {
+      "name": "safety/story-provider-secret-output-moderation-20260919",
+      "head_commit_sha": "176993dddf995bbb0c9542a444e82962a8c23e77",
+      "protected": false
+    },
+    {
+      "name": "safety/storytime-report-appcheck-20260923",
+      "head_commit_sha": "f1d20bc58ac3ffebaaf08588f5b0bb609d671808",
+      "protected": false
+    },
+    {
+      "name": "security/adc-only-storytime-2026-08-11",
+      "head_commit_sha": "36657066a5826d290822971ad29d749d35fe30ff",
+      "protected": false
+    },
+    {
+      "name": "security/storytime-authorization-emulator-20260923",
+      "head_commit_sha": "8f1ce3b9a8040c2c24518a48dd90060527d47bbc",
+      "protected": false
+    },
+    {
+      "name": "storytime-build-hardening",
+      "head_commit_sha": "806a9a6499951bc3af530fa44acbf003a0c70142",
+      "protected": false
+    },
+    {
+      "name": "storytime-final-hardening",
+      "head_commit_sha": "5322131481ca30355ed9db9b114e2c0adb3e558b",
+      "protected": false
+    },
+    {
+      "name": "storytime-firebase-integration",
+      "head_commit_sha": "7e9c6a9fc2259841b79ca20438c00248de8057d5",
+      "protected": false
+    },
+    {
+      "name": "ux/storytime-guided-draft-review-20260923",
+      "head_commit_sha": "9a4bd44365bc41620d1e89fd97f80d55f59e206c",
+      "protected": false
+    },
+    {
+      "name": "ux/storytime-guided-review-current-main-20261005",
+      "head_commit_sha": "48c0b06119a6c97f285127bac9ea0a7bea052c3f",
+      "protected": false
+    },
+    {
+      "name": "ux/storytime-guided-review-current-main-r2-20261005",
+      "head_commit_sha": "3511857560329bdec0b100c01a520fd83617b6be",
+      "protected": false
+    },
+    {
+      "name": "ux/storytime-version-history-20260923",
+      "head_commit_sha": "a02a72630825d9595313dcd1c1a721049e6325a0",
+      "protected": false
+    }
+  ]
+}
