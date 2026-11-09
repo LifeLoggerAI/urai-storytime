@@ -1,0 +1,670 @@
+{
+  "schema": "one-urai-genesis-storytime-r913-next-chalk-decision-ledger-v1",
+  "observed_date_central": "2026-11-08",
+  "repository": "LifeLoggerAI/urai-storytime",
+  "review_source_head": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+  "working_docs_branch": "docs/genesis-storytime-r913-final-next-chalk-20261108",
+  "release": "NO_GO_HOLD",
+  "source_inventory": "docs/estate/R913_EXACT_R912_SOURCE_TREE_AND_VISIBLE_BRANCH_HEADS.json",
+  "historical_inventory": "docs/estate/history/BRANCH_HEAD_AGGREGATE.json at PR99 head a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+  "worker_pull_requests": [
+    {
+      "pr": 83,
+      "head_sha": "33ecc480ffe96e83647a29e09969defeb84ca3fd",
+      "purpose": "original owner product and protected-provider convergence",
+      "lane": "engineering",
+      "child_of": null,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/83"
+    },
+    {
+      "pr": 96,
+      "head_sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "purpose": "disposable Storytime-Jobs acceptance green Oct 15",
+      "lane": "engineering",
+      "child_of": 83,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/96"
+    },
+    {
+      "pr": 97,
+      "head_sha": "312240f5da9042a2cc9d11dac179bed90dee51d1",
+      "purpose": "Firebase target identity hard off",
+      "lane": "engineering",
+      "child_of": 96,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/97"
+    },
+    {
+      "pr": 98,
+      "head_sha": "a0fa8fc773a768de10cdb8b33386f3ce22282d15",
+      "purpose": "original forensic handoff",
+      "lane": "documentation",
+      "child_of": null,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/98"
+    },
+    {
+      "pr": 99,
+      "head_sha": "a1d9153a8b9308090649f2ede0f0eb7b43d74db8",
+      "purpose": "96 historical branch head trees, audit ledgers",
+      "lane": "documentation",
+      "child_of": 98,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/99"
+    },
+    {
+      "pr": 100,
+      "head_sha": "f0efee038d0acdcf8c74f4108c03c41e32bedfd1",
+      "purpose": "server-generated story and audit Rules denial",
+      "lane": "security-donor",
+      "child_of": 97,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/100"
+    },
+    {
+      "pr": 101,
+      "head_sha": "598c969fe4a258331c442692887903bacadf42fa",
+      "purpose": "private list account lease",
+      "lane": "security-donor",
+      "child_of": 97,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/101"
+    },
+    {
+      "pr": 102,
+      "head_sha": "9be92015f1f9b42101e224aedf92807d0777cdcb",
+      "purpose": "private form actor isolation",
+      "lane": "security-donor",
+      "child_of": 101,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/102"
+    },
+    {
+      "pr": 103,
+      "head_sha": "57b54044bb6e61713c75ba559166a1128244dc19",
+      "purpose": "same-ID reviewed/provider input binding",
+      "lane": "engineering",
+      "child_of": 97,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/103"
+    },
+    {
+      "pr": 104,
+      "head_sha": "94022314d331cac68fe48e93d52f438a12c1e96d",
+      "purpose": "cancellation atomic local output",
+      "lane": "engineering",
+      "child_of": 103,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/104"
+    },
+    {
+      "pr": 105,
+      "head_sha": "c01963408da4deabcc27a98156bafcd1f7b10ab7",
+      "purpose": "source label explanation truth",
+      "lane": "engineering",
+      "child_of": 104,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/105"
+    },
+    {
+      "pr": 106,
+      "head_sha": "83247db6cfc7bed1bd0059eb2aff51056222c575",
+      "purpose": "R908 full forensic report",
+      "lane": "documentation",
+      "child_of": 99,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/106"
+    },
+    {
+      "pr": 107,
+      "head_sha": "f2614267fde4da8d71be9b124d495dedafdcdc97",
+      "purpose": "exact original donor blob converge",
+      "lane": "engineering-review",
+      "child_of": 105,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/107"
+    },
+    {
+      "pr": 108,
+      "head_sha": "5af562ba7ebf39b0466b245a81ddc232de5459e0",
+      "purpose": "request UI uncertain response hold",
+      "lane": "engineering-review",
+      "child_of": 107,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/108"
+    },
+    {
+      "pr": 109,
+      "head_sha": "a11f35708bb81ae1cedfc36175af0595ac62874a",
+      "purpose": "owner-only read-only recovery",
+      "lane": "engineering-review",
+      "child_of": 108,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/109"
+    },
+    {
+      "pr": 110,
+      "head_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+      "purpose": "per-owner pending generation transaction lock",
+      "lane": "engineering-review",
+      "child_of": 109,
+      "status": "open_draft_unmerged",
+      "accepted_ci_current_exact_head": false,
+      "reviewer_approval_observed": false,
+      "link": "https://github.com/LifeLoggerAI/urai-storytime/pull/110"
+    }
+  ],
+  "feature_matrix": [
+    {
+      "feature": "direct_story_input_narratives",
+      "classification": "implemented_source",
+      "source_paths": [
+        "functions/src/storytime.ts"
+      ],
+      "verified_scope": "source-approved direct form yes; real captured memories no",
+      "unmet_gate": "current_head_ci_missing"
+    },
+    {
+      "feature": "structured_private_story_objects",
+      "classification": "implemented_source",
+      "source_paths": [
+        "functions/src/storytime.ts"
+      ],
+      "verified_scope": "chapter/moment/scene/script/arc/version stored via guarded writes",
+      "unmet_gate": "runtime_acceptance_missing"
+    },
+    {
+      "feature": "private_draft_versions",
+      "classification": "implemented_source",
+      "source_paths": [
+        "functions/src/story-drafts.ts",
+        "functions/src/story-versioning.ts"
+      ],
+      "verified_scope": "owner revision checks",
+      "unmet_gate": "emulator_and_actor_switch_missing"
+    },
+    {
+      "feature": "source_fact_verification",
+      "classification": "not_end_to_end",
+      "source_paths": [
+        "src/life-movie-story-graph.mjs"
+      ],
+      "verified_scope": "truth classes implemented as pure graph only",
+      "unmet_gate": "authenticated_original_memory_hash_resolver_missing"
+    },
+    {
+      "feature": "source_signal_attribution",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "src/lib/storytime/redaction.ts",
+        "functions/src/storytime.ts"
+      ],
+      "verified_scope": "source signals unverified metadata not provider source",
+      "unmet_gate": "old_record_migration_missing"
+    },
+    {
+      "feature": "generated_canon_client_write_denial",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "firestore.rules"
+      ],
+      "verified_scope": "13 server-owned collections plus audit Logs deny writes",
+      "unmet_gate": "actual_rules_emulator_missing"
+    },
+    {
+      "feature": "account_switch_isolation",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "src/lib/storytime/current-account-lease.ts",
+        "src/components/storytime/StorytimeHome.tsx"
+      ],
+      "verified_scope": "actor identity + epoch; reset private source",
+      "unmet_gate": "actual_browser_emulator_missing"
+    },
+    {
+      "feature": "same_id_retry_fingerprint",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "functions/src/storytime-request-binding.ts"
+      ],
+      "verified_scope": "matching original reviewed/provider hashes, owner, approved session",
+      "unmet_gate": "concurrent_runtime_missing"
+    },
+    {
+      "feature": "client_uncertain_generation",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "src/lib/storytime/generation-attempt.ts"
+      ],
+      "verified_scope": "one mounted actor/review request ID; uncertain lock",
+      "unmet_gate": "reload_cross_device_no_spend_missing"
+    },
+    {
+      "feature": "owner_recovery_receipts",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "functions/src/story-generation-recovery.ts",
+        "src/components/storytime/StoryGenerationRecovery.tsx"
+      ],
+      "verified_scope": "read-only owner status/verified ready private link",
+      "unmet_gate": "actual_firestore_index_and_browser_missing"
+    },
+    {
+      "feature": "owner_global_admission_fence",
+      "classification": "patched_unmerged",
+      "source_paths": [
+        "functions/src/story-generation-admission.ts",
+        "functions/src/storytime.ts"
+      ],
+      "verified_scope": "per-user Firestore guard and claim same txn",
+      "unmet_gate": "clearance_issuer_and_emulator_missing"
+    },
+    {
+      "feature": "narrator_jobs",
+      "classification": "implemented_bridge_source",
+      "source_paths": [
+        "functions/src/storytime-voiceover-consent-admission.ts",
+        "LifeLoggerAI/urai-jobs/functions/src/jobs/storytimeNarratorBridge.ts"
+      ],
+      "verified_scope": "source bridge + Jobs purpose-level consent block",
+      "unmet_gate": "signed_canonical_consent_private_output_missing"
+    },
+    {
+      "feature": "studio_envelopes",
+      "classification": "hard_off_source",
+      "source_paths": [
+        "src/lib/storytime/integration-contracts.ts"
+      ],
+      "verified_scope": "narrative graph contract for staging",
+      "unmet_gate": "authenticated_studio_consumption_missing"
+    },
+    {
+      "feature": "asset_factory_envelopes",
+      "classification": "hard_off_source",
+      "source_paths": [
+        "src/lib/storytime/asset-factory.ts"
+      ],
+      "verified_scope": "adapter and activation flag",
+      "unmet_gate": "licensed_actual_media_missing"
+    },
+    {
+      "feature": "content_envelopes",
+      "classification": "hard_off_source",
+      "source_paths": [
+        "src/lib/storytime/integration-contracts.ts"
+      ],
+      "verified_scope": "package contract; Content runtime edge RED",
+      "unmet_gate": "actual_content_receipt_missing"
+    },
+    {
+      "feature": "spatial_replay_envelopes",
+      "classification": "hard_off_source",
+      "source_paths": [
+        "src/lib/storytime/integration-contracts.ts"
+      ],
+      "verified_scope": "protected replay manifest type",
+      "unmet_gate": "actual_auth_playback_delete_missing"
+    },
+    {
+      "feature": "locale_readiness",
+      "classification": "partial_source",
+      "source_paths": [
+        "src/lib/storytime/locales.ts"
+      ],
+      "verified_scope": "only en-US source enabled; other 19 hard-off",
+      "unmet_gate": "native_lang_review_missing"
+    },
+    {
+      "feature": "private_export_deletion",
+      "classification": "implemented_source",
+      "source_paths": [
+        "functions/src/privacy-execution.ts"
+      ],
+      "verified_scope": "Storytime-scoped plan/execution receipts",
+      "unmet_gate": "whole_urai_provider_backup_deletion_missing"
+    },
+    {
+      "feature": "finite_time",
+      "classification": "governed_preproduction",
+      "source_paths": [
+        "src/lib/finite-time/",
+        "docs/finite-time/"
+      ],
+      "verified_scope": "shot/canon/narration plans",
+      "unmet_gate": "approved_render_and_asset_receipts_missing"
+    }
+  ],
+  "truth_and_provenance_classes": [
+    {
+      "class": "recorded_original_source",
+      "authority": "original owner-scoped bytes/hash capture receipt",
+      "state": "no live original memory importer verified",
+      "may_be_claimed_as_fact_only_after": "capture metadata+cryptographic checksum+independent access/consent support"
+    },
+    {
+      "class": "attributed_human_recollection",
+      "authority": "human testimony/source statement/date/recollecting actor",
+      "state": "pure Life Movie graph supports attributed class; not automatically source verified",
+      "may_be_claimed_as_fact_only_after": "reporter attribution and independent support; preserve uncertainty"
+    },
+    {
+      "class": "AI_creative_derivative",
+      "authority": "input prompt/model/transform receipt",
+      "state": "current Storytime direct source narrative sessions label creative_derivative_not_source_evidence",
+      "may_be_claimed_as_fact_only_after": "never by itself; independent recorded corroboration required"
+    },
+    {
+      "class": "unknown_or_disputed",
+      "authority": "claim provenance ledger and contradictory evidence",
+      "state": "pure truth graph labels present; sentence-level generator binding unverified",
+      "may_be_claimed_as_fact_only_after": "never invent certainty; preserve disputed/unknown"
+    },
+    {
+      "class": "user_correction",
+      "authority": "immutable version+actor+edit reason+supporting evidence",
+      "state": "versioning exists; claim-level independent correction class incomplete",
+      "may_be_claimed_as_fact_only_after": "verify against original, do not overwrite source records"
+    }
+  ],
+  "owner_authorization_matrix": [
+    {
+      "operation": "generate_direct_private_story",
+      "actual": "Firebase UID/email + adult/guardian affirmation + request review + two provider/generation consents + moderation",
+      "missing": "canonical signed source-specific Privacy rights for original memories; guardian/third-party review"
+    },
+    {
+      "operation": "read_private_sessions",
+      "actual": "owner Firestore read and source lease",
+      "missing": "two-account runtime browser and Rules acceptance"
+    },
+    {
+      "operation": "modify_generated_canon",
+      "actual": "client writes denied to 13 generated collections and auditLogs in R909 branch",
+      "missing": "real Rules emulator and Admin SDK least privilege acceptance"
+    },
+    {
+      "operation": "view_recovery_receipts",
+      "actual": "owner-authenticated verified-email callable, bounded 12 + optional specific ID, minimal status",
+      "missing": "deployed current index, owner negative tests, safe older receipt access"
+    },
+    {
+      "operation": "start_new_generation",
+      "actual": "R912 prepared clearance guard+request transaction source",
+      "missing": "trustworthy clearance issuer, signed receipt/expiry, full legacy charge sweep, concurrent emulator"
+    },
+    {
+      "operation": "retry_after_uncertain",
+      "actual": "R910 UI hold; R911 read-only recovery; R912 cross-device txn guard source",
+      "missing": "global durable exact provider charge and receipt reconciliation before new admission"
+    },
+    {
+      "operation": "voiceover_narration",
+      "actual": "Storytime consent staging and Jobs purpose block",
+      "missing": "Jobs independently validating canonical signed source grant+revocation and protected media readback"
+    },
+    {
+      "operation": "share_story",
+      "actual": "public-safe placeholder lifecycle and revoke",
+      "missing": "real redacted content safe publishing, family/participant rights and caches"
+    },
+    {
+      "operation": "delete_account_and_outputs",
+      "actual": "Storytime scoped deletion and verify functions",
+      "missing": "all service/provider/backup acknowledgement"
+    }
+  ],
+  "cross_system_dependencies": [
+    {
+      "system": "UrAi / Life Map",
+      "edge": "inbound original memory selection",
+      "observed_level": "schema_only",
+      "missing_proof": "owner source ID/byte hash, canonical Privacy consent, contradiction ledger"
+    },
+    {
+      "system": "Privacy",
+      "edge": "source-specific rights and revocation",
+      "observed_level": "local_storytime_consent_only",
+      "missing_proof": "signed issuer and current purpose/owner/source receipt independently verified"
+    },
+    {
+      "system": "Jobs",
+      "edge": "narrator.tts output and delete",
+      "observed_level": "substantial_bridge_source",
+      "missing_proof": "protected audio runtime, signed consent readback, provider deletion"
+    },
+    {
+      "system": "Studio",
+      "edge": "narrative graph and rendered derivative",
+      "observed_level": "hard_off_envelope",
+      "missing_proof": "signed render admission, immutable output and authorized media"
+    },
+    {
+      "system": "Asset Factory",
+      "edge": "story assets and license",
+      "observed_level": "hard_off_adapter",
+      "missing_proof": "real approved licensed output, storage, cost"
+    },
+    {
+      "system": "Content",
+      "edge": "public-safe story package",
+      "observed_level": "contract_only_runtime_red",
+      "missing_proof": "reviewed publishing and asset rights"
+    },
+    {
+      "system": "Spatial / Replay",
+      "edge": "private media experience",
+      "observed_level": "manifest_only",
+      "missing_proof": "auth protected playback, caption, revoke, device"
+    },
+    {
+      "system": "Admin / Analytics",
+      "edge": "operation audit",
+      "observed_level": "source_types",
+      "missing_proof": "IAM, protected admin claims, privacy-safe logging"
+    }
+  ],
+  "evidence_matrix": [
+    {
+      "pr": 24,
+      "sha": "0ea33e1049b122db9bdfc518032cb2c84777d267",
+      "evidence": "Drive URAI-100 July 14 historical 58/58 and 16/16 source/smoke, app Functions build",
+      "level": "historical"
+    },
+    {
+      "pr": 96,
+      "sha": "31cf72a01b65667de89c9ad565b6f0a4e51759a0",
+      "runs": [
+        38685224348,
+        38685224444,
+        38685224333
+      ],
+      "status": "SUCCESS historic exact SHA, synthetic disposable emulator"
+    },
+    {
+      "pr": 107,
+      "sha": "f2614267fde4da8d71be9b124d495dedafdcdc97",
+      "runs": [
+        42558471303,
+        42558471472,
+        42558471275,
+        42558471353
+      ],
+      "status": "FAILURE jobs zero steps blank runner; not executed source tests"
+    },
+    {
+      "pr": 108,
+      "sha": "5af562ba7ebf39b0466b245a81ddc232de5459e0",
+      "runs": [
+        42559658284,
+        42559658266,
+        42559658265
+      ],
+      "status": "FAILURE jobs zero steps blank runner"
+    },
+    {
+      "pr": 109,
+      "sha": "a11f35708bb81ae1cedfc36175af0595ac62874a",
+      "runs": [
+        42560933916,
+        42560933877,
+        42560933870,
+        42560933968
+      ],
+      "status": "FAILURE jobs zero steps blank runner"
+    },
+    {
+      "pr": 110,
+      "sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+      "runs": [
+        42562412805,
+        42562412752,
+        42562412709,
+        42562412796
+      ],
+      "status": "FAILURE jobs zero steps blank runner, native Firebase skipped"
+    }
+  ],
+  "completion_backlog": [
+    {
+      "priority": "P0",
+      "id": "restore_current_ci",
+      "acceptance": "actual runner job steps, full root/Functions frozen build and original native tests",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "project_identity",
+      "acceptance": "isolate Firebase Apps/Auth/Storage/Functions/Rules/Indexes IAM and exact deployed source",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "transaction_concurrency",
+      "acceptance": "two synthetic devices same owner different request ID, exactly one admission; negative Rules",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "trusted_guard_clearance",
+      "acceptance": "legacy all-account complete sweep, reconciled provider charges, canonical signed issuer scope/expiry",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "identity_switch",
+      "acceptance": "same UID different Firebase User and cross-user stale draft/session/recovery UI testing",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "source_consent",
+      "acceptance": "canonical signed Privacy source-specific consent, capture hash, revocation",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "cross_service_protected_media",
+      "acceptance": "Jobs and Studio output -> Spatial Replay protected read -> revoke/deletion acknowledgements",
+      "complete": false
+    },
+    {
+      "priority": "P0",
+      "id": "approval_release",
+      "acceptance": "independent code/security/human approval and AAA visual/device signoff",
+      "complete": false
+    },
+    {
+      "priority": "P1",
+      "id": "claim_truth",
+      "acceptance": "claim-level recorded/recollection/AI/unknown/disputed/correction immutable ledger",
+      "complete": false
+    },
+    {
+      "priority": "P1",
+      "id": "legacy_whyGenerated",
+      "acceptance": "owner-approved version-safe migration of previously misleading labels",
+      "complete": false
+    },
+    {
+      "priority": "P1",
+      "id": "sharing",
+      "acceptance": "true PII safe derivative, participant rights, revocation of caches and exports",
+      "complete": false
+    },
+    {
+      "priority": "P2",
+      "id": "accessibility",
+      "acceptance": "real devices, screen readers, captions, reduced-motion, children guardian policy",
+      "complete": false
+    },
+    {
+      "priority": "P2",
+      "id": "localization",
+      "acceptance": "19 additional locales native/safety/legal/RTL review and tests",
+      "complete": false
+    },
+    {
+      "priority": "P3",
+      "id": "raw_git_and_cloud_asset_coverage",
+      "acceptance": "SHA256 original bytes across all Git refs/intermediate history LFS and authorized Cloud Storage",
+      "complete": false
+    },
+    {
+      "priority": "P3",
+      "id": "drive_and_provider_forensics",
+      "acceptance": "full Drive traversal and immutable provider/hosting/runtime/backup identity receipts",
+      "complete": false
+    }
+  ],
+  "observed_pr_approvals_for_96_99_106_to_110": 0,
+  "original_source_build_on_r912": "NOT_EXECUTED",
+  "native_firebase_r912": "NOT_EXECUTED",
+  "current_production_deploy_sha": "NOT_VERIFIED",
+  "original_real_memory_used": "NO_REAL_PRIVATE_MEMORY_ACCESSED_IN_AUDIT",
+  "distinguish_at_all_times": [
+    "recorded original source",
+    "attributed human recollection",
+    "AI generated creative derivative",
+    "unknown/disputed",
+    "versioned human correction"
+  ],
+  "negative_claims": [
+    "No full raw-byte SHA256 audit across 383 files",
+    "No current exact-head green CI",
+    "No actual protected cross-service memory->media->Replay->purge acceptance",
+    "No trusted guard clearance issuer",
+    "No release reviewer approval",
+    "No complete Drive or external Firebase inventory"
+  ]
+}
