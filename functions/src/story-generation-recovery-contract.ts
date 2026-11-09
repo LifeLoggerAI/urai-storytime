@@ -41,8 +41,8 @@ export function sanitizeStorytimeRecoveryReceipt(
 
   let state: StorytimeRecoveryState = "requires_review";
   if (ready) state = "ready";
-  else if (record.status === "cancellation_requested" || record.cancellationRequested === true) state = "cancellation_requested";
   else if (record.status === "cancelled") state = "cancelled";
+  else if (record.status === "cancellation_requested" || record.cancellationRequested === true) state = "cancellation_requested";
   else if (record.status === "processing") state = "processing";
 
   const updatedAt = typeof record.updatedAt === "string"
