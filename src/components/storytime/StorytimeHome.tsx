@@ -6,6 +6,7 @@ import { httpsCallable } from "firebase/functions";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseFunctions, isStorytimeCloudModeEnabled } from "@/lib/firebase/client";
 import { captureStorytimeAccountLease } from "@/lib/storytime/current-account-lease";
+import { bindStorytimeGenerationAttempt, type StorytimeGenerationAttempt } from "@/lib/storytime/generation-attempt";
 import { AuthPanel } from "./AuthPanel";
 import { DraftLibrary } from "./DraftLibrary";
 import { SessionLibrary } from "./SessionLibrary";
@@ -37,7 +38,7 @@ function firstUnsafeTerm(values: string[]) {
 }
 
 function errorMessage() {
-  return "Story creation was interrupted. No private story was saved. Please try again.";
+  return "Story creation was interrupted. This request may already have been saved or may still be processing. Check your private story library and reconcile the result before starting another generation.";
 }
 
 function createRequestId() {
@@ -97,6 +98,8 @@ export function StorytimeHome() {
   const [formActor, setFormActor] = useState<User | null>(null);
   const authEpoch = useRef(0);
   const activeActor = useRef<User | null>(null);
+  const generationAttempt = useRef<StorytimeGenerationAttempt<User> | null>(null);
+  const [generationOutcomeUnknown, setGenerationOutcomeUnknown] = useState(false);
   const captureCurrentActor = () => {
     const auth = getFirebaseAuth();
     const actor = auth.currentUser;
@@ -139,6 +142,8 @@ export function StorytimeHome() {
       if (!active) return;
       authEpoch.current += 1;
       activeActor.current = user;
+      generationAttempt.current = null;
+      setGenerationOutcomeUnknown(false);
       const lease = captureStorytimeAccountLease(user, authEpoch.current, () => auth.currentUser, () => authEpoch.current);
       const isCurrentAccount = () => active && activeActor.current === user && lease.isCurrent();
       clearResumedDraft();
@@ -196,6 +201,7 @@ export function StorytimeHome() {
       active = false;
       authEpoch.current += 1;
       activeActor.current = null;
+      generationAttempt.current = null;
       unsubscribe();
     };
   }, [cloudReady]);
@@ -357,6 +363,12 @@ export function StorytimeHome() {
       return;
     }
 
+    if (generationOutcomeUnknown) {
+      setSubmitError(errorMessage());
+      return;
+    }
+    const attempt = bindStorytimeGenerationAttempt(generationAttempt.current, actor, requestReviewFingerprint, createRequestId);
+    generationAttempt.current = attempt;
     setIsSubmitting(true);
     try {
       const createStory = httpsCallable<Record<string, unknown>, GenerateStoryResponse>(getFirebaseFunctions(), "generateStorySession");
@@ -365,7 +377,7 @@ export function StorytimeHome() {
         sourceText: sourceText.trim().slice(0, MAX_SOURCE_CHARS),
         emotionalTone: mood,
         symbolicMotifs: [theme.trim()],
-        requestId: createRequestId(),
+        requestId: attempt.requestId,
         locale: "en-US",
         sourceSignals: ["storytime form"],
         audienceAgeBand,
@@ -402,7 +414,12 @@ export function StorytimeHome() {
       }
       if (isCurrent()) window.location.assign(`/storytime/${encodeURIComponent(result.data.sessionId)}`);
     } catch (error) {
-      if (isCurrent()) setSubmitError(errorMessage());
+      if (isCurrent()) {
+        // A timeout or failed client receipt cannot prove the server did not
+        // commit or charge the original request. Do not issue a fresh ID.
+        setGenerationOutcomeUnknown(true);
+        setSubmitError(errorMessage());
+      }
     } finally {
       if (isCurrent()) setIsSubmitting(false);
     }
@@ -586,7 +603,7 @@ export function StorytimeHome() {
           {cloudReady && validationError ? <p className="storytime-helper" id="storytime-validation" role="status" aria-live="polite">{validationError}</p> : null}
 
           <div className="storytime-actions">
-            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving}>
+            <button className="storytime-button" type="submit" disabled={!cloudReady || Boolean(validationError) || isSubmitting || draftSaving || generationOutcomeUnknown}>
               {isSubmitting ? "Creating story…" : draftSaving ? "Saving draft…" : "Create story"}
             </button>
           </div>
