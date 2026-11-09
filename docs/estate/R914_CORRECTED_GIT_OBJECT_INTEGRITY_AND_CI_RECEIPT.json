@@ -1,0 +1,106 @@
+{
+  "schema": "one-urai-storytime-r914-source-object-integrity-erratum-v1",
+  "checkpoint_date_local": "2026-11-08",
+  "evidence_repository": "LifeLoggerAI/urai-storytime",
+  "prior_handoff_pr": 111,
+  "prior_handoff_head": "8b0738a85e6eab32233f3308a336bd27a94a6351",
+  "original_manifest_path": "docs/estate/R913_EXACT_R912_SOURCE_TREE_AND_VISIBLE_BRANCH_HEADS.json",
+  "original_manifest_git_blob_sha1": "023928468ee233a249cc844a4b4461ec2ee0fa41",
+  "original_manifest_filed_tree_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+  "source_commit_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+  "source_commit_actual_tree_sha": "c0745b9d85e5939746ee2b505fb206b53b2cb1d4",
+  "main_commit_sha": "73f586a0a2931961ae221af7cfc0caf1b6aef39d",
+  "main_commit_actual_tree_sha": "f847d3bfbcf5bc07258107f5a18338a62480a14f",
+  "finding": {
+    "id": "R913-OBJECT-IDENTITY-001",
+    "status": "confirmed_metadata_erratum",
+    "description": "R913 filed the source commit SHA as source_git_tree_sha, because GitHub git/trees fetched by commit-ish echoes that commit-ish in response.sha; Git commit object's tree.sha is the actual Git tree object identity.",
+    "scope": "Only the R913 field source_git_tree_sha is known wrong in this review. File content identity and sizes were independently compared to the real Git tree object.",
+    "actual_tree_object_sha": "c0745b9d85e5939746ee2b505fb206b53b2cb1d4",
+    "r913_mislabeled_sha": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+    "correction_required": true,
+    "next_chalk_rule": "Use source_commit_sha for commit provenance, source_commit_actual_tree_sha for tree object; do not use the old R913 source_git_tree_sha as a tree-object identifier."
+  },
+  "integrity_recheck": {
+    "tree_fetch_by_actual_tree_sha": true,
+    "tree_recursive_truncated": false,
+    "git_blob_entries": 383,
+    "git_tree_entries": 56,
+    "git_reported_blob_bytes": 2083982,
+    "manifest_file_entries": 383,
+    "path_mode_sha1_size_matches": 383,
+    "path_mode_sha1_size_mismatch_count": 0,
+    "manifest_extraneous_paths": 0,
+    "main_real_git_blob_count": 306,
+    "main_real_reported_bytes": 1356257,
+    "removed_paths_vs_main": 0,
+    "added_paths_vs_main": 77,
+    "modified_paths_vs_main": 40,
+    "note": "Git SHA-1/mode/size match is NOT independently re-downloading, SHA-256 hashing or runtime testing each raw file."
+  },
+  "branches": {
+    "r913_visible_head_snapshot_count": 108,
+    "fresh_visible_head_count": 109,
+    "fresh_pagination": [
+      100,
+      9
+    ],
+    "changed_snapshot_head_refs": [
+      {
+        "branch": "docs/genesis-storytime-r913-final-next-chalk-20261108",
+        "snapshot": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+        "current": "8b0738a85e6eab32233f3308a336bd27a94a6351"
+      },
+      {
+        "branch": "docs/genesis-storytime-r914-verified-handoff-20261108",
+        "snapshot": null,
+        "current": "8b0738a85e6eab32233f3308a336bd27a94a6351"
+      }
+    ],
+    "note": "After creating the R914 branch the fresh visible count will increase by at least one; branch inventories are dated snapshots, not complete Git history."
+  },
+  "review_and_runtime": {
+    "r913_pr_111_submitted_reviews": 0,
+    "r913_pr_111_actions": [
+      {
+        "run_id": 42564032696,
+        "name": "Visual Proof",
+        "conclusion": "failure",
+        "failed_job_id": 128986500896,
+        "failed_job_steps": 0
+      },
+      {
+        "run_id": 42564032705,
+        "name": "CI",
+        "conclusion": "failure",
+        "failed_job_ids": [
+          128986500978,
+          128986501217
+        ],
+        "failed_job_steps": 0,
+        "skipped_jobs": [
+          128986502206,
+          128986502209
+        ]
+      },
+      {
+        "run_id": 42564032775,
+        "name": "Verify",
+        "conclusion": "failure",
+        "failed_job_id": 128986501295,
+        "failed_job_steps": 0
+      }
+    ],
+    "interpretation": "No actual job steps or runner names were observed for failing jobs; native disposable Firebase job skipped. Cause unknown. This is not compiled source, production or emulator acceptance."
+  },
+  "production_status": "HOLD",
+  "unverified": [
+    "raw SHA-256 of all 383 current source files",
+    "all unreachable/deleted/intermediate historical commits",
+    "all cloud/Storage/LFS/provider media",
+    "full native current-head build/CI and Firebase emulator",
+    "independent reviewer approval and real signed source consent",
+    "protected cross-service private Replay and deletion"
+  ],
+  "no_secret_or_user_data_accessed": true
+}
