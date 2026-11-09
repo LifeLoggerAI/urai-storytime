@@ -1,0 +1,627 @@
+{
+  "schema": "one-urai-genesis-storytime-r916-synthetic-release-acceptance-v1",
+  "timestamp_local": "2026-11-08 America/Chicago",
+  "status": "SPECIFICATION_ONLY_NOT_EXECUTED",
+  "lineage": {
+    "r916_parent_head": "37639263c41291656c8f51b0bcd6525ae6bfd783",
+    "storytime_engineering_pr": 110,
+    "storytime_engineering_head": "0c3358463c7a21db97c2932ce99c8f46e2419749",
+    "jobs_private_delivery_pr": 170,
+    "jobs_private_delivery_head": "d379debb757a405b8757aa244e8bb87dfb574e37",
+    "privacy_main_head": "1163d6f32a123ef9a6638e092a3eee5ec4a3b317"
+  },
+  "pinned_cross_repo_main_branches": [
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "head": "73f586a0a2931961ae221af7cfc0caf1b6aef39d",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "head": "9d29be1bcd3a45a4b9a743df9c9706c00811f38b",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/urai-privacy",
+      "head": "1163d6f32a123ef9a6638e092a3eee5ec4a3b317",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/urai-studio",
+      "head": "854477d80b1a7aa718edb60d1ed4c1cf22dbed9d",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/urai-spatial",
+      "head": "da94837c2457b0a7590e26a7a644cd728de8afb8",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/urai-content",
+      "head": "988ca4f7f38b1ce86e4d3f426361b5866fd23e0",
+      "branch_protected": false,
+      "rulesets_visible": 0
+    },
+    {
+      "repo": "LifeLoggerAI/B2Bportal",
+      "head": "4aea8574970d28a293f921a34156c4cc5a971213",
+      "branch_protected": false,
+      "rulesets_visible": "INACCESSIBLE_403_PRIVATE_REPO_SUBSCRIPTION_RESTRICTION"
+    }
+  ],
+  "pinned_source_blobs": [
+    {
+      "repo": "LifeLoggerAI/urai-privacy",
+      "path": "functions/src/consent-decision.ts",
+      "blob": "0f12c560a7772ccb362285e35d8745aa4eba5f69",
+      "finding": "canonical registry lacks storytime.voiceover and storytime.story-generation"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-privacy",
+      "path": "functions/src/consent-api.ts",
+      "blob": "3b03f3c0b25cddc9f4f612c967f177bb5faf4e44",
+      "finding": "canonicalPurpose rejects any unknown purpose with failed-precondition"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "functions/src/storytime.ts",
+      "blob": "95716cf1beb2f2382657f5c5934ad4a516e3a133",
+      "finding": "uses Storytime local consent snapshot; no captured source ID in direct generate schema"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "functions/src/storytime-voiceover-consent-admission.ts",
+      "blob": "43d44560d392b7be908ba5d38e855828eb7f7d77",
+      "finding": "Storytime-local receipt and outbox transaction, explicitly no cross-service atomicity"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "functions/src/storytime-voiceover-delivery.ts",
+      "blob": "3801bbd3a6931e6da7d3291c2e2bbae73fa976ca",
+      "finding": "authenticated Storytime private deliver proxy"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "functions/src/jobs/storytimeNarratorBridge.ts",
+      "ref": "main",
+      "blob": "cec3a4f6638aa3d646457b08f7c24e99cf4715a3",
+      "finding": "no deliver action, playback returns signed GCS URL"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "functions/src/jobs/storytimeNarratorBridge.ts",
+      "ref": "PR170",
+      "blob": "0729c324c4c600eb3092abbf3a2674486e257cc7",
+      "finding": "draft matching deliver/private descriptor and owner-purposed block; no signed original-source grant verifier observed"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "functions/src/jobs/privateMediaDelivery.ts",
+      "ref": "PR170",
+      "blob": "2261b2f2bc315c2fa6935890af5294f553c0474a",
+      "finding": "draft generation-pinned streaming revalidation, not deployed evidence"
+    }
+  ],
+  "source_test_families": [
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "tests/e2e/storytime-narrator-delivery-authority.test.mjs",
+      "blob": "fc1c82397f04ee215acf82dec1a08b8ad44dd335",
+      "source_top_level_declared_tests": 5,
+      "note": "parameterized loops expand cases; not a full paired cross-project acceptance"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "tests/unit/storytime-narrator-delivery.test.mjs",
+      "blob": "ee8ffb24d5410e46bcda3c6c49ba2ccdb3a878d4",
+      "source_top_level_declared_tests": 7
+    },
+    {
+      "repo": "LifeLoggerAI/urai-storytime",
+      "path": "tests/unit/storytime-voiceover-consent-admission.test.mjs",
+      "blob": "699ef7ba35c419027a5a7040ba0b65a38030e1f2",
+      "source_top_level_declared_tests": 32
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "scripts/storytime-narrator-consent-transaction.test.mjs",
+      "blob": "02ece3f9dfe45790272ccba843b2c821f69b3f30",
+      "source_top_level_declared_tests": 20
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "scripts/private-media-download-authority-smoke.mjs",
+      "blob": "4dc4e6f4d1f7182c68c8cdbad51240391e126242",
+      "source_test_pattern": "self-executing source-only scenarios; prints counters, does not use node:test"
+    },
+    {
+      "repo": "LifeLoggerAI/urai-jobs",
+      "path": "scripts/private-media-preflight-cancellation.test.mjs",
+      "blob": "7180ef27f0ec4e073514f8e1d6fdf778be97b0ee",
+      "source_top_level_declared_tests": 6
+    }
+  ],
+  "current_source_release_receipt": {
+    "storytime_latest_docs_pr": 113,
+    "head": "37639263c41291656c8f51b0bcd6525ae6bfd783",
+    "actions": [
+      42566568469,
+      42566568492,
+      42566568527
+    ],
+    "result": "ALL_COMPLETED_FAILURE_WITH_ZERO_EXECUTED_STEPS_IN_FAILED_JOBS; DISPOSABLE_FIREBASE_SKIPPED",
+    "jobs_pr170_head": "d379debb757a405b8757aa244e8bb87dfb574e37",
+    "jobs_pr170_reviews": "2_COMMENTED_NOT_APPROVED",
+    "actual_cross_repo_live_acceptance": "NONE_VERIFIED"
+  },
+  "tests": [
+    {
+      "id": "C01",
+      "area": "privacy_purpose",
+      "actor": "owner-A",
+      "action": "Request canonical Privacy purpose storytime.voiceover against current main registry",
+      "expected": "DENY_UNKNOWN_PURPOSE",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C02",
+      "area": "privacy_purpose",
+      "actor": "owner-A",
+      "action": "Propose separately governed storytime.voiceover purpose, approved tier, source class and expiration",
+      "expected": "DESIGN_AND_APPROVAL_REQUIRED_BEFORE_ACTIVATION",
+      "evidence_required": "Policy signoff, signed registry changes, versioned rejection/acceptance tests",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C03",
+      "area": "privacy_purpose",
+      "actor": "owner-B",
+      "action": "Use valid receipt string from owner-A",
+      "expected": "DENY_FOREIGN_OWNER",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C04",
+      "area": "privacy_purpose",
+      "actor": "owner-A",
+      "action": "Use revoked, expired, wrong-purpose, or wrong-policy canonical record",
+      "expected": "DENY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C05",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Use unsigned fabricated 64-hex clearance receipt",
+      "expected": "DENY_UNTRUSTED_ISSUER",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C06",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Use signed grant for another source SHA/record version",
+      "expected": "DENY_SOURCE_MISMATCH",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C07",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Use signed grant for a different processing purpose",
+      "expected": "DENY_PURPOSE_MISMATCH",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C08",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Use signed grant after revocation event and before Jobs dispatch",
+      "expected": "DENY_NO_JOB_ADMISSION",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C09",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Revoke grant after Jobs accepted while render is running",
+      "expected": "STOP_OUTPUT_AND_PURGE_AS_AUTHORIZED",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "C10",
+      "area": "privacy_signing",
+      "actor": "owner-A",
+      "action": "Use owner/guardian record for unapproved third party voice/likeness",
+      "expected": "DENY_AND_REQUIRE_SEPARATE_RIGHTS",
+      "evidence_required": "Legal/consent and ethical review plus synthetic denial trace",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B01",
+      "area": "bridge_protocol",
+      "actor": "Storytime-service",
+      "action": "Send create to Jobs main with matching idempotency and purpose receipt",
+      "expected": "SOURCE_SHAPE_MATCH_NOT_RUNTIME_CERT",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B02",
+      "area": "bridge_protocol",
+      "actor": "Storytime-service",
+      "action": "Request playback against Jobs main expecting playback.delivery",
+      "expected": "DENY_OR_PROTOCOL_INCOMPATIBILITY_NO_URL_FALLBACK",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B03",
+      "area": "bridge_protocol",
+      "actor": "Storytime-service",
+      "action": "Send action deliver to Jobs main",
+      "expected": "SCHEMA_DENY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B04",
+      "area": "bridge_protocol",
+      "actor": "Storytime-service",
+      "action": "Obtain descriptor via Jobs PR170 matched head",
+      "expected": "ACCEPT_ONLY_WITH_PROVEN_OWNER_CURRENT_RIGHTS",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B05",
+      "area": "bridge_protocol",
+      "actor": "Storytime-service",
+      "action": "Send correct private descriptor through Storytime bearer proxy to Jobs PR170",
+      "expected": "STREAM_AUTHORIZED_BYTES_ONLY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B06",
+      "area": "bridge_protocol",
+      "actor": "owner-B",
+      "action": "Present owner-A job, session or script ID to private proxy",
+      "expected": "DENY_WITH_ZERO_PRIVATE_BYTES",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B07",
+      "area": "bridge_protocol",
+      "actor": "signed-out",
+      "action": "Submit private proxy without Firebase ID token",
+      "expected": "DENY_BEFORE_BRIDGE_CREDENTIAL_USED",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B08",
+      "area": "bridge_protocol",
+      "actor": "owner-A",
+      "action": "Rotate bridge credential during audio stream",
+      "expected": "DENY_LATER_CHUNKS",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B09",
+      "area": "bridge_protocol",
+      "actor": "owner-A",
+      "action": "Change source script/session consent while Jobs response in flight",
+      "expected": "DENY_NO_UNAUTHORIZED_OUTPUT",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B10",
+      "area": "bridge_protocol",
+      "actor": "owner-A",
+      "action": "Attempt direct Storage signed URL from narrator playback endpoint",
+      "expected": "DENY_PROTOCOL_FALLBACK_NO_PUBLIC_URL",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "B11",
+      "area": "bridge_protocol",
+      "actor": "owner-A",
+      "action": "Switch to different Firebase User during client audio fetch",
+      "expected": "WITHHOLD_PRIVATE_AUDIO",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G01",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "New request with no R912 guard",
+      "expected": "DENY_PENDING_TRUSTED_CLEARANCE",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G02",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "New request with legacy unresolved or provider charges unknown",
+      "expected": "DENY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G03",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Two devices submit different fresh IDs with one independently cleared guard",
+      "expected": "EXACTLY_ONE_ADMIT_ONE_DENY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G04",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Two devices submit identical request ID but changed review SHA",
+      "expected": "DENY_REPLAY_CONFLICT",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G05",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Lost server acknowledgement after charge recorded; retry from another tab",
+      "expected": "NO_SECOND_PROVIDER_CHARGE",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G06",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Cancelled/failed/succeeded request but provider held charge remains",
+      "expected": "HOLD_NEW_REQUEST",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G07",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Read latest 12 receipts but prior 13th unsettled record exists",
+      "expected": "DO_NOT_ASSUME_NO_HISTORICAL_HOLD",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G08",
+      "area": "generation_admission",
+      "actor": "owner-A",
+      "action": "Generate with typed direct sourceText and sourceSignals only",
+      "expected": "CLASSIFY_AI_CREATIVE_DERIVATIVE_NOT_CAPTURED_SOURCE",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G09",
+      "area": "generation_admission",
+      "actor": "owner-B",
+      "action": "Attempt to read/write owner-A generation guard from client SDK",
+      "expected": "DENY_FIRESTORE_RULES",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "G10",
+      "area": "generation_admission",
+      "actor": "admin-token-client",
+      "action": "Attempt direct client SDK mutation of server-only guard",
+      "expected": "DENY_EVEN_WITH_ADMIN_CLAIM",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D01",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "Revoke voiceover consent before Jobs create transaction",
+      "expected": "DENY_NEW_JOB",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D02",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "Revoke voiceover consent during audio streaming after first chunk",
+      "expected": "DENY_SUBSEQUENT_CHUNKS",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D03",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "Change GCS generation after playback descriptor issued",
+      "expected": "DENY_WRONG_GENERATION",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D04",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "Cancel output while remote create response delayed",
+      "expected": "NO_RESURRECTION_OF_CANCELLED_OUTBOX",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D05",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "GCS delete fails after PENDING fence",
+      "expected": "REMAIN_UNAVAILABLE_AND_PENDING_RETRY",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D06",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "GCS delete succeeds but local acknowledgement fails",
+      "expected": "DO_NOT_CERTIFY_COMPLETE_UNTIL_RECONCILED",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "D07",
+      "area": "deletion_delivery",
+      "actor": "owner-A",
+      "action": "Delete account and downstream story derivatives",
+      "expected": "PROVE_SERVICE_PROVIDER_STORAGE_BACKUP_PURGE_ACKS",
+      "evidence_required": "Synthetic multi-service source/version/deletion lineage receipts plus provider deletion evidence when explicitly authorized",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "T01",
+      "area": "truth_and_provenance",
+      "actor": "owner-A",
+      "action": "Original recorded audio supports one story claim",
+      "expected": "REQUIRE_CAPTURE_HASH_AND_PURPOSE_BOUND_GRANT",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "T02",
+      "area": "truth_and_provenance",
+      "actor": "family-reporter",
+      "action": "Report conflicting recollection against original captured source",
+      "expected": "PRESERVE_ATTRIBUTED_DISPUTED_CLAIMS",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "T03",
+      "area": "truth_and_provenance",
+      "actor": "owner-A",
+      "action": "Correct story assertion from prior version",
+      "expected": "VERSIONED_CORRECTION_NOT_REWRITE_ORIGINAL",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "T04",
+      "area": "truth_and_provenance",
+      "actor": "provider",
+      "action": "Generate scene with no corroborated recorded source",
+      "expected": "LABEL_CREATIVE_AI_INTERPRETATION",
+      "evidence_required": "Frozen exact-head two-repo Auth/Firestore/Functions/Storage disposable emulator + matched request/response/denial logs, source SHAs, UTC timestamps, no real media or provider spend",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "R01",
+      "area": "release_governance",
+      "actor": "release-reviewer",
+      "action": "Review protected branch required checks and approver",
+      "expected": "APPROVED_EXACT_COMMIT_AND_RULESETS",
+      "evidence_required": "GitHub live branch protection and ruleset readback; independent reviewer; exact-head check logs",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "R02",
+      "area": "release_governance",
+      "actor": "release-reviewer",
+      "action": "Verify Storytime, Jobs and Privacy deployed source versions against tested refs",
+      "expected": "MATCH_VERIFIED_SOURCE_HASH_AND_ENVIRONMENT",
+      "evidence_required": "Actual Firebase/GCP Hosting, Functions, IAM, Storage, Rules, index, rollback and monitoring readbacks",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    },
+    {
+      "id": "R03",
+      "area": "release_governance",
+      "actor": "release-reviewer",
+      "action": "Run mobile/desktop/XR captions, keyboard/reduced-motion and AAA visuals",
+      "expected": "REAL_DEVICE_AND_HUMAN_APPROVAL_REQUIRED",
+      "evidence_required": "Recorded device acceptance with no private content; independent accessibility report and founder signoff",
+      "status": "NOT_EXECUTED_AT_R916",
+      "auto_release_gate": false
+    }
+  ],
+  "totals": {
+    "cases": 45,
+    "unexecuted": 45
+  },
+  "constraints": [
+    "No production deploy",
+    "No paid media/provider calls",
+    "No raw private memories or photographs",
+    "No fabricated source/consent/clearance receipts",
+    "No use of direct Storage signed URL as workaround",
+    "Preserve real source vs attributed recollection vs AI reconstruction",
+    "No GO without protected CI, independent review, authenticated end-to-end source and delete evidence"
+  ]
+}
