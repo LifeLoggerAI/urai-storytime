@@ -219,21 +219,20 @@ test('append-only analytics can be created by owner but cannot be rewritten or d
   await assertFails(deleteDoc(analytics));
 });
 
-test('family story storage is claim-scoped and export writes remain admin-only', async () => {
+test('family story photos, recordings, and exports reject raw client access including family claims', async () => {
   const ownerStorage = testEnv.authenticatedContext('ownerUser', { familyIds: ['family-a'] }).storage();
   const otherStorage = testEnv.authenticatedContext('otherUser', { familyIds: ['family-b'] }).storage();
   const adminStorage = testEnv.authenticatedContext('adminUser', { admin: true }).storage();
-
+  const momStorage = testEnv.authenticatedContext('syntheticMom', { familyIds: ['family-a'] }).storage();
   const storyPath = 'families/family-a/stories/story-a/page.txt';
-  await assertSucceeds(uploadString(ref(ownerStorage, storyPath), 'synthetic story asset'));
-  await assertSucceeds(getBytes(ref(ownerStorage, storyPath)));
-  await assertFails(getBytes(ref(otherStorage, storyPath)));
-  await assertSucceeds(getBytes(ref(adminStorage, storyPath)));
-
+  const privateRecording = 'families/family-a/stories/story-b/private-recording.wav';
   const exportPath = 'families/family-a/exports/export.json';
-  await assertFails(uploadString(ref(ownerStorage, exportPath), '{"synthetic":true}'));
-  await assertSucceeds(uploadString(ref(adminStorage, exportPath), '{"synthetic":true}'));
-  await assertSucceeds(getBytes(ref(ownerStorage, exportPath)));
+  for (const storage of [ownerStorage, otherStorage, adminStorage, momStorage]) {
+    for (const path of [storyPath, privateRecording, exportPath]) {
+      await assertFails(uploadString(ref(storage, path), 'synthetic story asset'));
+      await assertFails(getBytes(ref(storage, path)));
+    }
+  }
 });
 
 test('moderation storage and unknown storage paths fail closed', async () => {
