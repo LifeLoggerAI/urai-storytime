@@ -7,6 +7,8 @@ export {
 } from "./storytime.js";
 
 export { createPublicStoryShare, revokePublicStoryShare } from "./public-story-share-lifecycle.js";
+// REVIEW / HARD-OFF: named family grants require canonical Privacy certification.
+export { grantFamilyStoryView, getFamilyStoryView, revokeFamilyStoryView } from "./family-story-sharing.js";
 export { generateNarratorScript } from "./generate-narrator-script.js";
 export { generateEmotionalArcSummary } from "./generate-emotional-arc-summary.js";
 export { generateWeeklyStoryScroll } from "./generate-weekly-story-scroll.js";
