@@ -60,6 +60,23 @@ function currentReceipt(receipt: Record<string, any>, input: {
     && receipt.expiresAt instanceof Timestamp
     && receipt.expiresAt.toMillis() > input.nowMs;
 }
+/** Auth and Firestore are independent authorities. A deleted/disabled source
+ * owner must not remain shareable while downstream document deletion is pending. */
+async function requireActiveSourceOwner(ownerUid: string) {
+  const owner = await getAuth().getUser(ownerUid).catch(() => { throw safeError(); });
+  if (owner.uid !== ownerUid || owner.disabled || !owner.emailVerified) throw safeError();
+}
+async function assertNoDeletionFence(tx: Transaction, ...uids: string[]) {
+  const fences = await Promise.all(
+    [...new Set(uids)].map((uid) => tx.get(db.collection("privacyDeletionTombstones").doc(uid)))
+  );
+  if (fences.some((snapshot) => snapshot.data()?.active === true)) throw safeError();
+}
+function provenanceLabel(value: unknown) {
+  // Do not pass nested private metadata through a purported classification.
+  return typeof value === "string" && /^[a-z][a-z0-9_]{0,79}$/.test(value)
+    ? value : "unverified";
+}
 function stateRef(sessionId: string) {
   return db.collection("familyStorySharingStates").doc(sessionId);
 }
@@ -95,6 +112,7 @@ export const grantFamilyStoryView = onCall(async (request) => {
     const pRef = db.collection("consentDecisionReceipts").doc(consentReceiptId);
     const eRef = stateRef(sessionId), gRef = grantRef(sessionId, recipientUid);
     const [s, p, e, g] = await Promise.all([tx.get(sRef), tx.get(pRef), tx.get(eRef), tx.get(gRef)]);
+    await assertNoDeletionFence(tx, ownerUid, recipientUid);
     const story = s.data() ?? {}, receipt = p.data() ?? {}, epoch = readEpoch(e.data());
     const nowMs = Date.now();
     if (!s.exists || !activeSource(story, ownerUid)
@@ -130,10 +148,12 @@ export const getFamilyStoryView = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid family story request.");
   const { sessionId, ownerUid } = parsed.data;
   if (recipientUid === ownerUid) throw safeError(); // owners use existing owner-only APIs
+  await requireActiveSourceOwner(ownerUid);
   const projection = await db.runTransaction(async (tx: Transaction) => {
     const sRef = db.collection("storySessions").doc(sessionId);
     const gRef = grantRef(sessionId, recipientUid), eRef = stateRef(sessionId);
     const [s, g, e] = await Promise.all([tx.get(sRef), tx.get(gRef), tx.get(eRef)]);
+    await assertNoDeletionFence(tx, ownerUid, recipientUid);
     const story = s.data() ?? {}, grant = g.data() ?? {};
     const epoch = readEpoch(e.data()), nowMs = Date.now();
     if (!s.exists || !activeSource(story, ownerUid) || !g.exists
@@ -161,10 +181,11 @@ export const getFamilyStoryView = onCall(async (request) => {
       || story.title.length > 200) throw safeError();
     // Only the owner-approved synthetic/story summary is exposed by this pilot.
     return { sessionId, ownerUid, title: story.title, summary: chapter.summary,
-      provenance: { type: story.provenance?.sourceType ?? "unverified",
-        factualStatus: story.provenance?.factualStatus ?? "unverified" } };
+      provenance: { type: provenanceLabel(story.provenance?.sourceType),
+        factualStatus: provenanceLabel(story.provenance?.factualStatus) } };
   });
   await verifiedActor(request);
+  await requireActiveSourceOwner(ownerUid);
   return projection;
 });
 
