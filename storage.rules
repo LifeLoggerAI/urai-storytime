@@ -10,18 +10,15 @@ service firebase.storage {
       return signedIn() && request.auth.token.admin == true;
     }
 
-    function isFamilyAsset(familyId) {
-      return signedIn() && request.auth.token.familyIds != null && familyId in request.auth.token.familyIds;
-    }
-
+    // R1586 HOLD: a familyId claim is NOT a media/story grant.
+    // Real private photos/audio remain server/broker-only until scoped consent,
+    // IAM and generation fencing are independently certified.
     match /families/{familyId}/stories/{storyId}/{fileName} {
-      allow read: if isFamilyAsset(familyId) || isAdmin();
-      allow write: if isFamilyAsset(familyId) || isAdmin();
+      allow read, write: if false;
     }
 
     match /families/{familyId}/exports/{fileName} {
-      allow read: if isFamilyAsset(familyId) || isAdmin();
-      allow write: if isAdmin();
+      allow read, write: if false;
     }
 
     match /moderation/{fileName} {
