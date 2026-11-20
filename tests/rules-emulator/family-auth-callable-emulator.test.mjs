@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -10,6 +10,8 @@ const require = createRequire(resolve(repoRoot, "functions/package.json"));
 const { initializeApp, getApps } = require("firebase-admin/app");
 const { getFirestore, Timestamp } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
+const { canonicalFamilyPrivacyReceiptBytes } =
+  await import(pathToFileURL(resolve(repoRoot, "functions/lib/family-privacy-receipt-signature.js")).href);
 const { getFamilyStoryView, grantFamilyStoryView, revokeFamilyStoryView } =
   await import(pathToFileURL(resolve(repoRoot, "functions/lib/family-story-sharing.js")).href);
 
@@ -32,6 +34,11 @@ if ((process.env.GCLOUD_PROJECT !== projectId && process.env.GOOGLE_CLOUD_PROJEC
   throw new Error("Use only the exact isolated localhost synthetic Firebase emulator project.");
 }
 process.env.STORYTIME_FAMILY_SHARING_ENABLED = "true"; // TEST PROCESS ONLY
+// Keys are ephemeral and synthetic; only the public verifier is in Functions.
+const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+process.env.STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID = "synthetic-test-key-r1586";
+process.env.STORYTIME_FAMILY_PRIVACY_ED25519_PUBLIC_KEY_SPKI_B64 =
+  publicKey.export({ format:"der", type:"spki" }).toString("base64");
 if (!getApps().length) initializeApp({projectId});
 const auth = getAuth(), db = getFirestore();
 
@@ -88,18 +95,35 @@ test("auth-emulator-issued Grandma token allows one specific consented story to 
     sourceSystem:"urai-storytime", ownerUid:grandma.uid, sessionId:first, versionId:version,
     title:"Synthetic grandma shared childhood story", summary
   })).digest("hex");
-  await db.collection("consentDecisionReceipts").doc(receiptId).set({
+  const expiresAtMs = Date.now()+86400000;
+  const signedFields = {
     schemaVersion:"storytime-consent-decision-receipt-v1",id:receiptId,
     userId:grandma.uid,sourceSessionId:first,recipientUid:mom.uid,
     sourceVersionId:version,shareEpoch:0,purpose:"storytime.family_share",
-    policyVersion:"family-story-share-v1",decision:"authorized",revoked:false,
-    issuedBy:"urai-privacy",approvedProjectionSha256,
-    expiresAt:Timestamp.fromMillis(Date.now()+86400000)
-  }); // EMULATOR-SEEDED FAKE RECEIPT; NOT CANONICAL PRODUCTION PRIVACY
+    policyVersion:"family-story-share-v1",decision:"authorized",
+    issuedBy:"urai-privacy",approvedProjectionSha256,expiresAtMs,
+  };
+  const receipt = {
+    ...signedFields,revoked:false,expiresAt:Timestamp.fromMillis(expiresAtMs),
+    issuerKeyId:"synthetic-test-key-r1586",
+    issuerSignature:sign(null,canonicalFamilyPrivacyReceiptBytes(signedFields),privateKey).toString("base64url"),
+  };
+  delete receipt.expiresAtMs; // Firestore Timestamp is the only expiry source.
+  await db.collection("consentDecisionReceipts").doc(receiptId).set(receipt);
+  // A forged issuedBy marker and signed-looking but invalid bytes fail closed.
+  await db.collection("consentDecisionReceipts").doc(receiptId).update({issuerSignature:"A".repeat(86)});
+  await rejects(grantFamilyStoryView,req(grandma,{
+    sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
+  }));
+  await db.collection("consentDecisionReceipts").doc(receiptId).update({issuerSignature:receipt.issuerSignature});
+  // This is only a SYNTHETIC TEST KEY, not a canonical Privacy-issued signature.
   const g=await grantFamilyStoryView.run(req(grandma,{
     sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
   }));
   assert.equal(g.granted,true);
+  await db.collection("consentDecisionReceipts").doc(receiptId).update({recipientUid:outsider.uid});
+  await rejects(getFamilyStoryView,req(mom,{sessionId:first,ownerUid:grandma.uid}));
+  await db.collection("consentDecisionReceipts").doc(receiptId).update({recipientUid:mom.uid});
   const view=await getFamilyStoryView.run(req(mom,{sessionId:first,ownerUid:grandma.uid}));
   assert.equal(view.title,"Synthetic grandma shared childhood story");
   assert.equal(view.summary,"Synthetic story summary for "+first);
