@@ -21,6 +21,18 @@ let sequence = 0;
 const importSource = source => import(`data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(source)).toString('base64')}`);
 const helper = await importSource(helperSource.replace('import { defineSecret } from "firebase-functions/params";', 'const defineSecret = () => ({ value: () => process.env.STORYTIME_SPEND_WORKER_TOKENS_JSON });'));
 const persistence = await importSource(readFileSync('functions/src/story-persistence.ts', 'utf8'));
+// Import current production security helpers rather than leaving stripped
+// imports undefined or replacing policy with permissive test doubles.
+const requestBinding = await importSource(readFileSync('functions/src/storytime-request-binding.ts', 'utf8'));
+const admission = await importSource(readFileSync('functions/src/story-generation-admission.ts', 'utf8'));
+const version = await importSource(readFileSync('functions/src/story-version.ts', 'utf8'));
+const voiceoverGuard = await importSource(readFileSync('functions/src/storytime-voiceover-result-guard.ts', 'utf8'));
+const voiceoverAdmission = await importSource(readFileSync('functions/src/storytime-voiceover-consent-admission.ts', 'utf8'));
+globalThis.__storytimeSyntheticZod = z;
+const mediaContract = await importSource(readFileSync('functions/src/storytime-media-delivery-contract.ts', 'utf8')
+  .replace('import { z } from "zod";', 'const z = globalThis.__storytimeSyntheticZod;'));
+delete globalThis.__storytimeSyntheticZod;
+
 const envKeys = ['URAI_SOURCE_SHA', 'STORYTIME_SPEND_GATEWAY_SOURCE_SHA', 'STORYTIME_PRODUCTION_SPEND_URL', 'STORYTIME_SPEND_WORKER_TOKENS_JSON', 'STORYTIME_GENERATION_PROVIDER', 'OPENAI_API_KEY', 'STORYTIME_OPENAI_MODEL', 'STORYTIME_PROVIDER_SPEND_AUTHORIZED', 'STORYTIME_OPENAI_INPUT_USD_PER_1M_TOKENS', 'STORYTIME_OPENAI_OUTPUT_USD_PER_1M_TOKENS', 'STORYTIME_MAX_GENERATION_COST_USD', 'STORYTIME_PROVIDER_DAILY_BUDGET_USD', 'STORYTIME_PROVIDER_USER_DAILY_BUDGET_USD', 'STORYTIME_ALLOW_DETERMINISTIC_FUNCTION_BUILDER'];
 const signingPair = () => { const pair = generateKeyPairSync('ed25519'); return { privateKey: pair.privateKey, publicKey: pair.publicKey.export({ type: 'spki', format: 'pem' }) }; };
 const approver = signingPair(), reconciler = signingPair(), verifier = signingPair();
@@ -82,9 +94,9 @@ async function provider(execute = helper.executeProtectedStoryProvider, before =
 async function callables(f) {
   const key = `story-provider-callable-${++sequence}`;
   class HttpsError extends Error { constructor(code, message) { super(message); this.code = code; } }
-  globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: persistence.reconcileStoryPersistence, buildInitialStoryVersionRecord: value => value, ...helper, ...f.provider };
+  globalThis[key] = { initializeApp: () => {}, FieldValue: { increment: value => ({ increment: value }) }, getFirestore: () => f.db, HttpsError, onCall: (...args) => args.at(-1), defineSecret: () => ({ value: () => 'SYNTHETIC-unused-bridge' }), z, auditLog: () => {}, reconcileStoryPersistence: persistence.reconcileStoryPersistence, ...version, ...requestBinding, ...admission, ...voiceoverGuard, ...voiceoverAdmission, ...mediaContract, ...helper, ...f.provider };
   const source = stripTypeScriptTypes(callerSource).replace(/^import[\s\S]*?from "[^\"]+";\n/gm, '');
-  try { return await importSource(`import { createHash } from 'node:crypto'; const { initializeApp, FieldValue, getFirestore, HttpsError, onCall, defineSecret, z, auditLog, reconcileStoryPersistence, buildInitialStoryVersionRecord, storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, generateStoryWithProvider, getStoryProviderCostPreflight, getStoryProviderReadiness } = globalThis[${JSON.stringify(key)}];\n${source}`); }
+  try { return await importSource(`import { createHash } from 'node:crypto'; const { initializeApp, FieldValue, getFirestore, HttpsError, onCall, defineSecret, z, auditLog, reconcileStoryPersistence, buildInitialStoryVersionRecord, sameStorytimeGenerationBinding, isReusableStorytimeSession, isValidStorytimeSessionId, heldStorytimeAdmissionRecord, isClearedStorytimeAdmissionGuard, StorytimeNarratorDeliverySchema, boundStorytimeRemoteJob, confirmedStorytimeOutputDeletion, hasStorytimeOutputTombstone, preservedStorytimeTerminalStatus, stageStorytimeVoiceoverConsent, completeStorytimeVoiceoverDispatch, markStorytimeVoiceoverDispatchUncertain, StorytimeVoiceoverAdmissionDenied, storySourceJson, storySpendHash, storytimeSpendWorkerTokensSecret, generateStoryWithProvider, getStoryProviderCostPreflight, getStoryProviderReadiness } = globalThis[${JSON.stringify(key)}];\n${source}`); }
   finally { delete globalThis[key]; }
 }
 const syntheticInput = () => ({ title: 'SYNTHETIC story', sourceText: 'A synthetic tree grows in a fictional garden.', emotionalTone: 'gentle', symbolicMotifs: ['tree'], locale: 'en-US', audienceAgeBand: 'family' });
@@ -103,6 +115,14 @@ async function fixture(run) {
   try {
     const f = storage(); f.provider = await provider(); f.input = syntheticInput(); f.callableInput = callableInput(f.input);
     f.authority = { userId: 'synthetic-owner', requestId: f.callableInput.requestId, reviewedRequestSha256: reviewedHash(f.callableInput) };
+    // Explicit synthetic prior-charge clearance for this policy harness only.
+    // This is never a canonical Privacy receipt or independent spend approval.
+    f.admissionPath = 'storytimeGenerationAdmissionGuards/' + f.authority.userId;
+    f.rows.set(f.admissionPath, {
+      schemaVersion: 'storytime-generation-admission-v1', userId: f.authority.userId,
+      state: 'ready', activeRequestId: null, legacyRequestsReconciled: true,
+      providerChargesReconciled: true, clearanceReceiptSha256: 'a'.repeat(64),
+    });
     let exact;
     const probe = await provider(async (...args) => { exact = args[3]; return { result: { output: {}, receipt: {} }, spend: {} }; });
     await probe.generateStoryWithProvider(f.input, f.authority, f.db);
@@ -150,9 +170,36 @@ async function fixture(run) {
       return Response.json(providerPayload(), { headers: { 'x-request-id': 'synthetic-provider-request' } });
     };
     f.generate = () => f.provider.generateStoryWithProvider(f.input, f.authority, f.db);
-    f.generateCallable = async () => { f.rows.delete(f.claimPath); const c = await callables(f); return c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }); };
+    f.generateCallable = async ({ preserveClaim = false } = {}) => { if (!preserveClaim) f.rows.delete(f.claimPath); const c = await callables(f); return c.generateStorySession({ auth: { uid: f.authority.userId, token: { email_verified: true } }, data: f.callableInput }); };
     return await run(f);
   } finally { process.chdir(repositoryRoot); globalThis.fetch = originalFetch; for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } rmSync(temp, { recursive: true, force: true }); }
+}
+
+// The synthetic clearance above must not obscure production's default hold.
+for (const [name, change] of [
+  ['missing', f => f.rows.delete(f.admissionPath)],
+  ['held', f => { f.rows.get(f.admissionPath).state = 'held'; }],
+  ['foreign owner', f => { f.rows.get(f.admissionPath).userId = 'foreign-owner'; }],
+  ['unreconciled charges', f => { f.rows.get(f.admissionPath).providerChargesReconciled = false; }],
+  ['unreconciled legacy requests', f => { f.rows.get(f.admissionPath).legacyRequestsReconciled = false; }],
+  ['missing clearance receipt', f => { f.rows.get(f.admissionPath).clearanceReceiptSha256 = null; }],
+]) test('current callable rejects ' + name + ' admission without provider or gateway calls', () => fixture(async f => {
+  change(f);
+  await assert.rejects(f.generateCallable(), error => error.code === 'failed-precondition');
+  assert.equal(f.providerRequests.length, 0);
+  assert.deepEqual(f.gatewayActions, []);
+  assert.equal(f.rows.has(f.claimPath), false);
+}));
+
+for (const status of ['requires_reconciliation', 'failed', 'needs_review', 'legacy_unknown']) {
+  test('current callable never replaces existing ' + status + ' claim with fresh admission', () => fixture(async f => {
+    f.rows.get(f.claimPath).status = status;
+    const original = structuredClone(f.rows.get(f.claimPath));
+    await assert.rejects(f.generateCallable({ preserveClaim: true }), error => error.code === 'failed-precondition');
+    assert.deepEqual(f.rows.get(f.claimPath), original);
+    assert.equal(f.providerRequests.length, 0);
+    assert.deepEqual(f.gatewayActions, []);
+  }));
 }
 
 const issuerChanges = [
