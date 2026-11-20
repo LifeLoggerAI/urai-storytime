@@ -211,6 +211,12 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // R1586: named family sharing is a server-only projection, never a
+    // Firestore client-side relationship grant or raw private record access.
+    match /familyStoryViewGrants/{id} { allow read, write: if false; }
+    match /familyStorySharingStates/{id} { allow read, write: if false; }
+    match /consentDecisionReceipts/{id} { allow read, write: if false; }
+
     match /publicStoryShareControls/{id} {
       allow read: if signedIn() && resource.data.userId == request.auth.uid;
       allow create, update, delete: if false;
