@@ -94,16 +94,16 @@ service cloud.firestore {
       allow update: if canManageFamily(resource.data.familyId) || isAdmin();
       allow delete: if false;
     }
+    // R1603 REVIEW/HOLD: legacy family membership is NOT an exact story grant.
+    // These legacy collections predate owner/recipient-specific signed consent.
+    // Preserve their documents for export/migration under server authority;
+    // reject ALL direct client CRUD until a separately reviewed authorized
+    // family-scoped projection exists. Admin SDK bypass is independent of Rules.
     match /stories/{storyId} {
-      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
-      allow create: if canManageFamily(request.resource.data.familyId);
-      allow update: if canManageFamily(resource.data.familyId) || isAdmin();
-      allow delete: if false;
+      allow read, write: if false;
     }
     match /storyRuns/{runId} {
-      allow read: if isFamilyMember(resource.data.familyId) || isAdmin();
-      allow create: if canManageFamily(request.resource.data.familyId);
-      allow update, delete: if false;
+      allow read, write: if false;
     }
     match /storySafetyReports/{reportId} {
       allow read: if isSelf(resource.data.userId) || isAdmin();
