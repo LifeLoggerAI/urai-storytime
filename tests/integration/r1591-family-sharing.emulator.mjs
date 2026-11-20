@@ -9,7 +9,8 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-import { createHash } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
+import { canonicalFamilyPrivacyReceiptBytes } from "../../functions/lib/family-privacy-receipt-signature.js";
 
 const projectId = "demo-urai-family-r1591";
 assert.equal(process.env.GCLOUD_PROJECT, projectId);
@@ -93,15 +94,34 @@ await check("real emulator-issued distinct verified Firebase identities", async 
 await check("no receipt means grant denied",()=>denied(()=>grant()));
 await check("no grant means Mom denied",()=>denied(()=>view()));
 await check("anonymous caller denied",()=>denied(()=>view(null)));
-await pRef.set({
-  schemaVersion: "storytime-consent-decision-receipt-v1", id: receiptId,
-  userId: ownerUid, sourceSessionId: sessionId, recipientUid,
-  sourceVersionId: "v1", shareEpoch: 0,
-  purpose: "storytime.family_share", policyVersion: "family-story-share-v1",
-  decision: "authorized", revoked: false, issuedBy: "urai-privacy", expiresAt: expiry,
-  testFixtureOnly: true
+const testPrivateKey = process.env.TEST_ONLY_FAMILY_PRIVATE_KEY_PKCS8_B64;
+if(!testPrivateKey) throw Error("Local-only synthetic test signer required");
+const signedFields = {
+  schemaVersion:"storytime-consent-decision-receipt-v1",id:receiptId,userId:ownerUid,
+  sourceSessionId:sessionId,recipientUid,sourceVersionId:"v1",shareEpoch:0,
+  purpose:"storytime.family_share",policyVersion:"family-story-share-v1",
+  decision:"authorized",issuedBy:"urai-privacy",
+  approvedProjectionSha256:createHash("sha256").update(JSON.stringify({
+    sourceSystem:"urai-storytime",ownerUid,sessionId,versionId:"v1",
+    title:story.title,summary:"A synthetic family memory."
+  })).digest("hex"),expiresAtMs:expiry.toMillis()
+};
+const key=createPrivateKey({key:Buffer.from(testPrivateKey,"base64"),format:"der",type:"pkcs8"});
+const issuerSignature=sign(null,canonicalFamilyPrivacyReceiptBytes(signedFields),key).toString("base64url");
+const {expiresAtMs:_expiry,...record}=signedFields;
+await pRef.set({...record,expiresAt:expiry,revoked:false,testFixtureOnly:true,
+  issuerKeyId:process.env.STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID,issuerSignature});
+console.log("BOUNDARY: local synthetic signed receipt; NOT canonical Privacy issuance.");
+await check("forged signed Privacy receipt cannot grant",async()=>{
+  await pRef.update({issuerSignature:"A".repeat(86)});
+  await denied(()=>grant());
+  await pRef.update({issuerSignature});
 });
-console.log("BOUNDARY: positive receipt is administrator-seeded FIXTURE, not canonical Privacy issuance.");
+await check("altered signed recipient cannot grant",async()=>{
+  await pRef.update({recipientUid:people.outsider.uid});
+  await denied(()=>grant());
+  await pRef.update({recipientUid});
+});
 await check("outsider cannot issue Grandma grant",()=>denied(()=>grant(people.outsider)));
 await check("verified Grandma grants exact memory using seeded receipt fixture",async()=>{
   const result=await grant(); assert.equal(result.granted,true); assert.equal(result.recipientUid,recipientUid);

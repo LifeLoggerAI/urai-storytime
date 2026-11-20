@@ -12,6 +12,7 @@ import { getAuth } from "firebase-admin/auth";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { requireCurrentStorytimeOwner } from "./privacy-actor.js";
+import { verifyFamilyPrivacyReceiptSignature, type FamilyPrivacySignedFields } from "./family-privacy-receipt-signature.js";
 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
@@ -32,6 +33,27 @@ function enabled() {
 function hid(sessionId: string, recipientUid: string) {
   return createHash("sha256").update(JSON.stringify([sessionId, recipientUid])).digest("hex");
 }
+/** Bind the precise sanitized text approved by the owner to the canonical
+ * purpose/recipient consent receipt. Version-only matching is insufficient:
+ * a chapter summary may be edited without changing a session version.
+ */
+function approvedProjection(story: Record<string, any>, chapter: Record<string, any>, ownerUid: string, sessionId: string) {
+  if (typeof story.title !== "string" || !story.title.trim() || story.title.length > 200
+    || chapter.userId !== ownerUid || chapter.sessionId !== sessionId
+    || typeof chapter.summary !== "string" || !chapter.summary.trim()
+    || chapter.summary.length > 4000) throw safeError();
+  const title = story.title, summary = chapter.summary;
+  const digest = createHash("sha256").update(JSON.stringify({
+    sourceSystem: "urai-storytime", ownerUid, sessionId,
+    versionId: story.currentVersionId, title, summary,
+  })).digest("hex");
+  return { title, summary, digest };
+}
+function chapterRefFor(story: Record<string, any>) {
+  const ids = story.chapterIds;
+  if (!Array.isArray(ids) || ids.length !== 1 || !ID.safeParse(ids[0]).success) throw safeError();
+  return db.collection("storyChapters").doc(ids[0] as string);
+}
 function safeError() {
   return new HttpsError("permission-denied", "This family story is not available.");
 }
@@ -45,9 +67,20 @@ function activeSource(session: Record<string, any>, ownerUid: string) {
 }
 function currentReceipt(receipt: Record<string, any>, input: {
   ownerUid: string; sessionId: string; recipientUid: string; consentReceiptId: string;
-  versionId: string; epoch: number; nowMs: number;
+  versionId: string; epoch: number; nowMs: number; projectionDigest: string;
 }) {
-  return receipt.schemaVersion === "storytime-consent-decision-receipt-v1"
+  const signed: FamilyPrivacySignedFields = {
+    schemaVersion: receipt.schemaVersion,
+    id: receipt.id, userId: receipt.userId,
+    sourceSessionId: receipt.sourceSessionId, recipientUid: receipt.recipientUid,
+    sourceVersionId: receipt.sourceVersionId, shareEpoch: receipt.shareEpoch,
+    purpose: receipt.purpose, policyVersion: receipt.policyVersion,
+    decision: receipt.decision, issuedBy: receipt.issuedBy,
+    approvedProjectionSha256: receipt.approvedProjectionSha256,
+    expiresAtMs: receipt.expiresAt instanceof Timestamp ? receipt.expiresAt.toMillis() : -1,
+  };
+  return verifyFamilyPrivacyReceiptSignature(signed, receipt.issuerSignature, receipt.issuerKeyId)
+    && receipt.schemaVersion === "storytime-consent-decision-receipt-v1"
     && receipt.id === input.consentReceiptId
     && receipt.userId === input.ownerUid
     && receipt.sourceSessionId === input.sessionId
@@ -57,6 +90,7 @@ function currentReceipt(receipt: Record<string, any>, input: {
     && receipt.purpose === purpose && receipt.policyVersion === policyVersion
     && receipt.decision === "authorized" && receipt.revoked !== true
     && receipt.issuedBy === "urai-privacy"
+    && receipt.approvedProjectionSha256 === input.projectionDigest
     && receipt.expiresAt instanceof Timestamp
     && receipt.expiresAt.toMillis() > input.nowMs;
 }
@@ -115,10 +149,13 @@ export const grantFamilyStoryView = onCall(async (request) => {
     await assertNoDeletionFence(tx, ownerUid, recipientUid);
     const story = s.data() ?? {}, receipt = p.data() ?? {}, epoch = readEpoch(e.data());
     const nowMs = Date.now();
-    if (!s.exists || !activeSource(story, ownerUid)
-      || !p.exists || !currentReceipt(receipt, {
+    if (!s.exists || !activeSource(story, ownerUid)) throw safeError();
+    const chapterSnap = await tx.get(chapterRefFor(story));
+    if (!chapterSnap.exists) throw safeError();
+    const projection = approvedProjection(story, chapterSnap.data() ?? {}, ownerUid, sessionId);
+    if (!p.exists || !currentReceipt(receipt, {
         ownerUid, sessionId, recipientUid, consentReceiptId,
-        versionId: story.currentVersionId, epoch, nowMs
+        versionId: story.currentVersionId, epoch, nowMs, projectionDigest: projection.digest
       })) throw safeError();
     const expiry = Math.min(nowMs + expiresInDays * 86_400_000, receipt.expiresAt.toMillis());
     if (expiry <= nowMs) throw safeError();
@@ -128,6 +165,7 @@ export const grantFamilyStoryView = onCall(async (request) => {
       schemaVersion: "storytime-named-family-grant-v1",
       sessionId, ownerUid, recipientUid, consentReceiptId,
       sourceVersionId: story.currentVersionId,
+      approvedProjectionSha256: projection.digest,
       shareEpoch: epoch, status: "active", scopes: ["view_story"],
       ownerApproved: true, issuedAt: Timestamp.fromMillis(nowMs),
       expiresAt: Timestamp.fromMillis(expiry), updatedAt: FieldValue.serverTimestamp(),
@@ -166,26 +204,23 @@ export const getFamilyStoryView = onCall(async (request) => {
       || !(grant.expiresAt instanceof Timestamp)
       || grant.expiresAt.toMillis() <= nowMs
       || typeof grant.consentReceiptId !== "string") throw safeError();
+    const chapterSnapshot = await tx.get(chapterRefFor(story));
+    if (!chapterSnapshot.exists) throw safeError();
+    const projection = approvedProjection(story, chapterSnapshot.data() ?? {}, ownerUid, sessionId);
+    if (grant.approvedProjectionSha256 !== projection.digest) throw safeError();
     const receiptSnap = await tx.get(db.collection("consentDecisionReceipts").doc(grant.consentReceiptId));
     if (!receiptSnap.exists || !currentReceipt(receiptSnap.data() ?? {}, {
       ownerUid, sessionId, recipientUid, consentReceiptId: grant.consentReceiptId,
-      versionId: story.currentVersionId, epoch, nowMs
+      versionId: story.currentVersionId, epoch, nowMs, projectionDigest: projection.digest
     })) throw safeError();
-    const chapterIds = story.chapterIds;
-    if (!Array.isArray(chapterIds) || chapterIds.length !== 1 || !ID.safeParse(chapterIds[0]).success) throw safeError();
-    const chapterSnapshot = await tx.get(db.collection("storyChapters").doc(chapterIds[0]));
-    const chapter = chapterSnapshot.data() ?? {};
-    if (!chapterSnapshot.exists || chapter.userId !== ownerUid
-      || chapter.sessionId !== sessionId || typeof chapter.summary !== "string"
-      || chapter.summary.length > 4000 || typeof story.title !== "string"
-      || story.title.length > 200) throw safeError();
-    // Only the owner-approved synthetic/story summary is exposed by this pilot.
-    return { sessionId, ownerUid, title: story.title, summary: chapter.summary,
+    // Only signed, exact owner-approved projection; do not leak nested provenance.
+    return { sessionId, ownerUid, title: projection.title, summary: projection.summary,
       provenance: { type: provenanceLabel(story.provenance?.sourceType),
         factualStatus: provenanceLabel(story.provenance?.factualStatus) } };
   });
-  await verifiedActor(request);
+  // Recheck the source-owner account and recipient after the transaction.
   await requireActiveSourceOwner(ownerUid);
+  await verifiedActor(request);
   return projection;
 });
 
