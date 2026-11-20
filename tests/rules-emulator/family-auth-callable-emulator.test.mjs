@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
@@ -82,12 +83,18 @@ test("auth-emulator-issued Grandma token allows one specific consented story to 
       id:chapterId,userId:grandma.uid,sessionId,summary:"Synthetic story summary for "+sessionId
     });
   }
+  const summary = "Synthetic story summary for "+first;
+  const approvedProjectionSha256 = createHash("sha256").update(JSON.stringify({
+    sourceSystem:"urai-storytime", ownerUid:grandma.uid, sessionId:first, versionId:version,
+    title:"Synthetic grandma shared childhood story", summary
+  })).digest("hex");
   await db.collection("consentDecisionReceipts").doc(receiptId).set({
     schemaVersion:"storytime-consent-decision-receipt-v1",id:receiptId,
     userId:grandma.uid,sourceSessionId:first,recipientUid:mom.uid,
     sourceVersionId:version,shareEpoch:0,purpose:"storytime.family_share",
     policyVersion:"family-story-share-v1",decision:"authorized",revoked:false,
-    issuedBy:"urai-privacy",expiresAt:Timestamp.fromMillis(Date.now()+86400000)
+    issuedBy:"urai-privacy",approvedProjectionSha256,
+    expiresAt:Timestamp.fromMillis(Date.now()+86400000)
   }); // EMULATOR-SEEDED FAKE RECEIPT; NOT CANONICAL PRODUCTION PRIVACY
   const g=await grantFamilyStoryView.run(req(grandma,{
     sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
@@ -98,6 +105,12 @@ test("auth-emulator-issued Grandma token allows one specific consented story to 
   assert.equal(view.summary,"Synthetic story summary for "+first);
   assert.deepEqual(Object.keys(view).sort(),["ownerUid","provenance","sessionId","summary","title"].sort());
   assert.ok(!JSON.stringify(view).includes("Synthetic private family recording"));
+  // A later edited summary is never silently shared under the old grant.
+  await db.collection("storyChapters").doc("synthetic-chapter-one").update({
+    summary:"Synthetic edited text not approved by the owner"
+  });
+  await rejects(getFamilyStoryView,req(mom,{sessionId:first,ownerUid:grandma.uid}));
+  await db.collection("storyChapters").doc("synthetic-chapter-one").update({summary});
   await rejects(getFamilyStoryView,req(mom,{sessionId:second,ownerUid:grandma.uid}));
   await rejects(getFamilyStoryView,req(outsider,{sessionId:first,ownerUid:grandma.uid}));
   await rejects(grantFamilyStoryView,req(mom,{
