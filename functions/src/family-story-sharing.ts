@@ -12,6 +12,7 @@ import { getAuth } from "firebase-admin/auth";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { requireCurrentStorytimeOwner } from "./privacy-actor.js";
+import { verifyFamilyPrivacyReceiptSignature, type FamilyPrivacySignedFields } from "./family-privacy-receipt-signature.js";
 
 if (!getApps().length) initializeApp();
 const db = getFirestore();
@@ -68,7 +69,18 @@ function currentReceipt(receipt: Record<string, any>, input: {
   ownerUid: string; sessionId: string; recipientUid: string; consentReceiptId: string;
   versionId: string; epoch: number; nowMs: number; projectionDigest: string;
 }) {
-  return receipt.schemaVersion === "storytime-consent-decision-receipt-v1"
+  const signed: FamilyPrivacySignedFields = {
+    schemaVersion: receipt.schemaVersion,
+    id: receipt.id, userId: receipt.userId,
+    sourceSessionId: receipt.sourceSessionId, recipientUid: receipt.recipientUid,
+    sourceVersionId: receipt.sourceVersionId, shareEpoch: receipt.shareEpoch,
+    purpose: receipt.purpose, policyVersion: receipt.policyVersion,
+    decision: receipt.decision, issuedBy: receipt.issuedBy,
+    approvedProjectionSha256: receipt.approvedProjectionSha256,
+    expiresAtMs: receipt.expiresAt instanceof Timestamp ? receipt.expiresAt.toMillis() : -1,
+  };
+  return verifyFamilyPrivacyReceiptSignature(signed, receipt.issuerSignature, receipt.issuerKeyId)
+    && receipt.schemaVersion === "storytime-consent-decision-receipt-v1"
     && receipt.id === input.consentReceiptId
     && receipt.userId === input.ownerUid
     && receipt.sourceSessionId === input.sessionId
