@@ -156,6 +156,10 @@ export const getFamilyStoryView = onCall(async (request) => {
   if (!parsed.success) throw new HttpsError("invalid-argument", "Invalid family story request.");
   const { sessionId, ownerUid } = parsed.data;
   if (recipientUid === ownerUid) throw safeError(); // owners use existing owner-only APIs
+  // A still-active named grant does not outlive the source owner's Firebase
+  // account. This must be checked outside the Firestore transaction too.
+  const ownerAccount = await getAuth().getUser(ownerUid).catch(() => { throw safeError(); });
+  if (ownerAccount.disabled || !ownerAccount.emailVerified) throw safeError();
   const projection = await db.runTransaction(async (tx: Transaction) => {
     const sRef = db.collection("storySessions").doc(sessionId);
     const gRef = grantRef(sessionId, recipientUid), eRef = stateRef(sessionId);
@@ -186,6 +190,9 @@ export const getFamilyStoryView = onCall(async (request) => {
       provenance: { type: story.provenance?.sourceType ?? "unverified",
         factualStatus: story.provenance?.factualStatus ?? "unverified" } };
   });
+  // Final deny on account deactivation during the asynchronous transaction.
+  const currentOwner = await getAuth().getUser(ownerUid).catch(() => { throw safeError(); });
+  if (currentOwner.disabled || !currentOwner.emailVerified) throw safeError();
   await verifiedActor(request);
   return projection;
 });
