@@ -117,6 +117,18 @@ test("auth-emulator-issued Grandma token allows one specific consented story to 
   }));
   await db.collection("consentDecisionReceipts").doc(receiptId).update({issuerSignature:receipt.issuerSignature});
   // This is only a SYNTHETIC TEST KEY, not a canonical Privacy-issued signature.
+  const expectedKeyId = process.env.STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID;
+  const approvedPublicKey = process.env.STORYTIME_FAMILY_PRIVACY_ED25519_PUBLIC_KEY_SPKI_B64;
+  delete process.env.STORYTIME_FAMILY_PRIVACY_ED25519_PUBLIC_KEY_SPKI_B64;
+  await rejects(grantFamilyStoryView,req(grandma,{
+    sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
+  }));
+  process.env.STORYTIME_FAMILY_PRIVACY_ED25519_PUBLIC_KEY_SPKI_B64 = approvedPublicKey;
+  process.env.STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID = "unapproved-test-issuer";
+  await rejects(grantFamilyStoryView,req(grandma,{
+    sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
+  }));
+  process.env.STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID = expectedKeyId;
   const g=await grantFamilyStoryView.run(req(grandma,{
     sessionId:first,recipientUid:mom.uid,consentReceiptId:receiptId,expiresInDays:1
   }));
