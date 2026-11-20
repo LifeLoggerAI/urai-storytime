@@ -155,6 +155,18 @@ await check("recipient canonical deletion fence denies projection and grant",asy
   const ref=db.collection("privacyDeletionTombstones").doc(recipientUid);
   await ref.set({active:true}); await denied(()=>view()); await denied(()=>grant()); await ref.delete();
 });
+for (const [role,uid] of [["owner",ownerUid],["recipient",recipientUid]]) {
+  for (const collection of ["accountDeletionFences","privacyDeletionTombstones"]) {
+    await check(role+" "+collection+" present but inactive-looking denies existing view and new grant",async()=>{
+      const fenceRef=db.collection(collection).doc(uid);
+      await fenceRef.set({active:false,note:"synthetic legacy fixture"});
+      try { await denied(()=>view()); await denied(()=>grant()); }
+      finally { await fenceRef.delete(); }
+      const restored=await view();
+      assert.equal(restored.sessionId,sessionId);
+    });
+  }
+}
 await check("disabled source owner denies existing recipient projection",async()=>{
   await auth.updateUser(ownerUid,{disabled:true}); await denied(()=>view()); await auth.updateUser(ownerUid,{disabled:false});
 });
