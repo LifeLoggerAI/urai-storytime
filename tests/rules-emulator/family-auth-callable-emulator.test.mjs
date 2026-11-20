@@ -16,8 +16,19 @@ const projectId = "demo-urai-family-r1586";
 if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_HOST) {
   throw new Error("Both Firebase Auth and Firestore emulators required; never run against cloud.");
 }
-if (process.env.GCLOUD_PROJECT !== projectId || process.env.FIREBASE_CONFIG) {
-  throw new Error("Use only exact isolated synthetic emulator project.");
+// Firebase CLI injects FIREBASE_CONFIG for emulator executions. Validate its
+// project identity rather than rejecting the legitimate injected configuration.
+let firebaseConfig = {};
+try {
+  firebaseConfig = process.env.FIREBASE_CONFIG ? JSON.parse(process.env.FIREBASE_CONFIG) : {};
+} catch {
+  throw new Error("Firebase emulator config must be valid JSON.");
+}
+if ((process.env.GCLOUD_PROJECT !== projectId && process.env.GOOGLE_CLOUD_PROJECT !== projectId)
+    || (firebaseConfig.projectId && firebaseConfig.projectId !== projectId)
+    || !/^127[.]0[.]0[.]1:[0-9]+$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST)
+    || !/^127[.]0[.]0[.]1:[0-9]+$/.test(process.env.FIRESTORE_EMULATOR_HOST)) {
+  throw new Error("Use only the exact isolated localhost synthetic Firebase emulator project.");
 }
 process.env.STORYTIME_FAMILY_SHARING_ENABLED = "true"; // TEST PROCESS ONLY
 if (!getApps().length) initializeApp({projectId});

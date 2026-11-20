@@ -13,8 +13,22 @@ const ts = require('typescript');
 function fixture() {
   const auth = { currentUser: null };
   const docs = new Map();
-  const states = [];
-  let stateIndex = 0, effects = [], callback, cleanup;
+  const states = [], refs = [];
+  let stateIndex = 0, refIndex = 0, effects = [], callback, cleanup;
+  // Load the real pure policy dependencies; the mounted component now binds
+  // asynchronous work to exact Firebase User objects and persistent refs.
+  const policyModules = new Map();
+  function policy(name) {
+    if (policyModules.has(name)) return policyModules.get(name);
+    const file = path.resolve('src', name.slice(2) + '.ts');
+    const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+    }).outputText;
+    const module = { exports: {} };
+    vm.runInNewContext(code, { module, exports: module.exports, require });
+    policyModules.set(name, module.exports);
+    return module.exports;
+  }
   const hooks = { beforeRead: null };
   const writes = [];
   const stubs = {
@@ -34,6 +48,11 @@ function fixture() {
         if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
         return [states[index], next => { states[index] = typeof next === 'function' ? next(states[index]) : next; }];
       },
+      useRef: initial => {
+        const index = refIndex++;
+        if (!(index in refs)) refs[index] = { current: initial };
+        return refs[index];
+      },
       useMemo: fn => fn(),
       useEffect: fn => { effects.push(fn); },
     },
@@ -48,10 +67,11 @@ function fixture() {
   const module = { exports: {} };
   vm.runInNewContext(code, {
     module, exports: module.exports,
-    require: name => stubs[name] ?? (name.startsWith('./') ? {} : require(name)),
+    require: name => stubs[name] ?? (name.startsWith('@/lib/storytime/') ? policy(name)
+      : name.startsWith('./') ? {} : require(name)),
     URLSearchParams, window: { location: { search: '?draft=private-draft' } }, console,
   });
-  function render() { stateIndex = 0; effects = []; return module.exports.StorytimeHome(); }
+  function render() { stateIndex = 0; refIndex = 0; effects = []; return module.exports.StorytimeHome(); }
   render(); cleanup = effects[0]();
   return { auth, docs, hooks, writes, render,
     notify: user => { auth.currentUser = user; return callback(user); },
@@ -67,6 +87,17 @@ function find(tree, predicate) {
     const result = find(child, predicate); if (result) return result;
   }
   return null;
+}
+function assertProtectedFormHidden(f) {
+  const tree = f.render();
+  assert.equal(find(tree, item => item.type === 'input'), null);
+  assert.equal(find(tree, item => item.type === 'textarea'), null);
+  assert.equal(tree.type, 'main');
+  assert.equal(tree.props.role, 'status');
+  assert.equal(tree.props['aria-busy'], true);
+  assert.match(tree.props.children, /Checking private Storytime account/);
+  assert.doesNotMatch(JSON.stringify(tree), /Private owner title|Private owner memory/);
+  assert.deepEqual(f.writes, []);
 }
 function title(f) { return find(f.render(), item => item.type === 'input' && item.props.maxLength === 120)?.props.value; }
 function sourceText(f) { return find(f.render(), item => item.type === 'textarea')?.props.value; }
@@ -104,7 +135,7 @@ test('a callback for an obsolete Auth object cannot publish a private draft even
   f.hooks.beforeRead = () => gate.promise;
   const pending = f.notify({ uid: 'owner' }); f.auth.currentUser = { uid: 'foreign' };
   gate.release(); await pending;
-  assert.equal(title(f), ''); assert.equal(sourceText(f), '');
+  assertProtectedFormHidden(f);
 });
 
 test('foreign draft records remain unavailable even if a transport returns their data', async () => {
@@ -116,5 +147,5 @@ test('unmounted private draft completion cannot repopulate the form', async () =
   const f = fixture(); f.docs.set('private-draft', draft()); const gate = pause();
   f.hooks.beforeRead = () => gate.promise;
   const pending = f.notify({ uid: 'owner' }); f.dispose(); gate.release(); await pending;
-  assert.equal(title(f), ''); assert.equal(sourceText(f), '');
+  assertProtectedFormHidden(f);
 });

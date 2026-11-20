@@ -18,7 +18,8 @@ test('account source includes email verification and password recovery without r
 });
 
 test('cloud story generation is blocked for unverified email accounts on client and server', () => {
-  assert.match(home, /auth\.currentUser\.emailVerified/);
+  assert.match(home, /const \{ actor, isCurrent \} = captureCurrentActor\(\)/);
+  assert.match(home, /if \(!actor\.emailVerified\) \{/);
   assert.match(home, /Verify the adult\/guardian account email before creating a cloud story/);
   assert.match(storyFunctions, /requireVerifiedAdultAccount\(request\.auth\?\.token\.email_verified\)/);
   assert.match(storyFunctions, /Verify the adult\/guardian account email before creating cloud stories/);

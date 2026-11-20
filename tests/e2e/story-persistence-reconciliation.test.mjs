@@ -55,7 +55,12 @@ test('read failure propagates without writes or provider retry', async () => {
 test('request claim refuses reconciliation terminal status before fresh claim', () => {
   const runtime = readFileSync('functions/src/storytime.ts', 'utf8');
   const claim = runtime.slice(runtime.indexOf('async function claimGenerationRequest'), runtime.indexOf('async function enforceGenerationQuota'));
-  assert.match(claim, /if \(data.status === "requires_reconciliation"\) \{\s*throw new HttpsError\("failed-precondition"/);
+  // Current source holds every remaining existing claim, including reconciliation,
+  // failed and legacy states, before it can consult a fresh admission clearance.
+  const hold = claim.indexOf('throw new HttpsError("failed-precondition", "This Storytime request requires reconciliation');
+  assert.ok(hold > claim.indexOf('if (data.status === "processing")'));
+  assert.ok(hold < claim.indexOf('const guardSnapshot = await transaction.get(admissionRef)'));
+  assert.ok(claim.indexOf('transaction.set(requestRef') > hold);
 });
 test('reconciliation transaction failure cannot report persisted success', async () => {
   const f = fixture();

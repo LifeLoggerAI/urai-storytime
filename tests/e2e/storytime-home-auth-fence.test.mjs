@@ -46,7 +46,9 @@ test('autosave, deletion, and generation refuse stale asynchronous completions',
   const submit = source.slice(source.indexOf('async function handleCreateStory'),source.indexOf('// The Auth SDK can change accounts'));
   assert.match(submit, /if \(!isCurrent\(\)\) return;\s*if \(!result\.data\.sessionId/s);
   assert.match(submit, /if \(isCurrent\(\)\) window\.location\.assign/);
-  assert.match(submit, /if \(isCurrent\(\)\) setSubmitError\(errorMessage\(\)\)/);
+  const failure = submit.slice(submit.indexOf('} catch (error) {'), submit.indexOf('} finally {'));
+  assert.match(failure, /if \(isCurrent\(\)\) \{/);
+  assert.match(failure, /setGenerationOutcomeUnknown\(true\);\s*setSubmitError\(errorMessage\(\)\)/);
 });
 
 test('source actor lease rejects other account, same UID new User, and stale epoch', () => {

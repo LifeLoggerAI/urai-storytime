@@ -62,6 +62,6 @@ test('autosave is opt-in and resume restores no generation/provider consent or r
     'Private draft resumed. Generation and provider consent were not restored.'
   ]) assert.ok(home.includes(marker), `missing autosave/resume marker: ${marker}`);
 
-  assert.match(home, /disabled=\{!cloudReady \|\| Boolean\(validationError\) \|\| isSubmitting \|\| draftSaving\}/);
+  assert.match(home, /disabled=\{!cloudReady \|\| Boolean\(validationError\) \|\| isSubmitting \|\| draftSaving \|\| generationOutcomeUnknown\}/);
   assert.match(home, /deleteStoryDraft/);
 });
