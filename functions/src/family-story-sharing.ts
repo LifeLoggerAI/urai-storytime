@@ -101,10 +101,17 @@ async function requireActiveSourceOwner(ownerUid: string) {
   if (owner.uid !== ownerUid || owner.disabled || !owner.emailVerified) throw safeError();
 }
 async function assertNoDeletionFence(tx: Transaction, ...uids: string[]) {
-  const fences = await Promise.all(
-    [...new Set(uids)].map((uid) => tx.get(db.collection("privacyDeletionTombstones").doc(uid)))
-  );
-  if (fences.some((snapshot) => snapshot.data()?.active === true)) throw safeError();
+  // Match Jobs' canonical ownerDeletionFenceRefs/ownerDeletionFenced contract.
+  // Both owner and recipient are fenced if EITHER a pending account deletion
+  // fence or a Privacy deletion tombstone exists. A malformed or legacy
+  // tombstone without an `active` property is still a deletion marker.
+  const unique = [...new Set(uids)];
+  const refs = unique.flatMap((uid) => [
+    db.collection("accountDeletionFences").doc(uid),
+    db.collection("privacyDeletionTombstones").doc(uid),
+  ]);
+  const fences = await Promise.all(refs.map((ref) => tx.get(ref)));
+  if (fences.some((snapshot) => snapshot.exists)) throw safeError();
 }
 function provenanceLabel(value: unknown) {
   // Do not pass nested private metadata through a purported classification.
