@@ -24,6 +24,18 @@ with (logdir / "family-r1591-run.log").open("w") as log:
   log.flush()
   if result.returncode: raise SystemExit(result.returncode)
  run(["npm","--prefix","functions","run","build"])
+ # Synthetic in-memory test key, never a real Privacy authority.
+ import json
+ keygen = subprocess.run(["node","-e",
+  "const {generateKeyPairSync}=require('node:crypto');"
+  "const {publicKey,privateKey}=generateKeyPairSync('ed25519');"
+  "console.log(JSON.stringify({pub:publicKey.export({type:'spki',format:'der'}).toString('base64'),"
+  "priv:privateKey.export({type:'pkcs8',format:'der'}).toString('base64')}))"],
+  env=env,cwd=root,capture_output=True,text=True,check=True)
+ keys=json.loads(keygen.stdout)
+ env["STORYTIME_FAMILY_PRIVACY_ED25519_KEY_ID"]="synthetic-r1591-local-key"
+ env["STORYTIME_FAMILY_PRIVACY_ED25519_PUBLIC_KEY_SPKI_B64"]=keys["pub"]
+ env["TEST_ONLY_FAMILY_PRIVATE_KEY_PKCS8_B64"]=keys["priv"]
  run(["node","--input-type=module","-e",
       "const {grantFamilyStoryView:f}=await import('./functions/lib/family-story-sharing.js');"
       "try{await f.run({data:{}});throw Error('default gate opened')}catch(e){"
