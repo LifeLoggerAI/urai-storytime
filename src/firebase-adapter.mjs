@@ -16,12 +16,33 @@ export const STORYTIME_COLLECTIONS = Object.freeze({
   users: 'users',
   families: 'families',
   childProfiles: 'childProfiles',
+  // Legacy names retained ONLY for old local-demo/import compatibility.
+  // They are NOT approved cloud persistence endpoints.
   stories: 'stories',
   storyRuns: 'storyRuns',
   moderation: 'moderation',
   auditLogs: 'auditLogs',
   privacyRequests: 'privacyRequests',
 });
+
+// R1604: historical family-role collection names are exposed for compatibility
+// with old local records, not as permission to enable cloud reads/writes.
+// Explicitly reject any attempt to promote these paths to direct-client cloud
+// access. Server-owned migration requires a separate reviewed API.
+export const LEGACY_FAMILY_COLLECTIONS = Object.freeze(['stories', 'storyRuns']);
+export const LEGACY_FAMILY_CLOUD_ACCESS = Object.freeze({
+  status: 'denied',
+  access: 'no-direct-client-read-or-write',
+  migration: 'server-reviewed-only',
+  localDemoPreserved: true,
+});
+
+export function assertLegacyFamilyCloudAccessDenied(collectionName) {
+  if (LEGACY_FAMILY_COLLECTIONS.includes(collectionName)) {
+    throw new Error('Legacy family story cloud access is disabled. Use a reviewed owner-scoped server API.');
+  }
+  return true;
+}
 
 export const REQUIRED_FIREBASE_CONFIG_KEYS = Object.freeze([
   'apiKey',
@@ -62,6 +83,7 @@ export function createFirebaseRuntime(config = {}, status = FIREBASE_READINESS_S
     missingConfig: configValidation.missing,
     readiness: status,
     collections: STORYTIME_COLLECTIONS,
+    legacyFamilyCloudAccess: LEGACY_FAMILY_CLOUD_ACCESS,
     cloudSyncEnabled: false,
   };
 }
