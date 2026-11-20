@@ -111,6 +111,11 @@ test("auth-emulator-issued Grandma token allows one specific consented story to 
   });
   await rejects(getFamilyStoryView,req(mom,{sessionId:first,ownerUid:grandma.uid}));
   await db.collection("storyChapters").doc("synthetic-chapter-one").update({summary});
+  // Even a previously approved grant is unusable if the source owner account
+  // is disabled, independently of the recipient token and receipt status.
+  await auth.updateUser(grandma.uid,{disabled:true});
+  await rejects(getFamilyStoryView,req(mom,{sessionId:first,ownerUid:grandma.uid}));
+  await auth.updateUser(grandma.uid,{disabled:false});
   await rejects(getFamilyStoryView,req(mom,{sessionId:second,ownerUid:grandma.uid}));
   await rejects(getFamilyStoryView,req(outsider,{sessionId:first,ownerUid:grandma.uid}));
   await rejects(grantFamilyStoryView,req(mom,{
